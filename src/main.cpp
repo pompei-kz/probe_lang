@@ -99,7 +99,7 @@ int main(int /*argc*/, char * /*argv*/[])
               bool shift = (mod & SDL_KMOD_SHIFT) != 0;
               switch (ev.key.key) {
                 case SDLK_TAB:
-                  app.dlg.focus = (app.dlg.focus + (shift ? 4 : 1)) % 5;
+                  app.dlg.focus = (app.dlg.focus + (shift ? 5 : 1)) % 6;
                   break;
                 case SDLK_ESCAPE:
                   app.dlg.open = false;
@@ -107,7 +107,7 @@ int main(int /*argc*/, char * /*argv*/[])
                   break;
                 case SDLK_RETURN:
                 case SDLK_KP_ENTER:
-                  if (app.dlg.focus < 4) {
+                  if (app.dlg.focus < 5) {
                     app.dlg.focus++;
                   } else if (Conn c = app.dlg.to_conn();
                              !c.name.empty() && !c.host.empty()) {

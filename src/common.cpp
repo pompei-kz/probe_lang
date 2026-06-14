@@ -31,7 +31,7 @@ void draw_pencil(SDL_Renderer *r, float cx, float cy, float sz, Clr c)
 }
 
 // ── dialog ────────────────────────────────────────────────────────────────────
-static constexpr float DW = 440, DH = 500, FH = 28.f, FS_STEP = 58.f;
+static constexpr float DW = 440, DH = 560, FH = 28.f, FS_STEP = 58.f;
 
 int dlg_render(SDL_Renderer *ren, Dlg &d, const DlgMouse &m)
 {
@@ -55,7 +55,7 @@ int dlg_render(SDL_Renderer *ren, Dlg &d, const DlgMouse &m)
     const char *lbl;
     int         idx;
   };
-  constexpr FieldDef fields[5] = {{"Name", 0}, {"Host", 1}, {"Port", 2}, {"User", 3}, {"Password", 4}};
+  constexpr FieldDef fields[6] = {{"Name", 0}, {"Host", 1}, {"Port", 2}, {"DB Name", 3}, {"User", 4}, {"Password", 5}};
   float              fw = DW - 32, ct = dy + 48;
   float              text_ox = dx + 16.f + 6.f;
 
@@ -84,7 +84,7 @@ int dlg_render(SDL_Renderer *ren, Dlg &d, const DlgMouse &m)
 
   // ── Test Connection button ────────────────────────────────────────────────
   constexpr float BH = 30.f, BW_T = 170.f, BW_S = 90.f, BW_C = 80.f;
-  float           test_btn_y = ct + 5 * FS_STEP + 2;
+  float           test_btn_y = ct + 6 * FS_STEP + 2;
   bool            h_test     = hit(m.mx, m.my, dx + 16, test_btn_y, BW_T, BH);
   fill(ren, h_test ? C_HOVER : C_BORDER, dx + 16, test_btn_y, BW_T, BH);
   text_draw(ren, "Test connection",
@@ -94,14 +94,16 @@ int dlg_render(SDL_Renderer *ren, Dlg &d, const DlgMouse &m)
   if (m.ldown && h_test && !d.ctx_menu.open) {
     d.err = "";
     auto [ok, msg]  = test_connection(d.editors[1].buf, d.editors[2].buf,
-                                      d.editors[3].buf, d.editors[4].buf);
+                                      d.editors[3].buf, d.editors[4].buf,
+                                      d.editors[5].buf);
     d.test_ok  = ok;
     d.test_msg = msg;
     if (ok) {
-      d.snap_host = d.editors[1].buf;
-      d.snap_port = d.editors[2].buf;
-      d.snap_user = d.editors[3].buf;
-      d.snap_pass = d.editors[4].buf;
+      d.snap_host   = d.editors[1].buf;
+      d.snap_port   = d.editors[2].buf;
+      d.snap_dbname = d.editors[3].buf;
+      d.snap_user   = d.editors[4].buf;
+      d.snap_pass   = d.editors[5].buf;
     }
   }
 
@@ -296,7 +298,7 @@ void panel_render(SDL_Renderer *ren, App &app, bool click, bool rclick, bool dbl
     } else {
       // Присоединиться: verify connection, mark connected, persist
       auto [ok, err] = test_connection(node.conn.host, node.conn.port,
-                                       node.conn.user, node.conn.pass);
+                                       node.conn.dbname, node.conn.user, node.conn.pass);
       if (ok) {
         node.conn.connected = true;
         save_conn(node.conn);

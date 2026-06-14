@@ -5,7 +5,7 @@ static std::string make_cs(const Conn &c)
 {
   std::string cs = "host=" + c.host;
   cs += " port=" + (c.port.empty() ? "5432" : c.port);
-  cs += " dbname=postgres";
+  cs += " dbname=" + (c.dbname.empty() ? "postgres" : c.dbname);
   if (!c.user.empty()) cs += " user=" + c.user;
   if (!c.pass.empty()) cs += " password=" + c.pass;
   cs += " connect_timeout=5";
@@ -15,11 +15,14 @@ static std::string make_cs(const Conn &c)
 std::pair<bool, std::string> test_connection(
     const std::string &host,
     const std::string &port,
+    const std::string &dbname,
     const std::string &user,
     const std::string &pass)
 {
   try {
-    Conn tmp{"", host, port, user, pass};
+    Conn tmp;
+    tmp.host = host; tmp.port = port; tmp.dbname = dbname;
+    tmp.user = user; tmp.pass = pass;
     pqxx::connection c(make_cs(tmp));
     return {true, "Connected successfully"};
   } catch (const std::exception &e) {
@@ -78,7 +81,7 @@ std::pair<bool, std::string> create_repository(
   try {
     pqxx::connection pg(make_cs(c));
     pqxx::work       txn(pg);
-    auto             qsch = pg.quote_name(schema);
+    std::string      qsch = pg.quote_name(schema);
 
     txn.exec("CREATE SCHEMA IF NOT EXISTS " + qsch);
     txn.exec(

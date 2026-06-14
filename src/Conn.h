@@ -5,7 +5,7 @@
 
 struct Conn
 {
-  std::string name, host, port, user, pass;
+  std::string name, host, port, user, pass, dbname;
   bool        connected = false;
 };
 
