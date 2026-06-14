@@ -241,11 +241,11 @@ void panel_render(SDL_Renderer *ren, App &app, bool click, bool rclick, bool dbl
       if (node.open) {
         node.open = false;
       } else {
-        std::vector<SchemaNode> schemas;
-        auto [ok, err] = connect_and_load(node.conn, schemas);
+        std::vector<RepoNode> repos;
+        auto [ok, err] = connect_and_load(node.conn, repos);
         if (ok) {
-          node.open    = true;
-          node.schemas = std::move(schemas);
+          node.open  = true;
+          node.repos = std::move(repos);
         } else {
           app.msg_dlg = {true, "Connection error", std::move(err)};
         }
@@ -257,24 +257,24 @@ void panel_render(SDL_Renderer *ren, App &app, bool click, bool rclick, bool dbl
       float mx2 = std::min(app.mx, pw - PanelMenu::W - 2.f);
       float my2 = std::min(app.my, ph - PanelMenu::N * PanelMenu::IH - 10.f);
       app.panel_menu  = PanelMenu{true, mx2, my2, i, connected};
-      app.schema_menu.open = false;
+      app.repo_menu.open = false;
     }
     row++;
 
     if (node.open) {
-      for (int si = 0; si < (int)node.schemas.size(); si++) {
-        const auto &schema = node.schemas[si];
+      for (int ri = 0; ri < (int)node.repos.size(); ri++) {
+        const auto &repo = node.repos[ri];
         float sy = HDR_H + row * ITEM_H;
         if (hit(app.mx, app.my, 0, sy, pw, ITEM_H)) fill(ren, C_HOVER, 0, sy, pw, ITEM_H);
         fill(ren, C_ACCENT, PAD + 18, sy + (ITEM_H - 4) * .5f, 4, 4);
-        text_draw(ren, schema.repo_name.c_str(), PAD + 26, center_baseline(sy, ITEM_H), C_TEXT);
+        text_draw(ren, repo.repo_name.c_str(), PAD + 26, center_baseline(sy, ITEM_H), C_TEXT);
         sc(ren, C_BORDER);
         SDL_FRect sl{0, sy + ITEM_H - 1, pw, 1};
         SDL_RenderFillRect(ren, &sl);
         if (rclick && hit(app.mx, app.my, 0, sy, pw, ITEM_H)) {
-          float mx2 = std::min(app.mx, pw - SchemaMenu::W - 2.f);
-          float my2 = std::min(app.my, ph - SchemaMenu::N * SchemaMenu::IH - 10.f);
-          app.schema_menu = SchemaMenu{true, mx2, my2, i, si};
+          float mx2 = std::min(app.mx, pw - RepoMenu::W - 2.f);
+          float my2 = std::min(app.my, ph - RepoMenu::N * RepoMenu::IH - 10.f);
+          app.repo_menu = RepoMenu{true, mx2, my2, i, ri};
           app.panel_menu.open = false;
         }
         row++;
@@ -296,7 +296,7 @@ void panel_render(SDL_Renderer *ren, App &app, bool click, bool rclick, bool dbl
       // Отсоединиться
       node.conn.connected = false;
       node.open           = false;
-      node.schemas.clear();
+      node.repos.clear();
       save_conn(node.conn);
     } else {
       // Присоединиться: verify connection, mark connected, persist
@@ -327,14 +327,14 @@ void panel_render(SDL_Renderer *ren, App &app, bool click, bool rclick, bool dbl
                        "Удалить соединение \"" + app.conns[ci].conn.name + "\"?"};
   }
 
-  int  sact = app.schema_menu.render(ren, app.mx, app.my, click, rclick);
-  int  sci  = app.schema_menu.conn_idx;
-  int  ssi  = app.schema_menu.schema_idx;
-  bool valid_sci = sci >= 0 && sci < (int)app.conns.size()
-                && ssi >= 0 && ssi < (int)app.conns[sci].schemas.size();
+  int  ract = app.repo_menu.render(ren, app.mx, app.my, click, rclick);
+  int  rci  = app.repo_menu.conn_idx;
+  int  rri  = app.repo_menu.repo_idx;
+  bool valid_rci = rci >= 0 && rci < (int)app.conns.size()
+                && rri >= 0 && rri < (int)app.conns[rci].repos.size();
 
-  if (sact == 0 && valid_sci) {
-    app.repo_dlg.open_edit_for(app.conns[sci].conn, app.conns[sci].schemas[ssi]);
+  if (ract == 0 && valid_rci) {
+    app.repo_dlg.open_edit_for(app.conns[rci].conn, app.conns[rci].repos[rri]);
     app.repo_dlg.open = true;
     SDL_StartTextInput(app.win);
   }

@@ -16,7 +16,7 @@ struct FormEditRepository {
     Conn           conn;
 
     void open_for(const Conn &c);
-    void open_edit_for(const Conn &c, const SchemaNode &s);
+    void open_edit_for(const Conn &c, const RepoNode &repo);
 
     // returns 0=open, 1=saved, -1=cancelled
     int render(SDL_Renderer *ren, float mx, float my, bool ldown, bool rdown, int clicks);

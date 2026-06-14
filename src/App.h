@@ -30,7 +30,7 @@ struct App
   float     my       = 0;
   bool      lmb_held = false;
   PanelMenu  panel_menu;
-  SchemaMenu schema_menu;
+  RepoMenu   repo_menu;
 
   void reload_conns()
   {
@@ -41,8 +41,8 @@ struct App
       ConnNode node{c, false, {}};
       for (auto &old : conns) {
         if (old.conn.name == c.name) {
-          node.open    = old.open;
-          node.schemas = old.schemas;
+          node.open  = old.open;
+          node.repos = old.repos;
           break;
         }
       }

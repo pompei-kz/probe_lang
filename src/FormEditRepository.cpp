@@ -21,13 +21,13 @@ void FormEditRepository::open_for(const Conn &c)
   original_schema = "";
 }
 
-void FormEditRepository::open_edit_for(const Conn &c, const SchemaNode &s)
+void FormEditRepository::open_edit_for(const Conn &c, const RepoNode &repo)
 {
   open_for(c);
-  fields[0].ed.set(s.schema_name);
-  fields[1].ed.set(s.repo_name);
+  fields[0].ed.set(repo.schema_name);
+  fields[1].ed.set(repo.repo_name);
   editing         = true;
-  original_schema = s.schema_name;
+  original_schema = repo.schema_name;
 }
 
 int FormEditRepository::render(SDL_Renderer *ren, float mx, float my, bool ldown, bool rdown, int clicks)

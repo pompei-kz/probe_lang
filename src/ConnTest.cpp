@@ -30,14 +30,13 @@ std::pair<bool, std::string> test_connection(
   }
 }
 
-std::pair<bool, std::string> connect_and_load(const Conn &c, std::vector<SchemaNode> &schemas)
+std::pair<bool, std::string> connect_and_load(const Conn &c, std::vector<RepoNode> &repos)
 {
-  schemas.clear();
+  repos.clear();
   try {
     pqxx::connection pg(make_cs(c));
     pqxx::work       txn(pg);
 
-    // Find schemas that have a lang_setting table
     auto schema_rows = txn.exec(
         "SELECT table_schema FROM information_schema.tables "
         "WHERE table_name = 'lang_setting' "
@@ -50,7 +49,7 @@ std::pair<bool, std::string> connect_and_load(const Conn &c, std::vector<SchemaN
       try {
         pqxx::result vr = txn.exec("SELECT value FROM " + pg.quote_name(sch) + ".lang_setting WHERE name = 'name' LIMIT 1");
         if (!vr.empty() && !vr[0][0].is_null()) {
-          schemas.push_back({sch, vr[0][0].c_str()});
+          repos.push_back({sch, vr[0][0].c_str()});
         }
       } catch (...) {
         // skip schemas we can't query

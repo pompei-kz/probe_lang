@@ -188,9 +188,9 @@ int main(int /*argc*/, char * /*argv*/[])
               save_conn(node.conn);
             }
             if (node.open) {
-              std::vector<SchemaNode> schemas;
-              auto [ok, err] = connect_and_load(node.conn, schemas);
-              if (ok) node.schemas = std::move(schemas);
+              std::vector<RepoNode> repos;
+              auto [ok, err] = connect_and_load(node.conn, repos);
+              if (ok) node.repos = std::move(repos);
             }
             break;
           }

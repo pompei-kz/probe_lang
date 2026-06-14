@@ -5,7 +5,7 @@
 #include <vector>
 
 struct ConnNode {
-    Conn                    conn;
-    bool                    open = false;
-    std::vector<SchemaNode> schemas;
+    Conn                   conn;
+    bool                   open = false;
+    std::vector<RepoNode>  repos;
 };
