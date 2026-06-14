@@ -310,15 +310,26 @@ void panel_render(SDL_Renderer *ren, App &app, bool click, bool rclick, bool dbl
 
     if (node.open) {
       for (int ri = 0; ri < (int)node.repos.size(); ri++) {
-        auto &repo = node.repos[ri];
-        float sy = HDR_H + row * ITEM_H;
-        if (hit(app.mx, app.my, 0, sy, pw, ITEM_H)) fill(ren, C_HOVER, 0, sy, pw, ITEM_H);
-        fill(ren, C_ACCENT, PAD + 18, sy + (ITEM_H - 4) * .5f, 4, 4);
-        text_draw(ren, repo.repo_name.c_str(), PAD + 26, center_baseline(sy, ITEM_H), C_TEXT);
+        auto      &repo     = node.repos[ri];
+        float      sy       = HDR_H + row * ITEM_H;
+        float      caret_x  = PAD + CARET_W;            // caret zone right edge
+        bool       has_kids = !repo.folders.empty();
+        bool       h_caret  = has_kids && hit(app.mx, app.my, 0, sy, caret_x, ITEM_H);
+        bool       h_row    = !h_caret && hit(app.mx, app.my, 0, sy, pw, ITEM_H);
+        if (h_caret || h_row) fill(ren, C_HOVER, 0, sy, pw, ITEM_H);
+
+        if (has_kids)
+          draw_caret(ren, PAD + CARET_W * .5f, sy + ITEM_H * .5f, repo.open,
+                     repo.open ? C_ACCENT : C_DIM);
+
+        fill(ren, C_ACCENT, PAD + CARET_W + 4, sy + (ITEM_H - 4) * .5f, 4, 4);
+        text_draw(ren, repo.repo_name.c_str(), PAD + CARET_W + 12, center_baseline(sy, ITEM_H), C_TEXT);
         sc(ren, C_BORDER);
         SDL_FRect sl{0, sy + ITEM_H - 1, pw, 1};
         SDL_RenderFillRect(ren, &sl);
-        if (rclick && hit(app.mx, app.my, 0, sy, pw, ITEM_H)) {
+
+        if (click && h_caret) repo.open = !repo.open;
+        if (rclick && (h_caret || h_row)) {
           float mx2 = std::min(app.mx, pw - RepoMenu::W - 2.f);
           float my2 = std::min(app.my, ph - RepoMenu::N * RepoMenu::IH - 10.f);
           app.repo_menu = RepoMenu{true, mx2, my2, i, ri};
@@ -326,7 +337,8 @@ void panel_render(SDL_Renderer *ren, App &app, bool click, bool rclick, bool dbl
           app.folder_menu.open = false;
         }
         row++;
-        render_folder_list(ren, app, repo.folders, i, ri, 0, row, pw, ph, click, rclick);
+        if (repo.open)
+          render_folder_list(ren, app, repo.folders, i, ri, 0, row, pw, ph, click, rclick);
       }
     }
   }
