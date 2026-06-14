@@ -24,9 +24,11 @@ add_executable(probe_lang
     src/ConnTest.cpp
     src/TextEditor.cpp
     src/ContextMenu.cpp
+    src/InputField.cpp
     src/Dlg.cpp
     src/MsgDlg.cpp
     src/ConfirmDlg.cpp
+    src/SchemaMenu.cpp
     src/SelectableText.cpp
     src/FormEditRepository.cpp
 )

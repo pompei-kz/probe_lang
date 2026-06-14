@@ -1,7 +1,6 @@
 #pragma once
 #include "Conn.h"
-#include "ContextMenu.h"
-#include "TextEditor.h"
+#include "InputField.h"
 #include <string>
 
 struct Dlg
@@ -9,24 +8,21 @@ struct Dlg
   bool        open    = false;
   bool        editing = false;
   std::string old_name;
-  TextEditor  editors[6];  // 0=Name 1=Host 2=Port 3=DBName 4=User 5=Password
-  int         focus          = 0;
+  InputField  fields[6];  // 0=Name 1=Host 2=Port 3=DBName 4=User 5=Password
+  int         focus = 0;
   std::string err;
-  int         active_drag_ed = -1;
-  ContextMenu ctx_menu;
 
   bool        test_ok  = false;
   std::string test_msg;
-  // snapshot of connection fields at the moment the last successful test ran
   std::string snap_host, snap_port, snap_dbname, snap_user, snap_pass;
 
   bool save_enabled() const {
     return test_ok
-        && editors[1].buf == snap_host
-        && editors[2].buf == snap_port
-        && editors[3].buf == snap_dbname
-        && editors[4].buf == snap_user
-        && editors[5].buf == snap_pass;
+        && fields[1].ed.buf == snap_host
+        && fields[2].ed.buf == snap_port
+        && fields[3].ed.buf == snap_dbname
+        && fields[4].ed.buf == snap_user
+        && fields[5].ed.buf == snap_pass;
   }
 
   void open_add();

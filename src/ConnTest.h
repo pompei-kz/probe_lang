@@ -25,3 +25,10 @@ std::pair<bool, std::string> create_repository(
     const std::string &schema,
     const std::string &repo_name
 );
+
+std::pair<bool, std::string> edit_repository(
+    const Conn        &c,
+    const std::string &old_schema,
+    const std::string &new_schema,
+    const std::string &new_repo_name
+);

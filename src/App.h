@@ -6,6 +6,7 @@
 #include "FormEditRepository.h"
 #include "MsgDlg.h"
 #include "PanelMenu.h"
+#include "SchemaMenu.h"
 #include <SDL3/SDL.h>
 #include <vector>
 
@@ -28,7 +29,8 @@ struct App
   float     mx       = 0;
   float     my       = 0;
   bool      lmb_held = false;
-  PanelMenu panel_menu;
+  PanelMenu  panel_menu;
+  SchemaMenu schema_menu;
 
   void reload_conns()
   {

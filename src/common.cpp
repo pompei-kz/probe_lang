@@ -5,6 +5,7 @@
 #include "ContextMenu.h"
 #include "FontAtlas.h"
 #include "PanelMenu.h"
+#include "SchemaMenu.h"
 #include "SchemaNode.h"
 #include "render_helpers.h"
 
@@ -59,28 +60,29 @@ int dlg_render(SDL_Renderer *ren, Dlg &d, const DlgMouse &m)
   float              fw = DW - 32, ct = dy + 48;
   float              text_ox = dx + 16.f + 6.f;
 
+  float clamp_cx = dx + DW - ContextMenu::W - 4.f;
+  float clamp_cy = dy + DH - ContextMenu::N * ContextMenu::IH - 10.f;
+
   for (auto &f : fields) {
     float fy      = ct + f.idx * FS_STEP;
     float by      = fy + FS + 6;
     bool  focused = (d.focus == f.idx);
 
     text_draw(ren, f.lbl, dx + 16, fy + FS, C_DIM);
-    d.editors[f.idx].draw(ren, dx + 16, by, fw, FH, focused);
+    d.fields[f.idx].draw(ren, dx + 16, by, fw, FH, focused);
 
-    if (m.ldown && !d.ctx_menu.open && hit(m.mx, m.my, dx + 16, by, fw, FH)) {
-      d.focus    = f.idx;
-      bool shift = (SDL_GetModState() & SDL_KMOD_SHIFT) != 0;
-      d.editors[f.idx].on_mouse_press(text_ox, m.mx, m.clicks, shift);
-      d.active_drag_ed = f.idx;
+    if (m.ldown) {
+      if (d.fields[f.idx].on_ldown(text_ox, m.mx, m.my, dx + 16, by, fw, FH, m.clicks))
+        d.focus = f.idx;
     }
-
-    if (m.rdown && hit(m.mx, m.my, dx + 16, by, fw, FH)) {
-      d.focus    = f.idx;
-      float cx2  = std::min(m.mx, dx + DW - ContextMenu::W - 4.f);
-      float cy2  = std::min(m.my, dy + DH - ContextMenu::N * ContextMenu::IH - 10.f);
-      d.ctx_menu = ContextMenu{true, cx2, cy2, f.idx};
+    if (m.rdown) {
+      if (d.fields[f.idx].on_rdown(m.mx, m.my, dx + 16, by, fw, FH, clamp_cx, clamp_cy))
+        d.focus = f.idx;
     }
   }
+
+  bool any_ctx = false;
+  for (int i = 0; i < 6; i++) if (d.fields[i].ctx.open) { any_ctx = true; break; }
 
   // ── Test Connection button ────────────────────────────────────────────────
   constexpr float BH = 30.f, BW_T = 170.f, BW_S = 90.f, BW_C = 80.f;
@@ -91,19 +93,19 @@ int dlg_render(SDL_Renderer *ren, Dlg &d, const DlgMouse &m)
             dx + 16 + (BW_T - text_w("Test connection")) * .5f,
             center_baseline(test_btn_y, BH), C_TEXT);
 
-  if (m.ldown && h_test && !d.ctx_menu.open) {
+  if (m.ldown && h_test && !any_ctx) {
     d.err = "";
-    auto [ok, msg]  = test_connection(d.editors[1].buf, d.editors[2].buf,
-                                      d.editors[3].buf, d.editors[4].buf,
-                                      d.editors[5].buf);
+    auto [ok, msg] = test_connection(d.fields[1].ed.buf, d.fields[2].ed.buf,
+                                     d.fields[3].ed.buf, d.fields[4].ed.buf,
+                                     d.fields[5].ed.buf);
     d.test_ok  = ok;
     d.test_msg = msg;
     if (ok) {
-      d.snap_host   = d.editors[1].buf;
-      d.snap_port   = d.editors[2].buf;
-      d.snap_dbname = d.editors[3].buf;
-      d.snap_user   = d.editors[4].buf;
-      d.snap_pass   = d.editors[5].buf;
+      d.snap_host   = d.fields[1].ed.buf;
+      d.snap_port   = d.fields[2].ed.buf;
+      d.snap_dbname = d.fields[3].ed.buf;
+      d.snap_user   = d.fields[4].ed.buf;
+      d.snap_pass   = d.fields[5].ed.buf;
     }
   }
 
@@ -132,18 +134,11 @@ int dlg_render(SDL_Renderer *ren, Dlg &d, const DlgMouse &m)
   btn_text("Save",   sx,  BW_S, can_save ? (h_save ? C_PANEL : C_TEXT) : C_DIM);
   btn_text("Cancel", cx2, BW_C, C_TEXT);
 
-  int menu_act = d.ctx_menu.render(ren, m.mx, m.my, m.ldown, m.rdown);
-  if (menu_act >= 0 && d.ctx_menu.ed_idx >= 0) {
-    auto &ed = d.editors[d.ctx_menu.ed_idx];
-    if (menu_act == 0)
-      ed.do_copy();
-    else if (menu_act == 1)
-      ed.do_cut();
-    else
-      ed.do_paste();
-  }
+  // context menus rendered on top of everything
+  for (int i = 0; i < 6; i++)
+    d.fields[i].render_ctx(ren, m.mx, m.my, m.ldown, m.rdown);
 
-  if (m.ldown && !d.ctx_menu.open) {
+  if (m.ldown && !any_ctx) {
     if (h_can) return -1;
     if (h_save && can_save) {
       Conn c = d.to_conn();
@@ -261,12 +256,14 @@ void panel_render(SDL_Renderer *ren, App &app, bool click, bool rclick, bool dbl
     if (rclick && (h_row || h_edit)) {
       float mx2 = std::min(app.mx, pw - PanelMenu::W - 2.f);
       float my2 = std::min(app.my, ph - PanelMenu::N * PanelMenu::IH - 10.f);
-      app.panel_menu = PanelMenu{true, mx2, my2, i, connected};
+      app.panel_menu  = PanelMenu{true, mx2, my2, i, connected};
+      app.schema_menu.open = false;
     }
     row++;
 
     if (node.open) {
-      for (auto &schema : node.schemas) {
+      for (int si = 0; si < (int)node.schemas.size(); si++) {
+        const auto &schema = node.schemas[si];
         float sy = HDR_H + row * ITEM_H;
         if (hit(app.mx, app.my, 0, sy, pw, ITEM_H)) fill(ren, C_HOVER, 0, sy, pw, ITEM_H);
         fill(ren, C_ACCENT, PAD + 18, sy + (ITEM_H - 4) * .5f, 4, 4);
@@ -274,6 +271,12 @@ void panel_render(SDL_Renderer *ren, App &app, bool click, bool rclick, bool dbl
         sc(ren, C_BORDER);
         SDL_FRect sl{0, sy + ITEM_H - 1, pw, 1};
         SDL_RenderFillRect(ren, &sl);
+        if (rclick && hit(app.mx, app.my, 0, sy, pw, ITEM_H)) {
+          float mx2 = std::min(app.mx, pw - SchemaMenu::W - 2.f);
+          float my2 = std::min(app.my, ph - SchemaMenu::N * SchemaMenu::IH - 10.f);
+          app.schema_menu = SchemaMenu{true, mx2, my2, i, si};
+          app.panel_menu.open = false;
+        }
         row++;
       }
     }
@@ -322,5 +325,17 @@ void panel_render(SDL_Renderer *ren, App &app, bool click, bool rclick, bool dbl
     app.pending_delete_idx = ci;
     app.confirm_dlg = {true, "Удаление соединения",
                        "Удалить соединение \"" + app.conns[ci].conn.name + "\"?"};
+  }
+
+  int  sact = app.schema_menu.render(ren, app.mx, app.my, click, rclick);
+  int  sci  = app.schema_menu.conn_idx;
+  int  ssi  = app.schema_menu.schema_idx;
+  bool valid_sci = sci >= 0 && sci < (int)app.conns.size()
+                && ssi >= 0 && ssi < (int)app.conns[sci].schemas.size();
+
+  if (sact == 0 && valid_sci) {
+    app.repo_dlg.open_edit_for(app.conns[sci].conn, app.conns[sci].schemas[ssi]);
+    app.repo_dlg.open = true;
+    SDL_StartTextInput(app.win);
   }
 }

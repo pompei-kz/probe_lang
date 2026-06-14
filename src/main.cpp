@@ -49,10 +49,11 @@ int main(int /*argc*/, char * /*argv*/[])
         case SDL_EVENT_MOUSE_MOTION:
           app.mx = ev.motion.x;
           app.my = ev.motion.y;
-          if (app.dlg.open && app.dlg.active_drag_ed >= 0 && app.lmb_held) {
-            app.dlg.editors[app.dlg.active_drag_ed].on_mouse_move(ev.motion.x);
-          }
+          if (app.dlg.open && app.lmb_held)
+            for (auto &f : app.dlg.fields) f.on_move(ev.motion.x);
           if (app.repo_dlg.open) {
+            if (app.lmb_held)
+              for (auto &f : app.repo_dlg.fields) f.on_move(ev.motion.x);
             app.repo_dlg.err_view.on_move(ev.motion.x, ev.motion.y);
           }
           break;
@@ -75,11 +76,12 @@ int main(int /*argc*/, char * /*argv*/[])
         case SDL_EVENT_MOUSE_BUTTON_UP:
           if (ev.button.button == SDL_BUTTON_LEFT) {
             app.lmb_held = false;
-            if (app.dlg.open && app.dlg.active_drag_ed >= 0) {
-              app.dlg.editors[app.dlg.active_drag_ed].on_mouse_release();
-              app.dlg.active_drag_ed = -1;
+            if (app.dlg.open)
+              for (auto &f : app.dlg.fields) f.on_release();
+            if (app.repo_dlg.open) {
+              for (auto &f : app.repo_dlg.fields) f.on_release();
+              app.repo_dlg.err_view.on_release();
             }
-            if (app.repo_dlg.open) app.repo_dlg.err_view.on_release();
           }
           break;
 
@@ -89,16 +91,16 @@ int main(int /*argc*/, char * /*argv*/[])
 
         case SDL_EVENT_TEXT_INPUT:
           if (app.dlg.open)
-            app.dlg.editors[app.dlg.focus].handle_text(ev.text.text);
+            app.dlg.fields[app.dlg.focus].handle_text(ev.text.text);
           else if (app.repo_dlg.open)
-            app.repo_dlg.editors[app.repo_dlg.focus].handle_text(ev.text.text);
+            app.repo_dlg.fields[app.repo_dlg.focus].handle_text(ev.text.text);
           break;
 
         case SDL_EVENT_KEY_DOWN:
           if (app.dlg.open) {
-            app.dlg.ctx_menu.open = false;
-            SDL_Keymod mod        = ev.key.mod;
-            bool       consumed   = app.dlg.editors[app.dlg.focus].handle_key(ev.key.key, mod);
+            for (auto &f : app.dlg.fields) f.ctx.open = false;
+            SDL_Keymod mod      = ev.key.mod;
+            bool       consumed = app.dlg.fields[app.dlg.focus].handle_key(ev.key.key, mod);
             if (!consumed) {
               bool shift = (mod & SDL_KMOD_SHIFT) != 0;
               switch (ev.key.key) {
@@ -127,7 +129,7 @@ int main(int /*argc*/, char * /*argv*/[])
             SDL_Keymod mod      = ev.key.mod;
             bool       consumed = false;
             if (app.repo_dlg.err_view.focused) consumed = app.repo_dlg.err_view.handle_key(ev.key.key, mod);
-            if (!consumed) consumed = app.repo_dlg.editors[app.repo_dlg.focus].handle_key(ev.key.key, mod);
+            if (!consumed) consumed = app.repo_dlg.fields[app.repo_dlg.focus].handle_key(ev.key.key, mod);
             if (!consumed) {
               switch (ev.key.key) {
                 case SDLK_TAB: app.repo_dlg.focus = (app.repo_dlg.focus + 1) % 2; break;
@@ -179,11 +181,12 @@ int main(int /*argc*/, char * /*argv*/[])
       float my2 = lclick ? lclick_y : app.my;
       int   res = app.repo_dlg.render(app.ren, mx2, my2, lclick, rclick, lclicks);
       if (res == 1) {
-        // mark the matching node as connected, refresh schemas if open
         for (auto &node : app.conns) {
           if (node.conn.name == app.repo_dlg.conn.name) {
-            node.conn.connected = true;
-            save_conn(node.conn);
+            if (!app.repo_dlg.editing) {
+              node.conn.connected = true;
+              save_conn(node.conn);
+            }
             if (node.open) {
               std::vector<SchemaNode> schemas;
               auto [ok, err] = connect_and_load(node.conn, schemas);

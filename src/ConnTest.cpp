@@ -102,3 +102,33 @@ std::pair<bool, std::string> create_repository(
     return {false, e.what()};
   }
 }
+
+std::pair<bool, std::string> edit_repository(
+    const Conn        &c,
+    const std::string &old_schema,
+    const std::string &new_schema,
+    const std::string &new_repo_name)
+{
+  try {
+    pqxx::connection pg(make_cs(c));
+    pqxx::work       txn(pg);
+
+    if (old_schema != new_schema) {
+      txn.exec("ALTER SCHEMA " + pg.quote_name(old_schema)
+               + " RENAME TO " + pg.quote_name(new_schema));
+    }
+
+    txn.exec_params(
+        "UPDATE " + pg.quote_name(new_schema) + ".lang_setting "
+        "SET value = $1 WHERE name = 'name'",
+        new_repo_name
+    );
+
+    txn.commit();
+    return {true, ""};
+  } catch (const pqxx::sql_error &e) {
+    return {false, sql_err_msg(e)};
+  } catch (const std::exception &e) {
+    return {false, e.what()};
+  }
+}
