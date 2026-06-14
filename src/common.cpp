@@ -1,6 +1,8 @@
 #include "common.h"
+#include "Conn.h"
 #include "ContextMenu.h"
 #include "FontAtlas.h"
+#include "PanelMenu.h"
 #include "render_helpers.h"
 
 void draw_plus(SDL_Renderer *r, float cx, float cy, float sz, Clr c)
@@ -124,7 +126,7 @@ int dlg_render(SDL_Renderer *ren, Dlg &d, const DlgMouse &m)
 // ── left panel ────────────────────────────────────────────────────────────────
 static constexpr float ITEM_H = 30.f, HDR_H = 38.f, PAD = 10.f, ICON_SZ = 8.f, EDIT_W = 30.f;
 
-void panel_render(SDL_Renderer *ren, App &app, bool click)
+void panel_render(SDL_Renderer *ren, App &app, bool click, bool rclick)
 {
   const float pw = app.ww * 0.30f;
   const float ph = (float)app.wh;
@@ -169,9 +171,28 @@ void panel_render(SDL_Renderer *ren, App &app, bool click)
       app.dlg.open = true;
       SDL_StartTextInput(app.win);
     }
+    if (rclick && (h_row || h_edit)) {
+      float mx2 = std::min(app.mx, pw - PanelMenu::W - 2.f);
+      float my2 = std::min(app.my, ph - PanelMenu::N * PanelMenu::IH - 10.f);
+      app.panel_menu = PanelMenu{true, mx2, my2, i};
+    }
   }
 
   sc(ren, C_BORDER);
   SDL_FRect div{pw - 1, 0, 1, ph};
   SDL_RenderFillRect(ren, &div);
+
+  int act = app.panel_menu.render(ren, app.mx, app.my, click, rclick);
+  if (act == 0) {
+    app.dlg.open_add();
+    app.dlg.open = true;
+    SDL_StartTextInput(app.win);
+  } else if (act == 1 && app.panel_menu.conn_idx >= 0 && app.panel_menu.conn_idx < (int)app.conns.size()) {
+    app.dlg.open_edit(app.conns[app.panel_menu.conn_idx]);
+    app.dlg.open = true;
+    SDL_StartTextInput(app.win);
+  } else if (act == 2 && app.panel_menu.conn_idx >= 0 && app.panel_menu.conn_idx < (int)app.conns.size()) {
+    delete_conn(app.conns[app.panel_menu.conn_idx].name);
+    app.conns = load_all();
+  }
 }

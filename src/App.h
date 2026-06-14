@@ -1,6 +1,7 @@
 #pragma once
 #include "Conn.h"
 #include "Dlg.h"
+#include "PanelMenu.h"
 #include <SDL3/SDL.h>
 #include <vector>
 
@@ -13,10 +14,11 @@ struct App
   std::vector<Conn> conns;
   Dlg               dlg;
 
-  int   h_item   = -1;
-  int   h_edit   = -1;
-  bool  h_add    = false;
-  float mx       = 0;
-  float my       = 0;
-  bool  lmb_held = false;
+  int      h_item     = -1;
+  int      h_edit     = -1;
+  bool     h_add      = false;
+  float    mx         = 0;
+  float    my         = 0;
+  bool     lmb_held   = false;
+  PanelMenu panel_menu;
 };

@@ -127,7 +127,7 @@ int main(int /*argc*/, char * /*argv*/[])
 
     sc(app.ren, C_BG);
     SDL_RenderClear(app.ren);
-    panel_render(app.ren, app, lclick);
+    panel_render(app.ren, app, lclick, rclick);
 
     float pw = app.ww * 0.30f;
     fill(app.ren, C_BG, pw, 0, app.ww - pw, (float)app.wh);

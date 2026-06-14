@@ -10,4 +10,4 @@ void draw_pencil(SDL_Renderer *r, float cx, float cy, float sz, Clr c);
 
 // returns 0=open, 1=saved, -1=cancelled
 int  dlg_render(SDL_Renderer *ren, Dlg &d, const DlgMouse &m);
-void panel_render(SDL_Renderer *ren, App &app, bool click);
+void panel_render(SDL_Renderer *ren, App &app, bool click, bool rclick);

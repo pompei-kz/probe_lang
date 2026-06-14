@@ -15,6 +15,7 @@ include(cmake/EmbedResources.cmake)
 add_executable(probe_lang
     src/main.cpp
     src/common.cpp
+    src/PanelMenu.cpp
     src/FontAtlas.cpp
     src/Conn.cpp
     src/TextEditor.cpp

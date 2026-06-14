@@ -45,6 +45,11 @@ std::vector<Conn> load_all()
   return v;
 }
 
+void delete_conn(const std::string &name)
+{
+  fs::remove(ws_dir() / (name + EXT));
+}
+
 void save_conn(const Conn &c, const std::string &old_name)
 {
   auto d = ws_dir();
