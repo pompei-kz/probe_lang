@@ -4,6 +4,8 @@ project(probe_lang)
 set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+enable_language(ASM)
+
 include(FetchContent)
 FetchContent_Declare(
   stb
