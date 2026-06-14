@@ -14,6 +14,11 @@ include(cmake/EmbedResources.cmake)
 
 add_executable(probe_lang
     src/main.cpp
+    src/FontAtlas.cpp
+    src/Conn.cpp
+    src/TextEditor.cpp
+    src/ContextMenu.cpp
+    src/Dlg.cpp
 )
 target_include_directories(probe_lang PRIVATE ${stb_SOURCE_DIR})
 target_link_libraries(probe_lang PRIVATE SDL3::SDL3)
