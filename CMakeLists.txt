@@ -31,6 +31,7 @@ add_executable(probe_lang
     src/SchemaMenu.cpp
     src/SelectableText.cpp
     src/FormEditRepository.cpp
+    src/CustomId.cpp
 )
 target_include_directories(probe_lang PRIVATE ${stb_SOURCE_DIR})
 target_link_libraries(probe_lang PRIVATE SDL3::SDL3)
@@ -40,3 +41,18 @@ target_link_libraries(probe_lang PRIVATE ${PQXX_LINK_LIBRARIES})
 
 embed_resources(probe_lang "${CMAKE_CURRENT_SOURCE_DIR}/resources")
 target_include_directories(probe_lang PRIVATE external/stb)
+
+# ── Tests ────────────────────────────────────────────────────────────────────
+enable_testing()
+
+find_package(GTest REQUIRED)
+
+add_executable(probe_lang_tests
+    src_test/TestCustomId.cpp
+    src/CustomId.cpp
+)
+target_include_directories(probe_lang_tests PRIVATE src)
+target_link_libraries(probe_lang_tests PRIVATE GTest::GTest GTest::Main)
+
+include(GoogleTest)
+gtest_discover_tests(probe_lang_tests)
