@@ -2,3 +2,4 @@ Prerequire:
 
 
 sudo apt install libicu-dev
+sudo apt install libpq-dev libpqxx-dev
