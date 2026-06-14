@@ -47,6 +47,8 @@ int main(int /*argc*/, char * /*argv*/[])
           app.my = ev.motion.y;
           if (app.dlg.open && app.dlg.active_drag_ed >= 0 && app.lmb_held)
             app.dlg.editors[app.dlg.active_drag_ed].on_mouse_move(ev.motion.x);
+          if (app.repo_dlg.open)
+            app.repo_dlg.err_view.on_move(ev.motion.x, ev.motion.y);
           break;
 
         case SDL_EVENT_MOUSE_BUTTON_DOWN:
@@ -71,7 +73,14 @@ int main(int /*argc*/, char * /*argv*/[])
               app.dlg.editors[app.dlg.active_drag_ed].on_mouse_release();
               app.dlg.active_drag_ed = -1;
             }
+            if (app.repo_dlg.open)
+              app.repo_dlg.err_view.on_release();
           }
+          break;
+
+        case SDL_EVENT_MOUSE_WHEEL:
+          if (app.repo_dlg.open && app.repo_dlg.err_view.mouse_over(app.mx, app.my))
+            app.repo_dlg.err_view.on_scroll(ev.wheel.y);
           break;
 
         case SDL_EVENT_TEXT_INPUT:
@@ -115,7 +124,10 @@ int main(int /*argc*/, char * /*argv*/[])
             }
           } else if (app.repo_dlg.open) {
             SDL_Keymod mod      = ev.key.mod;
-            bool       consumed = app.repo_dlg.editors[app.repo_dlg.focus].handle_key(ev.key.key, mod);
+            bool       consumed = false;
+            if (app.repo_dlg.err_view.focused)
+              consumed = app.repo_dlg.err_view.handle_key(ev.key.key, mod);
+            if (!consumed) consumed = app.repo_dlg.editors[app.repo_dlg.focus].handle_key(ev.key.key, mod);
             if (!consumed) {
               switch (ev.key.key) {
                 case SDLK_TAB:

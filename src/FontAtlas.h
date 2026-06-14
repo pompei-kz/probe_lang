@@ -36,6 +36,7 @@ extern FontAtlas g_atlas;
 
 void  font_init(SDL_Renderer *ren);
 float text_draw(SDL_Renderer *ren, const char *s, float x, float y, Clr c);
+float text_draw_n(SDL_Renderer *ren, const char *s, int32_t byte_len, float x, float y, Clr c);
 float text_w_n(const char *s, int32_t byte_len);
 float text_w(const char *s);
 float center_baseline(float box_y, float box_h);

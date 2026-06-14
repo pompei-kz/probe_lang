@@ -4,14 +4,19 @@
 #include "FontAtlas.h"
 #include "render_helpers.h"
 
-static constexpr float FDW = 420.f, FDH = 260.f, FFH = 28.f, FFS = 58.f;
+// FDH increased to make room for the error text view
+static constexpr float FDW    = 420.f;
+static constexpr float FDH    = 320.f;
+static constexpr float FFH    = 28.f;
+static constexpr float FFS    = 58.f;
+static constexpr float ERR_H  = 80.f;  // height of the error text view
 
 void FormEditRepository::open_for(const Conn &c)
 {
   editors[0] = TextEditor{};
   editors[1] = TextEditor{};
   focus      = 0;
-  err        = "";
+  err_view.set("");
   conn       = c;
 }
 
@@ -45,12 +50,14 @@ int FormEditRepository::render(SDL_Renderer *ren, float mx, float my, bool ldown
     editors[i].draw(ren, dx + 16, by, fw, FFH, focus == i);
     if (ldown && hit(mx, my, dx + 16, by, fw, FFH)) {
       focus = i;
+      err_view.focused = false;
       editors[i].on_mouse_press(dx + 16 + 6, mx, 1, false);
     }
   }
 
-  if (!err.empty())
-    text_draw(ren, err.c_str(), dx + 16, ct + 2 * FFS, C_ERR);
+  // error text view — always at fixed position below fields
+  float ev_y = ct + 2 * FFS + 6;
+  err_view.render(ren, dx + 16, ev_y, fw, ERR_H, mx, my, ldown, rdown, C_ERR);
 
   constexpr float BH = 30.f, BW_S = 80.f, BW_C = 80.f;
   float           btn_y = dy + FDH - 50;
@@ -73,11 +80,11 @@ int FormEditRepository::render(SDL_Renderer *ren, float mx, float my, bool ldown
     if (h_save) {
       const std::string &schema   = editors[0].buf;
       const std::string &reponame = editors[1].buf;
-      if (schema.empty()) { err = "Schema name is required"; return 0; }
-      if (reponame.empty()) { err = "Repository name is required"; return 0; }
+      if (schema.empty())   { err_view.set("Schema name is required"); return 0; }
+      if (reponame.empty()) { err_view.set("Repository name is required"); return 0; }
       auto [ok, msg] = create_repository(conn, schema, reponame);
       if (ok) return 1;
-      err = msg;
+      err_view.set(msg);
     }
   }
   return 0;

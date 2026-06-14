@@ -103,6 +103,27 @@ float text_draw(SDL_Renderer *ren, const char *s, float x, float y, Clr c)
   return px - x;
 }
 
+float text_draw_n(SDL_Renderer *ren, const char *s, int32_t byte_len, float x, float y, Clr c)
+{
+  SDL_SetTextureColorMod(g_atlas.tex, c.r, c.g, c.b);
+  SDL_SetTextureAlphaMod(g_atlas.tex, c.a);
+  float   px = x;
+  int32_t i  = 0;
+  while (i < byte_len) {
+    UChar32 cp;
+    U8_NEXT(reinterpret_cast<const uint8_t *>(s), i, byte_len, cp);
+    if (cp < 0) continue;
+    const auto &g = g_atlas.get(cp);
+    if (g.visible) {
+      SDL_FRect src{(float)g.tx, (float)g.ty, (float)g.tw, (float)g.th};
+      SDL_FRect dst{px + g.bx, y + g.by, (float)g.tw, (float)g.th};
+      SDL_RenderTexture(ren, g_atlas.tex, &src, &dst);
+    }
+    px += g.adv;
+  }
+  return px - x;
+}
+
 float text_w_n(const char *s, int32_t byte_len)
 {
   float   px = 0;

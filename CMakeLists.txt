@@ -26,6 +26,7 @@ add_executable(probe_lang
     src/ContextMenu.cpp
     src/Dlg.cpp
     src/MsgDlg.cpp
+    src/SelectableText.cpp
     src/FormEditRepository.cpp
 )
 target_include_directories(probe_lang PRIVATE ${stb_SOURCE_DIR})
