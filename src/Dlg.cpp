@@ -12,6 +12,9 @@ void Dlg::open_add()
   old_name       = "";
   active_drag_ed = -1;
   ctx_menu.open  = false;
+  test_ok        = false;
+  test_msg       = "";
+  snap_host = snap_port = snap_user = snap_pass = "";
 }
 
 void Dlg::open_edit(const Conn &c)
@@ -22,8 +25,13 @@ void Dlg::open_edit(const Conn &c)
   editors[2].set(c.port);
   editors[3].set(c.user);
   editors[4].set(c.pass);
-  editing  = true;
-  old_name = c.name;
+  editing   = true;
+  old_name  = c.name;
+  test_ok   = true;
+  snap_host = c.host;
+  snap_port = c.port;
+  snap_user = c.user;
+  snap_pass = c.pass;
 }
 
 Conn Dlg::to_conn() const

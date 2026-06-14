@@ -1,5 +1,6 @@
 #include "common.h"
 #include "Conn.h"
+#include "ConnTest.h"
 #include "ContextMenu.h"
 #include "FontAtlas.h"
 #include "PanelMenu.h"
@@ -28,7 +29,7 @@ void draw_pencil(SDL_Renderer *r, float cx, float cy, float sz, Clr c)
 }
 
 // ── dialog ────────────────────────────────────────────────────────────────────
-static constexpr float DW = 440, DH = 400, FH = 28.f, FS_STEP = 58.f;
+static constexpr float DW = 440, DH = 500, FH = 28.f, FS_STEP = 58.f;
 
 int dlg_render(SDL_Renderer *ren, Dlg &d, const DlgMouse &m)
 {
@@ -79,19 +80,52 @@ int dlg_render(SDL_Renderer *ren, Dlg &d, const DlgMouse &m)
     }
   }
 
-  if (!d.err.empty()) text_draw(ren, d.err.c_str(), dx + 16, ct + 5 * FS_STEP, C_ERR);
+  // ── Test Connection button ────────────────────────────────────────────────
+  constexpr float BH = 30.f, BW_T = 170.f, BW_S = 90.f, BW_C = 80.f;
+  float           test_btn_y = ct + 5 * FS_STEP + 2;
+  bool            h_test     = hit(m.mx, m.my, dx + 16, test_btn_y, BW_T, BH);
+  fill(ren, h_test ? C_HOVER : C_BORDER, dx + 16, test_btn_y, BW_T, BH);
+  text_draw(ren, "Test connection",
+            dx + 16 + (BW_T - text_w("Test connection")) * .5f,
+            center_baseline(test_btn_y, BH), C_TEXT);
 
-  float           btn_y = dy + DH - 50;
-  constexpr float BH = 30, BW_S = 90, BW_C = 80;
-  float           sx = dx + DW - 16 - BW_S, cx2 = sx - 10 - BW_C;
+  if (m.ldown && h_test && !d.ctx_menu.open) {
+    d.err = "";
+    auto [ok, msg]  = test_connection(d.editors[1].buf, d.editors[2].buf,
+                                      d.editors[3].buf, d.editors[4].buf);
+    d.test_ok  = ok;
+    d.test_msg = msg;
+    if (ok) {
+      d.snap_host = d.editors[1].buf;
+      d.snap_port = d.editors[2].buf;
+      d.snap_user = d.editors[3].buf;
+      d.snap_pass = d.editors[4].buf;
+    }
+  }
 
-  bool h_save = hit(m.mx, m.my, sx, btn_y, BW_S, BH);
+  // test result message
+  if (!d.test_msg.empty())
+    text_draw(ren, d.test_msg.c_str(), dx + 16, test_btn_y + 38, d.test_ok ? C_OK : C_ERR);
+
+  // validation error
+  if (!d.err.empty())
+    text_draw(ren, d.err.c_str(), dx + 16, test_btn_y + 60, C_ERR);
+
+  // ── Save / Cancel buttons ─────────────────────────────────────────────────
+  float btn_y    = dy + DH - 52;
+  bool  can_save = d.save_enabled();
+  float sx       = dx + DW - 16 - BW_S;
+  float cx2      = sx - 10 - BW_C;
+
+  bool h_save = can_save && hit(m.mx, m.my, sx, btn_y, BW_S, BH);
   bool h_can  = hit(m.mx, m.my, cx2, btn_y, BW_C, BH);
-  fill(ren, h_save ? C_ACCENT : C_BORDER, sx, btn_y, BW_S, BH);
+  fill(ren, can_save ? (h_save ? C_ACCENT : C_BORDER) : C_DIM, sx, btn_y, BW_S, BH);
   fill(ren, h_can ? C_HOVER : C_BORDER, cx2, btn_y, BW_C, BH);
 
-  auto btn_text = [&](const char *t, float bx, float bw, Clr c) { text_draw(ren, t, bx + (bw - text_w(t)) * .5f, center_baseline(btn_y, BH), c); };
-  btn_text("Save", sx, BW_S, h_save ? C_PANEL : C_TEXT);
+  auto btn_text = [&](const char *t, float bx, float bw, Clr c) {
+    text_draw(ren, t, bx + (bw - text_w(t)) * .5f, center_baseline(btn_y, BH), c);
+  };
+  btn_text("Save",   sx,  BW_S, can_save ? (h_save ? C_PANEL : C_TEXT) : C_DIM);
   btn_text("Cancel", cx2, BW_C, C_TEXT);
 
   int menu_act = d.ctx_menu.render(ren, m.mx, m.my, m.ldown, m.rdown);
@@ -107,16 +141,9 @@ int dlg_render(SDL_Renderer *ren, Dlg &d, const DlgMouse &m)
 
   if (m.ldown && !d.ctx_menu.open) {
     if (h_can) return -1;
-    if (h_save) {
+    if (h_save && can_save) {
       Conn c = d.to_conn();
-      if (c.name.empty()) {
-        d.err = "Name is required";
-        return 0;
-      }
-      if (c.host.empty()) {
-        d.err = "Host is required";
-        return 0;
-      }
+      if (c.name.empty()) { d.err = "Name is required"; return 0; }
       return 1;
     }
   }
