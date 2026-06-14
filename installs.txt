@@ -1,0 +1,4 @@
+Prerequire:
+
+
+sudo apt install libicu-dev

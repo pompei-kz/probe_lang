@@ -1,0 +1,26 @@
+/cmake-build-debug*
+
+
+# IDEA
+# ----
+.idea
+!/.idea
+/.idea/*
+!/.idea/codeStyles
+!/.idea/dictionaries
+!/.idea/inspectionProfiles
+!/.idea/runConfigurations
+*/**/.idea
+.shelf
+*/**/*.iml
+*/**/*.ipr
+*/**/*.iws
+/*.iml
+/*.ipr
+/*.iws
+/out
+/subprojects/*/*.iml
+/subprojects/*/out
+/.teamcity/*.iml
+/.teamcity/target
+!/.teamcity/Gradle_Check_dsl.iml

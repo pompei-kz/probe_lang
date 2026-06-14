@@ -1,0 +1,19 @@
+networks:
+  probe-lang:
+    name: probe-lang
+
+services:
+
+  pg:
+    image: postgres:18.4-alpine3.23
+    container_name: probe-lang-pg
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: "pI9Tm1CWZwBucPPULcnS"
+    ports:
+      - "18401:5432"
+    volumes:
+      - ${APP_DATA_ROOT}/postgres-data:/var/lib/postgresql
+      - ./pg-init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - probe-lang
