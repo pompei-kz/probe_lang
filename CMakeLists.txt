@@ -25,6 +25,8 @@ add_executable(probe_lang
     src/TextEditor.cpp
     src/ContextMenu.cpp
     src/Dlg.cpp
+    src/MsgDlg.cpp
+    src/FormEditRepository.cpp
 )
 target_include_directories(probe_lang PRIVATE ${stb_SOURCE_DIR})
 target_link_libraries(probe_lang PRIVATE SDL3::SDL3)

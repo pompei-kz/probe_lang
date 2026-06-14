@@ -38,6 +38,8 @@ std::vector<Conn> load_all()
         c.user = val;
       else if (k == "pass")
         c.pass = val;
+      else if (k == "connected")
+        c.connected = (val == "YES");
     }
     v.push_back(std::move(c));
   }
@@ -56,5 +58,6 @@ void save_conn(const Conn &c, const std::string &old_name)
   fs::create_directories(d);
   if (!old_name.empty() && old_name != c.name) fs::remove(d / (old_name + EXT));
   std::ofstream f(d / (c.name + EXT));
-  f << "host=" << c.host << "\nport=" << c.port << "\nuser=" << c.user << "\npass=" << c.pass << "\n";
+  f << "host=" << c.host << "\nport=" << c.port << "\nuser=" << c.user << "\npass=" << c.pass
+    << "\nconnected=" << (c.connected ? "YES" : "NO") << "\n";
 }

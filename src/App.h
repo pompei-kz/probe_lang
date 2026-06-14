@@ -1,6 +1,9 @@
 #pragma once
 #include "Conn.h"
+#include "ConnNode.h"
 #include "Dlg.h"
+#include "FormEditRepository.h"
+#include "MsgDlg.h"
 #include "PanelMenu.h"
 #include <SDL3/SDL.h>
 #include <vector>
@@ -11,8 +14,10 @@ struct App
   SDL_Renderer *ren = nullptr;
   int           ww = 1280, wh = 720;
 
-  std::vector<Conn> conns;
-  Dlg               dlg;
+  std::vector<ConnNode> conns;
+  Dlg                   dlg;
+  FormEditRepository    repo_dlg;
+  MsgDlg                msg_dlg;
 
   int      h_item     = -1;
   int      h_edit     = -1;
@@ -21,4 +26,22 @@ struct App
   float    my         = 0;
   bool     lmb_held   = false;
   PanelMenu panel_menu;
+
+  void reload_conns() {
+    auto fresh = load_all();
+    std::vector<ConnNode> updated;
+    updated.reserve(fresh.size());
+    for (auto &c : fresh) {
+      ConnNode node{c, false, {}};
+      for (auto &old : conns) {
+        if (old.conn.name == c.name) {
+          node.open    = old.open;
+          node.schemas = old.schemas;
+          break;
+        }
+      }
+      updated.push_back(std::move(node));
+    }
+    conns = std::move(updated);
+  }
 };

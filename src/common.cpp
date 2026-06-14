@@ -1,9 +1,11 @@
 #include "common.h"
 #include "Conn.h"
+#include "ConnNode.h"
 #include "ConnTest.h"
 #include "ContextMenu.h"
 #include "FontAtlas.h"
 #include "PanelMenu.h"
+#include "SchemaNode.h"
 #include "render_helpers.h"
 
 void draw_plus(SDL_Renderer *r, float cx, float cy, float sz, Clr c)
@@ -150,10 +152,30 @@ int dlg_render(SDL_Renderer *ren, Dlg &d, const DlgMouse &m)
   return 0;
 }
 
-// ── left panel ────────────────────────────────────────────────────────────────
-static constexpr float ITEM_H = 30.f, HDR_H = 38.f, PAD = 10.f, ICON_SZ = 8.f, EDIT_W = 30.f;
+// ── left panel helpers ────────────────────────────────────────────────────────
+static constexpr float ITEM_H  = 30.f, HDR_H  = 38.f, PAD    = 10.f;
+static constexpr float ICON_SZ = 8.f,  EDIT_W = 30.f, CARET_W = 22.f;
 
-void panel_render(SDL_Renderer *ren, App &app, bool click, bool rclick)
+// Right-pointing (collapsed) or down-pointing (expanded) triangle
+static void draw_caret(SDL_Renderer *r, float cx, float cy, bool open, Clr c)
+{
+  sc(r, c);
+  if (open) {
+    // ▼
+    SDL_RenderLine(r, cx - 5, cy - 2, cx + 5, cy - 2);
+    SDL_RenderLine(r, cx - 5, cy - 2, cx,     cy + 3);
+    SDL_RenderLine(r, cx + 5, cy - 2, cx,     cy + 3);
+    SDL_RenderLine(r, cx - 3, cy,     cx + 3, cy);
+  } else {
+    // ▶
+    SDL_RenderLine(r, cx - 2, cy - 5, cx - 2, cy + 5);
+    SDL_RenderLine(r, cx - 2, cy - 5, cx + 3, cy);
+    SDL_RenderLine(r, cx - 2, cy + 5, cx + 3, cy);
+    SDL_RenderLine(r, cx - 2, cy,     cx,     cy);
+  }
+}
+
+void panel_render(SDL_Renderer *ren, App &app, bool click, bool rclick, bool dblclick)
 {
   const float pw = app.ww * 0.30f;
   const float ph = (float)app.wh;
@@ -181,27 +203,73 @@ void panel_render(SDL_Renderer *ren, App &app, bool click, bool rclick)
 
   app.h_item = -1;
   app.h_edit = -1;
+  int row    = 0;
+
   for (int i = 0; i < (int)app.conns.size(); i++) {
-    float iy     = HDR_H + i * ITEM_H;
-    bool  h_row  = hit(app.mx, app.my, 0, iy, pw - EDIT_W, ITEM_H);
-    bool  h_edit = hit(app.mx, app.my, pw - EDIT_W, iy, EDIT_W, ITEM_H);
-    if (h_row) app.h_item = i;
+    ConnNode   &node      = app.conns[i];
+    const bool  connected = node.conn.connected;
+    float       iy        = HDR_H + row * ITEM_H;
+
+    bool h_row  = hit(app.mx, app.my, 0,          iy, pw - EDIT_W, ITEM_H);
+    bool h_edit = hit(app.mx, app.my, pw - EDIT_W, iy, EDIT_W,     ITEM_H);
+    if (h_row)  app.h_item = i;
     if (h_edit) app.h_edit = i;
     if (h_row || h_edit) fill(ren, C_HOVER, 0, iy, pw, ITEM_H);
-    text_draw(ren, app.conns[i].name.c_str(), PAD, center_baseline(iy, ITEM_H), C_TEXT);
+
+    // caret on the left (only for connected nodes)
+    float caret_cx = PAD + CARET_W * .5f;
+    float caret_cy = iy + ITEM_H * .5f;
+    if (connected)
+      draw_caret(ren, caret_cx, caret_cy, node.open, node.open ? C_ACCENT : C_DIM);
+
+    // name: indented to make room for caret; dim if disconnected
+    Clr name_clr = connected ? C_TEXT : C_DIM;
+    text_draw(ren, node.conn.name.c_str(), PAD + CARET_W, center_baseline(iy, ITEM_H), name_clr);
+
     draw_pencil(ren, pw - EDIT_W * .5f, iy + ITEM_H * .5f, ICON_SZ, h_edit ? C_ACCENT : C_DIM);
+
     sc(ren, C_BORDER);
     SDL_FRect line{0, iy + ITEM_H - 1, pw, 1};
     SDL_RenderFillRect(ren, &line);
+
     if (click && h_edit) {
-      app.dlg.open_edit(app.conns[i]);
+      app.dlg.open_edit(node.conn);
       app.dlg.open = true;
       SDL_StartTextInput(app.win);
+    }
+    // double-click on row toggles open/close (only when connected)
+    if (dblclick && h_row && connected) {
+      if (node.open) {
+        node.open = false;
+      } else {
+        std::vector<SchemaNode> schemas;
+        auto [ok, err] = connect_and_load(node.conn, schemas);
+        if (ok) {
+          node.open    = true;
+          node.schemas = std::move(schemas);
+        } else {
+          app.msg_dlg = {true, "Connection error", std::move(err)};
+        }
+      }
     }
     if (rclick && (h_row || h_edit)) {
       float mx2 = std::min(app.mx, pw - PanelMenu::W - 2.f);
       float my2 = std::min(app.my, ph - PanelMenu::N * PanelMenu::IH - 10.f);
       app.panel_menu = PanelMenu{true, mx2, my2, i};
+    }
+    row++;
+
+    if (node.open) {
+      for (auto &schema : node.schemas) {
+        float sy = HDR_H + row * ITEM_H;
+        if (hit(app.mx, app.my, 0, sy, pw, ITEM_H)) fill(ren, C_HOVER, 0, sy, pw, ITEM_H);
+        fill(ren, C_ACCENT, PAD + 18, sy + (ITEM_H - 4) * .5f, 4, 4);
+        text_draw(ren, schema.repo_name.c_str(), PAD + 26, center_baseline(sy, ITEM_H), C_TEXT);
+        sc(ren, C_BORDER);
+        SDL_FRect sl{0, sy + ITEM_H - 1, pw, 1};
+        SDL_RenderFillRect(ren, &sl);
+        row++;
+      }
     }
   }
 
@@ -209,17 +277,35 @@ void panel_render(SDL_Renderer *ren, App &app, bool click, bool rclick)
   SDL_FRect div{pw - 1, 0, 1, ph};
   SDL_RenderFillRect(ren, &div);
 
-  int act = app.panel_menu.render(ren, app.mx, app.my, click, rclick);
-  if (act == 0) {
+  int  act      = app.panel_menu.render(ren, app.mx, app.my, click, rclick);
+  int  ci       = app.panel_menu.conn_idx;
+  bool valid_ci = ci >= 0 && ci < (int)app.conns.size();
+
+  if (act == 0 && valid_ci) {
+    // Присоединиться: verify connection, mark connected, persist
+    ConnNode &node = app.conns[ci];
+    auto [ok, err] = test_connection(node.conn.host, node.conn.port,
+                                     node.conn.user, node.conn.pass);
+    if (ok) {
+      node.conn.connected = true;
+      save_conn(node.conn);
+    } else {
+      app.msg_dlg = {true, "Connection failed", std::move(err)};
+    }
+  } else if (act == 1 && valid_ci) {
+    app.repo_dlg.open_for(app.conns[ci].conn);
+    app.repo_dlg.open = true;
+    SDL_StartTextInput(app.win);
+  } else if (act == 2) {
     app.dlg.open_add();
     app.dlg.open = true;
     SDL_StartTextInput(app.win);
-  } else if (act == 1 && app.panel_menu.conn_idx >= 0 && app.panel_menu.conn_idx < (int)app.conns.size()) {
-    app.dlg.open_edit(app.conns[app.panel_menu.conn_idx]);
+  } else if (act == 3 && valid_ci) {
+    app.dlg.open_edit(app.conns[ci].conn);
     app.dlg.open = true;
     SDL_StartTextInput(app.win);
-  } else if (act == 2 && app.panel_menu.conn_idx >= 0 && app.panel_menu.conn_idx < (int)app.conns.size()) {
-    delete_conn(app.conns[app.panel_menu.conn_idx].name);
-    app.conns = load_all();
+  } else if (act == 4 && valid_ci) {
+    delete_conn(app.conns[ci].conn.name);
+    app.reload_conns();
   }
 }

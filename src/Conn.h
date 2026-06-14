@@ -6,6 +6,7 @@
 struct Conn
 {
   std::string name, host, port, user, pass;
+  bool        connected = false;
 };
 
 std::filesystem::path ws_dir();
