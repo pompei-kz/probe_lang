@@ -4,10 +4,14 @@
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
 
+#include <unicode/utf8.h>
+#include <unicode/utypes.h>
+
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "resources.hpp"
@@ -30,74 +34,145 @@ constexpr Clr C_ERR    {0xf3,0x8b,0xa8};
 constexpr Clr C_OK     {0xa6,0xe3,0xa1};
 
 // ── font ─────────────────────────────────────────────────────────────────────
-static constexpr int   FA_W = 512, FA_H = 256;
-static constexpr float FS   = 14.0f;
+static constexpr float FS = 14.0f;
 
-static stbtt_packedchar g_glyphs[96];
-static SDL_Texture*     g_font   = nullptr;
-static float            g_asc    = 0; // ascent in pixels (positive)
-static float            g_desc   = 0; // descent in pixels (negative)
+// One entry per unique codepoint, added on first use.
+struct GlyphInfo {
+    int   tx, ty, tw, th; // position in atlas texture (pixels)
+    int   bx, by;         // bearing: offset from pen-origin to glyph top-left
+    float adv;            // horizontal advance
+    bool  visible;        // false for whitespace / missing glyphs
+};
+
+struct FontAtlas {
+    // Atlas size. 2048×2048 holds thousands of glyphs at 14 px.
+    static constexpr int W = 2048, H = 2048, PAD = 1;
+
+    SDL_Renderer*                          ren   = nullptr;
+    SDL_Texture*                           tex   = nullptr;
+    const SDL_PixelFormatDetails*          pfmt  = nullptr;
+    std::unordered_map<UChar32, GlyphInfo> cache;
+
+    stbtt_fontinfo info;
+    float          scale = 1.f;
+    float          asc   = 0.f; // ascent  (positive, pixels above baseline)
+    float          desc  = 0.f; // descent (negative, pixels below baseline)
+
+    // Row-advance packer state
+    int cx = PAD, cy = PAD, rh = 0;
+
+    void init(SDL_Renderer* r, const unsigned char* ttf, float size) {
+        ren = r;
+        stbtt_InitFont(&info, ttf, stbtt_GetFontOffsetForIndex(ttf, 0));
+        scale = stbtt_ScaleForPixelHeight(&info, size);
+        int ai, di, lg;
+        stbtt_GetFontVMetrics(&info, &ai, &di, &lg);
+        asc  = ai * scale;
+        desc = di * scale;
+
+        pfmt = SDL_GetPixelFormatDetails(SDL_PIXELFORMAT_RGBA32);
+        tex  = SDL_CreateTexture(r, SDL_PIXELFORMAT_RGBA32,
+                                 SDL_TEXTUREACCESS_STATIC, W, H);
+        SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
+
+        // Clear atlas to fully transparent
+        std::vector<Uint32> blank(W * H, 0);
+        SDL_UpdateTexture(tex, nullptr, blank.data(), W * sizeof(Uint32));
+    }
+
+    // Returns cached glyph, rasterizing it on first access.
+    const GlyphInfo& get(UChar32 cp) {
+        auto it = cache.find(cp);
+        if (it != cache.end()) return it->second;
+        return bake(cp);
+    }
+
+private:
+    const GlyphInfo& bake(UChar32 cp) {
+        GlyphInfo g{};
+        int gw, gh, gbx, gby;
+        unsigned char* bmp = stbtt_GetCodepointBitmap(
+            &info, 0, scale, static_cast<int>(cp), &gw, &gh, &gbx, &gby);
+
+        if (bmp && gw > 0 && gh > 0) {
+            // Advance to next row if this glyph doesn't fit horizontally
+            if (cx + gw + PAD > W) { cx = PAD; cy += rh + PAD; rh = 0; }
+
+            if (cy + gh + PAD <= H) {
+                // Convert 8-bit alpha bitmap → RGBA and upload the subrect
+                std::vector<Uint32> rgba(gw * gh);
+                for (int i = 0; i < gw * gh; i++)
+                    rgba[i] = SDL_MapRGBA(pfmt, nullptr, 255, 255, 255, bmp[i]);
+                SDL_Rect r{cx, cy, gw, gh};
+                SDL_UpdateTexture(tex, &r, rgba.data(), gw * sizeof(Uint32));
+
+                g.tx = cx;  g.ty = cy;
+                g.tw = gw;  g.th = gh;
+                g.bx = gbx; g.by = gby;
+                g.visible = true;
+
+                cx += gw + PAD;
+                rh  = std::max(rh, gh);
+            }
+        }
+
+        int adv, lsb;
+        stbtt_GetCodepointHMetrics(&info, static_cast<int>(cp), &adv, &lsb);
+        g.adv = adv * scale;
+
+        if (bmp) stbtt_FreeBitmap(bmp, nullptr);
+
+        return cache.emplace(cp, g).first->second;
+    }
+};
+
+static FontAtlas g_atlas;
 
 static void font_init(SDL_Renderer* ren) {
     const auto* ttf = reinterpret_cast<const unsigned char*>(
         resources::fonts::Roboto_Regular_ttf.data());
-
-    static unsigned char atlas[FA_H * FA_W];
-    stbtt_pack_context ctx;
-    stbtt_PackBegin(&ctx, atlas, FA_W, FA_H, 0, 1, nullptr);
-    stbtt_PackSetOversampling(&ctx, 2, 2);
-    stbtt_PackFontRange(&ctx, ttf, 0, FS, 32, 96, g_glyphs);
-    stbtt_PackEnd(&ctx);
-
-    stbtt_fontinfo info;
-    stbtt_InitFont(&info, ttf, stbtt_GetFontOffsetForIndex(ttf, 0));
-    float scale = stbtt_ScaleForPixelHeight(&info, FS);
-    int ai, di, lg;
-    stbtt_GetFontVMetrics(&info, &ai, &di, &lg);
-    g_asc  = ai * scale;
-    g_desc = di * scale;
-
-    g_font = SDL_CreateTexture(ren, SDL_PIXELFORMAT_RGBA32,
-                               SDL_TEXTUREACCESS_STATIC, FA_W, FA_H);
-    SDL_SetTextureBlendMode(g_font, SDL_BLENDMODE_BLEND);
-    const auto* fmt = SDL_GetPixelFormatDetails(SDL_PIXELFORMAT_RGBA32);
-    std::vector<Uint32> px(FA_W * FA_H);
-    for (int i = 0; i < FA_W * FA_H; i++)
-        px[i] = SDL_MapRGBA(fmt, nullptr, 255, 255, 255, atlas[i]);
-    SDL_UpdateTexture(g_font, nullptr, px.data(), FA_W * sizeof(Uint32));
+    g_atlas.init(ren, ttf, FS);
 }
 
-// x = left edge, y = baseline
+// x = left edge, y = baseline.
+// Iterates UTF-8 via ICU U8_NEXT; rasterizes unseen glyphs on demand.
 static float text_draw(SDL_Renderer* ren, const char* s, float x, float y, Clr c) {
-    SDL_SetTextureColorMod(g_font, c.r, c.g, c.b);
-    SDL_SetTextureAlphaMod(g_font, c.a);
-    float cx = x, by = y;
-    for (; *s; ++s) {
-        auto ch = (unsigned char)*s;
-        if (ch < 32 || ch >= 128) continue;
-        stbtt_aligned_quad q;
-        stbtt_GetPackedQuad(g_glyphs, FA_W, FA_H, ch - 32, &cx, &by, &q, 0);
-        SDL_FRect src{q.s0*FA_W, q.t0*FA_H, (q.s1-q.s0)*FA_W, (q.t1-q.t0)*FA_H};
-        SDL_FRect dst{q.x0, q.y0, q.x1-q.x0, q.y1-q.y0};
-        SDL_RenderTexture(ren, g_font, &src, &dst);
+    SDL_SetTextureColorMod(g_atlas.tex, c.r, c.g, c.b);
+    SDL_SetTextureAlphaMod(g_atlas.tex, c.a);
+    float px = x;
+    int32_t i = 0, len = static_cast<int32_t>(strlen(s));
+    while (i < len) {
+        UChar32 cp;
+        U8_NEXT(reinterpret_cast<const uint8_t*>(s), i, len, cp);
+        if (cp < 0) continue; // invalid UTF-8 byte
+        const auto& g = g_atlas.get(cp);
+        if (g.visible) {
+            SDL_FRect src{static_cast<float>(g.tx), static_cast<float>(g.ty),
+                          static_cast<float>(g.tw), static_cast<float>(g.th)};
+            SDL_FRect dst{px + g.bx, y + g.by,
+                          static_cast<float>(g.tw), static_cast<float>(g.th)};
+            SDL_RenderTexture(ren, g_atlas.tex, &src, &dst);
+        }
+        px += g.adv;
     }
-    return cx - x;
+    return px - x;
 }
 
 static float text_w(const char* s) {
-    float cx = 0, y = 0;
-    for (; *s; ++s) {
-        auto ch = (unsigned char)*s;
-        if (ch < 32 || ch >= 128) continue;
-        stbtt_aligned_quad q;
-        stbtt_GetPackedQuad(g_glyphs, FA_W, FA_H, ch - 32, &cx, &y, &q, 0);
+    float px = 0;
+    int32_t i = 0, len = static_cast<int32_t>(strlen(s));
+    while (i < len) {
+        UChar32 cp;
+        U8_NEXT(reinterpret_cast<const uint8_t*>(s), i, len, cp);
+        if (cp < 0) continue;
+        px += g_atlas.get(cp).adv;
     }
-    return cx;
+    return px;
 }
 
-// baseline y for text centered vertically in box (box_y, box_h)
+// Baseline y for text vertically centred inside a box (top=box_y, height=box_h).
 static float center_baseline(float box_y, float box_h) {
-    return box_y + (box_h + g_asc + g_desc) * 0.5f;
+    return box_y + (box_h + g_atlas.asc + g_atlas.desc) * 0.5f;
 }
 
 // ── SDL helpers ───────────────────────────────────────────────────────────────
