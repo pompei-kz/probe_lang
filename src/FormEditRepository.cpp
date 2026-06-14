@@ -20,7 +20,7 @@ void FormEditRepository::open_for(const Conn &c)
   conn       = c;
 }
 
-int FormEditRepository::render(SDL_Renderer *ren, float mx, float my, bool ldown, bool rdown, int /*clicks*/)
+int FormEditRepository::render(SDL_Renderer *ren, float mx, float my, bool ldown, bool rdown, int clicks)
 {
   if (!open) return 0;
 
@@ -57,7 +57,7 @@ int FormEditRepository::render(SDL_Renderer *ren, float mx, float my, bool ldown
 
   // error text view — always at fixed position below fields
   float ev_y = ct + 2 * FFS + 6;
-  err_view.render(ren, dx + 16, ev_y, fw, ERR_H, mx, my, ldown, rdown, C_ERR);
+  err_view.render(ren, dx + 16, ev_y, fw, ERR_H, mx, my, ldown, rdown, C_ERR, clicks);
 
   constexpr float BH = 30.f, BW_S = 80.f, BW_C = 80.f;
   float           btn_y = dy + FDH - 50;

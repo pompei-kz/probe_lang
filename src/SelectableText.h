@@ -28,11 +28,14 @@ struct SelectableText {
     bool mouse_over(float mx, float my) const;
 
     void render(SDL_Renderer *ren, float bx, float by, float bw, float bh,
-                float mx, float my, bool ldown, bool rdown, Clr text_clr = C_TEXT);
+                float mx, float my, bool ldown, bool rdown,
+                Clr text_clr = C_TEXT, int clicks = 1);
 
 private:
-    void    build_lines();
-    int32_t pos_at(float abs_x, int li) const;
-    int32_t pos_at_mouse(float abs_x, float abs_y) const;
-    float   total_h() const;
+    void                        build_lines();
+    int32_t                     pos_at(float abs_x, int li) const;
+    int32_t                     pos_at_mouse(float abs_x, float abs_y) const;
+    int                         line_idx_at(float abs_y) const;
+    std::pair<int32_t,int32_t>  word_range_at(int32_t pos) const;
+    float                       total_h() const;
 };

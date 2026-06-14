@@ -68,11 +68,49 @@ int32_t SelectableText::pos_at(float abs_x, int li) const
   return ln.start + ln.len;
 }
 
-int32_t SelectableText::pos_at_mouse(float abs_x, float abs_y) const
+int SelectableText::line_idx_at(float abs_y) const
 {
   int li = (int)((abs_y - (box_y + PADY) + scroll_y) / LINE_H);
-  li     = std::clamp(li, 0, (int)lines.size() - 1);
-  return pos_at(abs_x, li);
+  return std::clamp(li, 0, (int)lines.size() - 1);
+}
+
+int32_t SelectableText::pos_at_mouse(float abs_x, float abs_y) const
+{
+  return pos_at(abs_x, line_idx_at(abs_y));
+}
+
+std::pair<int32_t,int32_t> SelectableText::word_range_at(int32_t pos) const
+{
+  int32_t        n = (int32_t)text.size();
+  if (n == 0) return {0, 0};
+  const uint8_t *s = reinterpret_cast<const uint8_t *>(text.data());
+
+  UChar32 ref = ' ';
+  if (pos < n) {
+    int32_t p = pos;
+    U8_NEXT(s, p, n, ref);
+  } else if (pos > 0) {
+    int32_t p = pos;
+    U8_PREV(s, 0, p, ref);
+  }
+  bool alnum = u_isalnum(ref) != 0;
+
+  int32_t lo = pos, hi = pos;
+  while (lo > 0) {
+    int32_t p = lo;
+    UChar32 cp;
+    U8_PREV(s, 0, p, cp);
+    if ((u_isalnum(cp) != 0) != alnum) break;
+    lo = p;
+  }
+  while (hi < n) {
+    int32_t p = hi;
+    UChar32 cp;
+    U8_NEXT(s, p, n, cp);
+    if ((u_isalnum(cp) != 0) != alnum) break;
+    hi = p;
+  }
+  return {lo, hi};
 }
 
 void SelectableText::do_copy() const
@@ -136,7 +174,8 @@ void SelectableText::on_scroll(float dy)
 }
 
 void SelectableText::render(SDL_Renderer *ren, float bx, float by, float bw, float bh,
-                            float mx, float my, bool ldown, bool rdown, Clr text_clr)
+                            float mx, float my, bool ldown, bool rdown,
+                            Clr text_clr, int clicks)
 {
   box_x = bx; box_y = by; box_w = bw; box_h = bh;
 
@@ -227,16 +266,36 @@ void SelectableText::render(SDL_Renderer *ren, float bx, float by, float bw, flo
 
   if (ldown) {
     if (over_box && !ctx_open) {
-      int32_t p  = pos_at_mouse(mx, my);
-      bool    sh = (SDL_GetModState() & SDL_KMOD_SHIFT) != 0;
-      if (sh) {
-        if (sel_start < 0) sel_start = cursor;
+      focused = true;
+      if (clicks >= 4 || (clicks >= 3 && lines.size() == 1)) {
+        // 4+ clicks (or 3+ on single line): select all
+        sel_start = 0;
+        cursor    = (int32_t)text.size();
+        dragging  = false;
+      } else if (clicks == 3) {
+        // triple click: select whole line
+        int li    = line_idx_at(my);
+        sel_start = lines[li].start;
+        cursor    = lines[li].start + lines[li].len;
+        dragging  = false;
+      } else if (clicks == 2) {
+        // double click: select word
+        auto [lo, hi] = word_range_at(pos_at_mouse(mx, my));
+        sel_start     = lo;
+        cursor        = hi;
+        dragging      = false;
       } else {
-        sel_start = p;
+        // single click
+        int32_t p  = pos_at_mouse(mx, my);
+        bool    sh = (SDL_GetModState() & SDL_KMOD_SHIFT) != 0;
+        if (sh) {
+          if (sel_start < 0) sel_start = cursor;
+        } else {
+          sel_start = p;
+        }
+        cursor   = p;
+        dragging = true;
       }
-      cursor   = p;
-      focused  = true;
-      dragging = true;
     } else if (!over_box && !ctx_open) {
       focused  = false;
       dragging = false;
