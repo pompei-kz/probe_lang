@@ -56,6 +56,8 @@ int main(int /*argc*/, char * /*argv*/[])
               for (auto &f : app.repo_dlg.fields) f.on_move(ev.motion.x);
             app.repo_dlg.err_view.on_move(ev.motion.x, ev.motion.y);
           }
+          if (app.folder_dlg.open && app.lmb_held)
+            app.folder_dlg.name_field.on_move(ev.motion.x);
           break;
 
         case SDL_EVENT_MOUSE_BUTTON_DOWN:
@@ -82,6 +84,8 @@ int main(int /*argc*/, char * /*argv*/[])
               for (auto &f : app.repo_dlg.fields) f.on_release();
               app.repo_dlg.err_view.on_release();
             }
+            if (app.folder_dlg.open)
+              app.folder_dlg.name_field.on_release();
           }
           break;
 
@@ -94,6 +98,8 @@ int main(int /*argc*/, char * /*argv*/[])
             app.dlg.fields[app.dlg.focus].handle_text(ev.text.text);
           else if (app.repo_dlg.open)
             app.repo_dlg.fields[app.repo_dlg.focus].handle_text(ev.text.text);
+          else if (app.folder_dlg.open)
+            app.folder_dlg.name_field.handle_text(ev.text.text);
           break;
 
         case SDL_EVENT_KEY_DOWN:
@@ -139,6 +145,13 @@ int main(int /*argc*/, char * /*argv*/[])
                   break;
                 default: break;
               }
+            }
+          } else if (app.folder_dlg.open) {
+            SDL_Keymod mod      = ev.key.mod;
+            bool       consumed = app.folder_dlg.name_field.handle_key(ev.key.key, mod);
+            if (!consumed && ev.key.key == SDLK_ESCAPE) {
+              app.folder_dlg.open = false;
+              SDL_StopTextInput(app.win);
             }
           }
           break;
@@ -203,6 +216,27 @@ int main(int /*argc*/, char * /*argv*/[])
       }
     }
 
+    if (app.folder_dlg.open) {
+      float mx2 = lclick ? lclick_x : app.mx;
+      float my2 = lclick ? lclick_y : app.my;
+      int   res = app.folder_dlg.render(app.ren, mx2, my2, lclick, rclick, lclicks);
+      if (res == 1) {
+        int fci = app.folder_dlg.conn_idx;
+        int fri = app.folder_dlg.repo_idx;
+        if (fci >= 0 && fci < (int)app.conns.size() &&
+            fri >= 0 && fri < (int)app.conns[fci].repos.size()) {
+          auto &repo = app.conns[fci].repos[fri];
+          auto [ok, err] = load_repo_folders(app.conns[fci].conn, repo.schema_name, repo.folders);
+          if (!ok) app.msg_dlg = {true, "Ошибка", std::move(err)};
+        }
+        app.folder_dlg.open = false;
+        SDL_StopTextInput(app.win);
+      } else if (res == -1) {
+        app.folder_dlg.open = false;
+        SDL_StopTextInput(app.win);
+      }
+    }
+
     if (app.msg_dlg.open) {
       if (app.msg_dlg.render(app.ren, app.mx, app.my, lclick)) app.msg_dlg.open = false;
     }
@@ -210,14 +244,37 @@ int main(int /*argc*/, char * /*argv*/[])
     if (app.confirm_dlg.open) {
       int res = app.confirm_dlg.render(app.ren, app.mx, app.my, lclick);
       if (res == 1) {
-        int idx = app.pending_delete_idx;
-        if (idx >= 0 && idx < (int)app.conns.size()) {
-          delete_conn(app.conns[idx].conn.name);
-          app.reload_conns();
+        if (app.pending_delete_idx >= 0) {
+          int idx = app.pending_delete_idx;
+          if (idx < (int)app.conns.size()) {
+            delete_conn(app.conns[idx].conn.name);
+            app.reload_conns();
+          }
+          app.pending_delete_idx = -1;
+        } else if (!app.pending_delete_folder_id.empty()) {
+          int fci = app.pending_delete_folder_conn;
+          int fri = app.pending_delete_folder_repo;
+          if (fci >= 0 && fci < (int)app.conns.size() &&
+              fri >= 0 && fri < (int)app.conns[fci].repos.size()) {
+            auto &repo = app.conns[fci].repos[fri];
+            auto [ok, err] = delete_folder_recursive(
+                app.conns[fci].conn, repo.schema_name, app.pending_delete_folder_id);
+            if (ok) {
+              auto [ok2, err2] = load_repo_folders(app.conns[fci].conn, repo.schema_name, repo.folders);
+              if (!ok2) app.msg_dlg = {true, "Ошибка", std::move(err2)};
+            } else {
+              app.msg_dlg = {true, "Ошибка", std::move(err)};
+            }
+          }
+          app.pending_delete_folder_conn = -1;
+          app.pending_delete_folder_repo = -1;
+          app.pending_delete_folder_id.clear();
         }
-        app.pending_delete_idx = -1;
       } else if (res == -1) {
         app.pending_delete_idx = -1;
+        app.pending_delete_folder_conn = -1;
+        app.pending_delete_folder_repo = -1;
+        app.pending_delete_folder_id.clear();
       }
     }
 

@@ -172,6 +172,52 @@ static void draw_caret(SDL_Renderer *r, float cx, float cy, bool open, Clr c)
   }
 }
 
+static void draw_folder_icon(SDL_Renderer *r, float x, float y, Clr c)
+{
+  sc(r, c);
+  SDL_FRect tab{x, y - 2.f, 6.f, 3.f};
+  SDL_RenderFillRect(r, &tab);
+  SDL_FRect body{x, y, 10.f, 7.f};
+  SDL_RenderFillRect(r, &body);
+}
+
+static void render_folder_list(SDL_Renderer *ren, App &app,
+    std::vector<FolderNode> &folders, int ci, int ri, int depth,
+    int &row, float pw, float ph, bool click, bool rclick)
+{
+  static constexpr float STEP = 14.f;
+  for (auto &folder : folders) {
+    float       iy        = HDR_H + row * ITEM_H;
+    float       ix        = PAD + CARET_W + (depth + 1) * STEP;
+    const bool  has_kids  = !folder.children.empty();
+    bool        h_caret   = has_kids && hit(app.mx, app.my, 0, iy, ix, ITEM_H);
+    bool        h_row     = !h_caret && hit(app.mx, app.my, 0, iy, pw, ITEM_H);
+    if (h_caret || h_row) fill(ren, C_HOVER, 0, iy, pw, ITEM_H);
+
+    if (has_kids)
+      draw_caret(ren, ix - 9.f, iy + ITEM_H * .5f, folder.open,
+                 folder.open ? C_ACCENT : C_DIM);
+
+    draw_folder_icon(ren, ix, iy + ITEM_H * .5f - 3.f, C_DIM);
+    text_draw(ren, folder.name.c_str(), ix + 14.f, center_baseline(iy, ITEM_H), C_TEXT);
+    sc(ren, C_BORDER);
+    SDL_FRect sl{0, iy + ITEM_H - 1, pw, 1};
+    SDL_RenderFillRect(ren, &sl);
+
+    if (click && h_caret)  folder.open = !folder.open;
+    if (rclick && (h_caret || h_row)) {
+      float mx2 = std::min(app.mx, pw - FolderMenu::W - 2.f);
+      float my2 = std::min(app.my, ph - FolderMenu::N * FolderMenu::IH - 10.f);
+      app.folder_menu = {true, mx2, my2, ci, ri, folder.id, folder.name};
+      app.panel_menu.open = false;
+      app.repo_menu.open  = false;
+    }
+    row++;
+    if (folder.open)
+      render_folder_list(ren, app, folder.children, ci, ri, depth + 1, row, pw, ph, click, rclick);
+  }
+}
+
 void panel_render(SDL_Renderer *ren, App &app, bool click, bool rclick, bool dblclick)
 {
   const float pw = app.ww * 0.30f;
@@ -257,13 +303,14 @@ void panel_render(SDL_Renderer *ren, App &app, bool click, bool rclick, bool dbl
       float mx2 = std::min(app.mx, pw - PanelMenu::W - 2.f);
       float my2 = std::min(app.my, ph - PanelMenu::N * PanelMenu::IH - 10.f);
       app.panel_menu  = PanelMenu{true, mx2, my2, i, connected};
-      app.repo_menu.open = false;
+      app.repo_menu.open    = false;
+      app.folder_menu.open  = false;
     }
     row++;
 
     if (node.open) {
       for (int ri = 0; ri < (int)node.repos.size(); ri++) {
-        const auto &repo = node.repos[ri];
+        auto &repo = node.repos[ri];
         float sy = HDR_H + row * ITEM_H;
         if (hit(app.mx, app.my, 0, sy, pw, ITEM_H)) fill(ren, C_HOVER, 0, sy, pw, ITEM_H);
         fill(ren, C_ACCENT, PAD + 18, sy + (ITEM_H - 4) * .5f, 4, 4);
@@ -275,9 +322,11 @@ void panel_render(SDL_Renderer *ren, App &app, bool click, bool rclick, bool dbl
           float mx2 = std::min(app.mx, pw - RepoMenu::W - 2.f);
           float my2 = std::min(app.my, ph - RepoMenu::N * RepoMenu::IH - 10.f);
           app.repo_menu = RepoMenu{true, mx2, my2, i, ri};
-          app.panel_menu.open = false;
+          app.panel_menu.open  = false;
+          app.folder_menu.open = false;
         }
         row++;
+        render_folder_list(ren, app, repo.folders, i, ri, 0, row, pw, ph, click, rclick);
       }
     }
   }
@@ -337,5 +386,38 @@ void panel_render(SDL_Renderer *ren, App &app, bool click, bool rclick, bool dbl
     app.repo_dlg.open_edit_for(app.conns[rci].conn, app.conns[rci].repos[rri]);
     app.repo_dlg.open = true;
     SDL_StartTextInput(app.win);
+  } else if (ract == 1 && valid_rci) {
+    app.folder_dlg.open_add(rci, rri,
+        app.conns[rci].conn, app.conns[rci].repos[rri].schema_name, "");
+    app.folder_dlg.open = true;
+    SDL_StartTextInput(app.win);
+  }
+
+  int  fmact = app.folder_menu.render(ren, app.mx, app.my, click, rclick);
+  int  fmci  = app.folder_menu.conn_idx;
+  int  fmri  = app.folder_menu.repo_idx;
+  bool valid_fm = fmci >= 0 && fmci < (int)app.conns.size()
+               && fmri >= 0 && fmri < (int)app.conns[fmci].repos.size();
+
+  if (valid_fm) {
+    if (fmact == 0) {
+      app.folder_dlg.open_add(fmci, fmri,
+          app.conns[fmci].conn, app.conns[fmci].repos[fmri].schema_name,
+          app.folder_menu.folder_id);
+      app.folder_dlg.open = true;
+      SDL_StartTextInput(app.win);
+    } else if (fmact == 1) {
+      app.folder_dlg.open_edit(fmci, fmri,
+          app.conns[fmci].conn, app.conns[fmci].repos[fmri].schema_name,
+          app.folder_menu.folder_id, app.folder_menu.folder_name);
+      app.folder_dlg.open = true;
+      SDL_StartTextInput(app.win);
+    } else if (fmact == 2) {
+      app.pending_delete_folder_conn = fmci;
+      app.pending_delete_folder_repo = fmri;
+      app.pending_delete_folder_id   = app.folder_menu.folder_id;
+      app.confirm_dlg = {true, "Удаление папки",
+          "Удалить папку \"" + app.folder_menu.folder_name + "\" и все вложенные подпапки?"};
+    }
   }
 }

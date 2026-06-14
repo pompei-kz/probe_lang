@@ -3,6 +3,8 @@
 #include "ConfirmDlg.h"
 #include "ConnNode.h"
 #include "Dlg.h"
+#include "FolderMenu.h"
+#include "FormEditFolder.h"
 #include "FormEditRepository.h"
 #include "MsgDlg.h"
 #include "PanelMenu.h"
@@ -19,9 +21,14 @@ struct App
   std::vector<ConnNode> conns;
   Dlg                   dlg;
   FormEditRepository    repo_dlg;
+  FormEditFolder        folder_dlg;
   MsgDlg                msg_dlg;
   ConfirmDlg            confirm_dlg;
-  int                   pending_delete_idx = -1;
+
+  int         pending_delete_idx          = -1;  // connection
+  int         pending_delete_folder_conn  = -1;  // folder
+  int         pending_delete_folder_repo  = -1;
+  std::string pending_delete_folder_id;
 
   int       h_item   = -1;
   int       h_edit   = -1;
@@ -31,6 +38,7 @@ struct App
   bool      lmb_held = false;
   PanelMenu  panel_menu;
   RepoMenu   repo_menu;
+  FolderMenu folder_menu;
 
   void reload_conns()
   {

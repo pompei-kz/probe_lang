@@ -1,9 +1,9 @@
-#include "SchemaMenu.h"
+#include "FolderMenu.h"
 #include "Clr.h"
 #include "FontAtlas.h"
 #include "render_helpers.h"
 
-int RepoMenu::render(SDL_Renderer *r, float mx, float my, bool ldown, bool rdown)
+int FolderMenu::render(SDL_Renderer *r, float mx, float my, bool ldown, bool rdown)
 {
   if (!open) return -1;
   float h = N * IH + 4.f;
@@ -11,7 +11,7 @@ int RepoMenu::render(SDL_Renderer *r, float mx, float my, bool ldown, bool rdown
   fill(r, C_DLGBG, x, y, W, h);
   rect(r, C_BORDER, x, y, W, h);
 
-  static const char *labels[N] = {"Изменить репозиторий", "Добавить папку"};
+  static const char *labels[N] = {"Добавить папку", "Изменить эту папку", "Удалить эту папку"};
   for (int i = 0; i < N; i++) {
     float iy  = y + 2.f + i * IH;
     bool  hov = hit(mx, my, x, iy, W, IH);
