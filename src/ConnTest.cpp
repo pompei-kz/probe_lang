@@ -45,12 +45,10 @@ std::pair<bool, std::string> connect_and_load(const Conn &c, std::vector<SchemaN
     for (const auto &row : schema_rows) {
       std::string sch = row[0].c_str();
       try {
-        auto vr = txn.exec(
-            "SELECT value FROM " + pg.quote_name(sch) +
-            ".lang_setting WHERE name = 'name' LIMIT 1"
-        );
-        if (!vr.empty() && !vr[0][0].is_null())
+        pqxx::result vr = txn.exec("SELECT value FROM " + pg.quote_name(sch) + ".lang_setting WHERE name = 'name' LIMIT 1");
+        if (!vr.empty() && !vr[0][0].is_null()) {
           schemas.push_back({sch, vr[0][0].c_str()});
+        }
       } catch (...) {
         // skip schemas we can't query
       }
@@ -60,6 +58,16 @@ std::pair<bool, std::string> connect_and_load(const Conn &c, std::vector<SchemaN
   } catch (const std::exception &e) {
     return {false, e.what()};
   }
+}
+
+static std::string sql_err_msg(const pqxx::sql_error &e)
+{
+  std::string msg = e.what();
+  if (!e.query().empty()) {
+    msg += "\nSQL:\n";
+    msg += e.query();
+  }
+  return msg;
 }
 
 std::pair<bool, std::string> create_repository(
@@ -85,6 +93,8 @@ std::pair<bool, std::string> create_repository(
     );
     txn.commit();
     return {true, ""};
+  } catch (const pqxx::sql_error &e) {
+    return {false, sql_err_msg(e)};
   } catch (const std::exception &e) {
     return {false, e.what()};
   }
