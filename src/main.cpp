@@ -50,14 +50,15 @@ int main(int /*argc*/, char * /*argv*/[])
           app.mx = ev.motion.x;
           app.my = ev.motion.y;
           if (app.dlg.open && app.lmb_held)
-            for (auto &f : app.dlg.fields) f.on_move(ev.motion.x);
+            for (auto &f : app.dlg.fields)
+              f.on_move(ev.motion.x);
           if (app.repo_dlg.open) {
             if (app.lmb_held)
-              for (auto &f : app.repo_dlg.fields) f.on_move(ev.motion.x);
+              for (auto &f : app.repo_dlg.fields)
+                f.on_move(ev.motion.x);
             app.repo_dlg.err_view.on_move(ev.motion.x, ev.motion.y);
           }
-          if (app.folder_dlg.open && app.lmb_held)
-            app.folder_dlg.name_field.on_move(ev.motion.x);
+          if (app.folder_dlg.open && app.lmb_held) app.folder_dlg.name_field.on_move(ev.motion.x);
           break;
 
         case SDL_EVENT_MOUSE_BUTTON_DOWN:
@@ -79,13 +80,14 @@ int main(int /*argc*/, char * /*argv*/[])
           if (ev.button.button == SDL_BUTTON_LEFT) {
             app.lmb_held = false;
             if (app.dlg.open)
-              for (auto &f : app.dlg.fields) f.on_release();
+              for (auto &f : app.dlg.fields)
+                f.on_release();
             if (app.repo_dlg.open) {
-              for (auto &f : app.repo_dlg.fields) f.on_release();
+              for (auto &f : app.repo_dlg.fields)
+                f.on_release();
               app.repo_dlg.err_view.on_release();
             }
-            if (app.folder_dlg.open)
-              app.folder_dlg.name_field.on_release();
+            if (app.folder_dlg.open) app.folder_dlg.name_field.on_release();
           }
           break;
 
@@ -104,7 +106,8 @@ int main(int /*argc*/, char * /*argv*/[])
 
         case SDL_EVENT_KEY_DOWN:
           if (app.dlg.open) {
-            for (auto &f : app.dlg.fields) f.ctx.open = false;
+            for (auto &f : app.dlg.fields)
+              f.ctx.open = false;
             SDL_Keymod mod      = ev.key.mod;
             bool       consumed = app.dlg.fields[app.dlg.focus].handle_key(ev.key.key, mod);
             if (!consumed) {
@@ -223,9 +226,8 @@ int main(int /*argc*/, char * /*argv*/[])
       if (res == 1) {
         int fci = app.folder_dlg.conn_idx;
         int fri = app.folder_dlg.repo_idx;
-        if (fci >= 0 && fci < (int)app.conns.size() &&
-            fri >= 0 && fri < (int)app.conns[fci].repos.size()) {
-          auto &repo = app.conns[fci].repos[fri];
+        if (fci >= 0 && fci < (int)app.conns.size() && fri >= 0 && fri < (int)app.conns[fci].repos.size()) {
+          auto &repo     = app.conns[fci].repos[fri];
           auto [ok, err] = load_repo_folders(app.conns[fci].conn, repo.schema_name, repo.folders);
           if (!ok) app.msg_dlg = {true, "Ошибка", std::move(err)};
         }
@@ -254,11 +256,9 @@ int main(int /*argc*/, char * /*argv*/[])
         } else if (!app.pending_delete_folder_id.empty()) {
           int fci = app.pending_delete_folder_conn;
           int fri = app.pending_delete_folder_repo;
-          if (fci >= 0 && fci < (int)app.conns.size() &&
-              fri >= 0 && fri < (int)app.conns[fci].repos.size()) {
-            auto &repo = app.conns[fci].repos[fri];
-            auto [ok, err] = delete_folder_recursive(
-                app.conns[fci].conn, repo.schema_name, app.pending_delete_folder_id);
+          if (fci >= 0 && fci < (int)app.conns.size() && fri >= 0 && fri < (int)app.conns[fci].repos.size()) {
+            auto &repo     = app.conns[fci].repos[fri];
+            auto [ok, err] = delete_folder_recursive(app.conns[fci].conn, repo.schema_name, app.pending_delete_folder_id);
             if (ok) {
               auto [ok2, err2] = load_repo_folders(app.conns[fci].conn, repo.schema_name, repo.folders);
               if (!ok2) app.msg_dlg = {true, "Ошибка", std::move(err2)};
@@ -271,7 +271,7 @@ int main(int /*argc*/, char * /*argv*/[])
           app.pending_delete_folder_id.clear();
         }
       } else if (res == -1) {
-        app.pending_delete_idx = -1;
+        app.pending_delete_idx         = -1;
         app.pending_delete_folder_conn = -1;
         app.pending_delete_folder_repo = -1;
         app.pending_delete_folder_id.clear();

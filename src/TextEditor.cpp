@@ -328,6 +328,7 @@ int32_t TextEditor::disp_cursor() const
 {
   return is_pwd ? pwd_disp_off(cursor) : cursor;
 }
+
 int32_t TextEditor::disp_sel_start() const
 {
   return sel_start < 0 ? -1 : (is_pwd ? pwd_disp_off(sel_start) : sel_start);

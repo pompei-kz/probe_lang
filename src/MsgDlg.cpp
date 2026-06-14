@@ -32,7 +32,7 @@ bool MsgDlg::render(SDL_Renderer *ren, float mx, float my, bool ldown)
   while (start <= msg.size() && nlines < 6) {
     size_t end = msg.find('\n', start);
     if (end == std::string::npos) end = msg.size();
-    SDL_Rect clip{(int)(dx + 16), (int)y_off, (int)(DW - 32), (int)(FS + 4)};
+    SDL_Rect clip{static_cast<int>(dx + 16), (int)y_off, (int)(DW - 32), (int)(FS + 4)};
     SDL_SetRenderClipRect(ren, &clip);
     text_draw(ren, msg.substr(start, end - start).c_str(), dx + 16, y_off + FS, C_TEXT);
     SDL_SetRenderClipRect(ren, nullptr);
