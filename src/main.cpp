@@ -6,6 +6,7 @@
 
 #include <unicode/utf8.h>
 #include <unicode/utypes.h>
+#include <unicode/uchar.h>
 
 #include <algorithm>
 #include <filesystem>
@@ -36,16 +37,14 @@ constexpr Clr C_OK     {0xa6,0xe3,0xa1};
 // ── font ─────────────────────────────────────────────────────────────────────
 static constexpr float FS = 14.0f;
 
-// One entry per unique codepoint, added on first use.
 struct GlyphInfo {
-    int   tx, ty, tw, th; // position in atlas texture (pixels)
-    int   bx, by;         // bearing: offset from pen-origin to glyph top-left
-    float adv;            // horizontal advance
-    bool  visible;        // false for whitespace / missing glyphs
+    int   tx, ty, tw, th;
+    int   bx, by;
+    float adv;
+    bool  visible;
 };
 
 struct FontAtlas {
-    // Atlas size. 2048×2048 holds thousands of glyphs at 14 px.
     static constexpr int W = 2048, H = 2048, PAD = 1;
 
     SDL_Renderer*                          ren   = nullptr;
@@ -55,10 +54,9 @@ struct FontAtlas {
 
     stbtt_fontinfo info;
     float          scale = 1.f;
-    float          asc   = 0.f; // ascent  (positive, pixels above baseline)
-    float          desc  = 0.f; // descent (negative, pixels below baseline)
+    float          asc   = 0.f;
+    float          desc  = 0.f;
 
-    // Row-advance packer state
     int cx = PAD, cy = PAD, rh = 0;
 
     void init(SDL_Renderer* r, const unsigned char* ttf, float size) {
@@ -75,12 +73,10 @@ struct FontAtlas {
                                  SDL_TEXTUREACCESS_STATIC, W, H);
         SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
 
-        // Clear atlas to fully transparent
         std::vector<Uint32> blank(W * H, 0);
         SDL_UpdateTexture(tex, nullptr, blank.data(), W * sizeof(Uint32));
     }
 
-    // Returns cached glyph, rasterizing it on first access.
     const GlyphInfo& get(UChar32 cp) {
         auto it = cache.find(cp);
         if (it != cache.end()) return it->second;
@@ -95,11 +91,8 @@ private:
             &info, 0, scale, static_cast<int>(cp), &gw, &gh, &gbx, &gby);
 
         if (bmp && gw > 0 && gh > 0) {
-            // Advance to next row if this glyph doesn't fit horizontally
             if (cx + gw + PAD > W) { cx = PAD; cy += rh + PAD; rh = 0; }
-
             if (cy + gh + PAD <= H) {
-                // Convert 8-bit alpha bitmap → RGBA and upload the subrect
                 std::vector<Uint32> rgba(gw * gh);
                 for (int i = 0; i < gw * gh; i++)
                     rgba[i] = SDL_MapRGBA(pfmt, nullptr, 255, 255, 255, bmp[i]);
@@ -121,7 +114,6 @@ private:
         g.adv = adv * scale;
 
         if (bmp) stbtt_FreeBitmap(bmp, nullptr);
-
         return cache.emplace(cp, g).first->second;
     }
 };
@@ -134,8 +126,6 @@ static void font_init(SDL_Renderer* ren) {
     g_atlas.init(ren, ttf, FS);
 }
 
-// x = left edge, y = baseline.
-// Iterates UTF-8 via ICU U8_NEXT; rasterizes unseen glyphs on demand.
 static float text_draw(SDL_Renderer* ren, const char* s, float x, float y, Clr c) {
     SDL_SetTextureColorMod(g_atlas.tex, c.r, c.g, c.b);
     SDL_SetTextureAlphaMod(g_atlas.tex, c.a);
@@ -144,7 +134,7 @@ static float text_draw(SDL_Renderer* ren, const char* s, float x, float y, Clr c
     while (i < len) {
         UChar32 cp;
         U8_NEXT(reinterpret_cast<const uint8_t*>(s), i, len, cp);
-        if (cp < 0) continue; // invalid UTF-8 byte
+        if (cp < 0) continue;
         const auto& g = g_atlas.get(cp);
         if (g.visible) {
             SDL_FRect src{static_cast<float>(g.tx), static_cast<float>(g.ty),
@@ -158,19 +148,23 @@ static float text_draw(SDL_Renderer* ren, const char* s, float x, float y, Clr c
     return px - x;
 }
 
-static float text_w(const char* s) {
+// Width of first byte_len bytes of s.
+static float text_w_n(const char* s, int32_t byte_len) {
     float px = 0;
-    int32_t i = 0, len = static_cast<int32_t>(strlen(s));
-    while (i < len) {
+    int32_t i = 0;
+    while (i < byte_len) {
         UChar32 cp;
-        U8_NEXT(reinterpret_cast<const uint8_t*>(s), i, len, cp);
+        U8_NEXT(reinterpret_cast<const uint8_t*>(s), i, byte_len, cp);
         if (cp < 0) continue;
         px += g_atlas.get(cp).adv;
     }
     return px;
 }
 
-// Baseline y for text vertically centred inside a box (top=box_y, height=box_h).
+static float text_w(const char* s) {
+    return text_w_n(s, static_cast<int32_t>(strlen(s)));
+}
+
 static float center_baseline(float box_y, float box_h) {
     return box_y + (box_h + g_atlas.asc + g_atlas.desc) * 0.5f;
 }
@@ -200,15 +194,12 @@ static void draw_plus(SDL_Renderer* r, float cx, float cy, float sz, Clr c) {
 
 static void draw_pencil(SDL_Renderer* r, float cx, float cy, float sz, Clr c) {
     sc(r, c);
-    // body: diagonal stroke (3 lines offset by 1 px)
     for (int i = -1; i <= 1; i++) {
         float ox = (float)i;
         SDL_RenderLine(r, cx-sz*.3f+ox, cy+sz*.4f, cx+sz*.3f+ox, cy-sz*.4f);
     }
-    // tip triangle
     SDL_RenderLine(r, cx-sz*.3f-1, cy+sz*.4f, cx-sz*.45f, cy+sz*.6f);
     SDL_RenderLine(r, cx-sz*.45f,  cy+sz*.6f, cx-sz*.05f, cy+sz*.45f);
-    // eraser cap
     SDL_FRect cap{cx+sz*.15f, cy-sz*.55f, sz*.25f, sz*.15f};
     SDL_RenderFillRect(r, &cap);
 }
@@ -260,14 +251,382 @@ static void save_conn(const Conn& c, const std::string& old_name = "") {
       << "\nuser=" << c.user << "\npass=" << c.pass << "\n";
 }
 
+// ── TextEditor ────────────────────────────────────────────────────────────────
+enum class TxAction { None, Insert, Delete, Other };
+
+struct TxSnapshot { std::string buf; int32_t cursor, sel_start; };
+
+struct TextEditor {
+    std::string buf;
+    int32_t  cursor    = 0;
+    int32_t  sel_start = -1;  // -1 = no selection
+    float    view_px   = 0.f;
+    bool     is_pwd    = false;
+
+    std::vector<TxSnapshot> undo_stack;
+    std::vector<TxSnapshot> redo_stack;
+    TxAction last_action = TxAction::None;
+
+    void set(const std::string& s) {
+        buf = s;
+        cursor = (int32_t)s.size();
+        sel_start = -1; view_px = 0.f;
+        undo_stack.clear(); redo_stack.clear();
+        last_action = TxAction::None;
+    }
+
+    // ── undo ──────────────────────────────────────────────────────────────────
+    void push_undo(TxAction action) {
+        bool coalesce = (action == last_action) &&
+                        (action == TxAction::Insert || action == TxAction::Delete) &&
+                        sel_start < 0;
+        if (!coalesce) {
+            undo_stack.push_back({buf, cursor, sel_start});
+            redo_stack.clear();
+        }
+        last_action = action;
+    }
+
+    void do_undo() {
+        if (undo_stack.empty()) return;
+        redo_stack.push_back({buf, cursor, sel_start});
+        auto s = undo_stack.back(); undo_stack.pop_back();
+        buf = s.buf; cursor = s.cursor; sel_start = s.sel_start;
+        last_action = TxAction::None;
+    }
+
+    void do_redo() {
+        if (redo_stack.empty()) return;
+        undo_stack.push_back({buf, cursor, sel_start});
+        auto s = redo_stack.back(); redo_stack.pop_back();
+        buf = s.buf; cursor = s.cursor; sel_start = s.sel_start;
+        last_action = TxAction::None;
+    }
+
+    // ── movement ──────────────────────────────────────────────────────────────
+    void delete_selection() {
+        if (sel_start < 0) return;
+        int32_t lo = std::min(sel_start, cursor);
+        int32_t hi = std::max(sel_start, cursor);
+        buf.erase((size_t)lo, (size_t)(hi - lo));
+        cursor = lo; sel_start = -1;
+    }
+
+    void move_to(int32_t pos, bool shift) {
+        if (shift) {
+            if (sel_start < 0) sel_start = cursor;
+        } else {
+            sel_start = -1;
+        }
+        cursor = std::clamp(pos, 0, (int32_t)buf.size());
+    }
+
+    void move_by(int dir, bool shift) {
+        if (!shift && sel_start >= 0) {
+            cursor = dir < 0 ? std::min(sel_start, cursor)
+                             : std::max(sel_start, cursor);
+            sel_start = -1;
+            return;
+        }
+        int32_t np = cursor;
+        if (dir < 0 && cursor > 0) {
+            UChar32 cp;
+            U8_PREV(reinterpret_cast<const uint8_t*>(buf.data()), 0, np, cp); (void)cp;
+        } else if (dir > 0 && cursor < (int32_t)buf.size()) {
+            UChar32 cp;
+            U8_NEXT(reinterpret_cast<const uint8_t*>(buf.data()), np, (int32_t)buf.size(), cp); (void)cp;
+        }
+        move_to(np, shift);
+    }
+
+    int32_t word_left_pos() const {
+        int32_t pos = cursor;
+        const uint8_t* s = reinterpret_cast<const uint8_t*>(buf.data());
+        // skip non-alnum backward
+        while (pos > 0) {
+            int32_t p = pos; UChar32 cp; U8_PREV(s, 0, p, cp);
+            if (u_isalnum(cp)) break;
+            pos = p;
+        }
+        // skip alnum backward
+        while (pos > 0) {
+            int32_t p = pos; UChar32 cp; U8_PREV(s, 0, p, cp);
+            if (!u_isalnum(cp)) break;
+            pos = p;
+        }
+        return pos;
+    }
+
+    int32_t word_right_pos() const {
+        int32_t pos = cursor;
+        int32_t len = (int32_t)buf.size();
+        const uint8_t* s = reinterpret_cast<const uint8_t*>(buf.data());
+        // skip non-alnum forward
+        while (pos < len) {
+            int32_t p = pos; UChar32 cp; U8_NEXT(s, p, len, cp);
+            if (u_isalnum(cp)) break;
+            pos = p;
+        }
+        // skip alnum forward
+        while (pos < len) {
+            int32_t p = pos; UChar32 cp; U8_NEXT(s, p, len, cp);
+            if (!u_isalnum(cp)) break;
+            pos = p;
+        }
+        return pos;
+    }
+
+    // ── clipboard ─────────────────────────────────────────────────────────────
+    void do_copy() {
+        if (sel_start < 0) return;
+        int32_t lo = std::min(sel_start, cursor);
+        int32_t hi = std::max(sel_start, cursor);
+        SDL_SetClipboardText(buf.substr((size_t)lo, (size_t)(hi - lo)).c_str());
+    }
+
+    void do_cut() {
+        if (sel_start < 0) return;
+        do_copy();
+        push_undo(TxAction::Other);
+        delete_selection();
+    }
+
+    void do_paste() {
+        char* clip = SDL_GetClipboardText();
+        if (clip && *clip) {
+            push_undo(TxAction::Other);
+            delete_selection();
+            int32_t tlen = (int32_t)strlen(clip);
+            buf.insert((size_t)cursor, clip, (size_t)tlen);
+            cursor += tlen;
+            sel_start = -1;
+        }
+        SDL_free(clip);
+    }
+
+    // ── input handling ────────────────────────────────────────────────────────
+    void handle_text(const char* text) {
+        int32_t tlen = (int32_t)strlen(text);
+        bool single = (tlen == 1 && sel_start < 0);
+        push_undo(single ? TxAction::Insert : TxAction::Other);
+        delete_selection();
+        buf.insert((size_t)cursor, text, (size_t)tlen);
+        cursor += tlen;
+        sel_start = -1;
+    }
+
+    // Returns true if the key was consumed.
+    bool handle_key(SDL_Keycode key, SDL_Keymod mod) {
+        bool ctrl  = (mod & SDL_KMOD_CTRL)  != 0;
+        bool shift = (mod & SDL_KMOD_SHIFT) != 0;
+
+        switch (key) {
+        case SDLK_LEFT:
+            if (ctrl) move_to(word_left_pos(), shift);
+            else      move_by(-1, shift);
+            return true;
+        case SDLK_RIGHT:
+            if (ctrl) move_to(word_right_pos(), shift);
+            else      move_by(+1, shift);
+            return true;
+        case SDLK_HOME:  move_to(0, shift);                   return true;
+        case SDLK_END:   move_to((int32_t)buf.size(), shift); return true;
+
+        case SDLK_BACKSPACE:
+            if (sel_start >= 0) {
+                push_undo(TxAction::Other); delete_selection();
+            } else if (ctrl) {
+                push_undo(TxAction::Other);
+                int32_t target = word_left_pos();
+                buf.erase((size_t)target, (size_t)(cursor - target));
+                cursor = target;
+            } else if (cursor > 0) {
+                push_undo(TxAction::Delete);
+                int32_t prev = cursor;
+                UChar32 cp; U8_PREV(reinterpret_cast<const uint8_t*>(buf.data()), 0, prev, cp); (void)cp;
+                buf.erase((size_t)prev, (size_t)(cursor - prev));
+                cursor = prev;
+            }
+            return true;
+
+        case SDLK_DELETE:
+            if (ctrl) {
+                // Ctrl+Delete = cut (per spec)
+                do_cut();
+            } else if (sel_start >= 0) {
+                push_undo(TxAction::Other); delete_selection();
+            } else if (cursor < (int32_t)buf.size()) {
+                push_undo(TxAction::Delete);
+                int32_t next = cursor;
+                UChar32 cp; U8_NEXT(reinterpret_cast<const uint8_t*>(buf.data()), next, (int32_t)buf.size(), cp); (void)cp;
+                buf.erase((size_t)cursor, (size_t)(next - cursor));
+            }
+            return true;
+
+        case SDLK_A:
+            if (ctrl) { sel_start = 0; cursor = (int32_t)buf.size(); return true; }
+            return false;
+        case SDLK_C:
+            if (ctrl) { do_copy(); return true; }
+            return false;
+        case SDLK_X:
+            if (ctrl) { do_cut(); return true; }
+            return false;
+        case SDLK_V:
+            if (ctrl) { do_paste(); return true; }
+            return false;
+        case SDLK_INSERT:
+            if (ctrl)  { do_copy();  return true; }
+            if (shift) { do_paste(); return true; }
+            return false;
+        case SDLK_Z:
+            if (ctrl && shift) { do_redo(); return true; }
+            if (ctrl)          { do_undo(); return true; }
+            return false;
+        case SDLK_Y:
+            if (ctrl) { do_redo(); return true; }
+            return false;
+        default:
+            return false;
+        }
+    }
+
+    // ── password helpers ──────────────────────────────────────────────────────
+    // Byte offset → codepoint count (for building display offset in pwd mode).
+    int32_t pwd_disp_off(int32_t byte_off) const {
+        int32_t count = 0, i = 0, len = (int32_t)buf.size();
+        const uint8_t* s = reinterpret_cast<const uint8_t*>(buf.data());
+        while (i < byte_off && i < len) {
+            UChar32 cp; U8_NEXT(s, i, len, cp);
+            if (cp >= 0) count++;
+        }
+        return count;
+    }
+
+    // Codepoint count → byte offset (reverse of pwd_disp_off).
+    int32_t pwd_real_off(int32_t disp_off) const {
+        int32_t count = 0, i = 0, len = (int32_t)buf.size();
+        const uint8_t* s = reinterpret_cast<const uint8_t*>(buf.data());
+        while (i < len && count < disp_off) {
+            UChar32 cp; U8_NEXT(s, i, len, cp);
+            if (cp >= 0) count++;
+        }
+        return i;
+    }
+
+    std::string get_display() const {
+        if (!is_pwd) return buf;
+        int32_t count = 0, i = 0, len = (int32_t)buf.size();
+        const uint8_t* s = reinterpret_cast<const uint8_t*>(buf.data());
+        while (i < len) { UChar32 cp; U8_NEXT(s, i, len, cp); if (cp >= 0) count++; }
+        return std::string((size_t)count, '*');
+    }
+
+    int32_t disp_cursor() const   { return is_pwd ? pwd_disp_off(cursor)    : cursor; }
+    int32_t disp_sel_start() const { return sel_start < 0 ? -1
+                                         : (is_pwd ? pwd_disp_off(sel_start) : sel_start); }
+
+    // ── click positioning ─────────────────────────────────────────────────────
+    void click_at(float text_origin_x, float click_x, bool shift) {
+        float offset = click_x - text_origin_x + view_px;
+        std::string disp = get_display();
+        const char* ds = disp.c_str();
+        int32_t dlen = (int32_t)disp.size(), i = 0, found = dlen;
+        float cur_x = 0.f;
+        while (i < dlen) {
+            int32_t prev_i = i;
+            UChar32 cp; U8_NEXT(reinterpret_cast<const uint8_t*>(ds), i, dlen, cp);
+            if (cp < 0) continue;
+            float adv = g_atlas.get(cp).adv;
+            if (offset <= cur_x + adv * 0.5f) { found = prev_i; break; }
+            cur_x += adv;
+        }
+        int32_t real_pos = is_pwd ? pwd_real_off(found) : found;
+        move_to(real_pos, shift);
+    }
+
+    // ── draw ─────────────────────────────────────────────────────────────────
+    void draw(SDL_Renderer* ren, float bx, float by, float bw, float bh, bool focused) {
+        fill(ren, C_INBG, bx, by, bw, bh);
+        rect(ren, focused ? C_ACCENT : C_BORDER, bx, by, bw, bh);
+
+        constexpr float PADX = 6.f;
+        float inner_w = bw - 2.f * PADX;
+        float text_y  = center_baseline(by, bh);
+
+        std::string disp = get_display();
+        const char* ds   = disp.c_str();
+        int32_t     dlen = (int32_t)disp.size();
+        int32_t     dc   = disp_cursor();
+        int32_t     dss  = disp_sel_start();
+
+        float total_w   = text_w_n(ds, dlen);
+        float cursor_px = text_w_n(ds, dc);
+
+        if (focused) {
+            if (cursor_px - view_px < 0.f)
+                view_px = cursor_px;
+            else if (cursor_px - view_px > inner_w - 2.f)
+                view_px = cursor_px - inner_w + 2.f;
+        }
+        float max_scroll = std::max(0.f, total_w - inner_w);
+        view_px = std::clamp(view_px, 0.f, max_scroll);
+
+        float ox = bx + PADX - view_px;
+
+        SDL_Rect clip{(int)(bx + 1), (int)(by + 1), (int)(bw - 2), (int)(bh - 2)};
+        SDL_SetRenderClipRect(ren, &clip);
+
+        // Selection highlight
+        if (focused && dss >= 0) {
+            int32_t lo = std::min(dss, dc);
+            int32_t hi = std::max(dss, dc);
+            float sx = ox + text_w_n(ds, lo);
+            float sw = text_w_n(ds + lo, hi - lo);
+            SDL_SetRenderDrawBlendMode(ren, SDL_BLENDMODE_BLEND);
+            fill(ren, Clr{0x89, 0xb4, 0xfa, 0x55}, sx, by + 2.f, sw, bh - 4.f);
+            SDL_SetRenderDrawBlendMode(ren, SDL_BLENDMODE_NONE);
+        }
+
+        if (!disp.empty())
+            text_draw(ren, ds, ox, text_y, C_TEXT);
+
+        // Blinking cursor
+        if (focused && (SDL_GetTicks() / 530) % 2 == 0)
+            fill(ren, C_TEXT, ox + cursor_px - 0.5f, by + 3.f, 1.5f, bh - 6.f);
+
+        SDL_SetRenderClipRect(ren, nullptr);
+    }
+};
+
 // ── app state ─────────────────────────────────────────────────────────────────
 struct Dlg {
     bool        open     = false;
     bool        editing  = false;
-    std::string old_name;       // name before edit (for rename)
-    Conn        c;
-    int         focus    = 0;   // 0-4: name/host/port/user/pass
+    std::string old_name;
+    TextEditor  editors[5];
+    int         focus    = 0;
     std::string err;
+
+    void open_add() {
+        for (int i = 0; i < 5; i++) { editors[i] = TextEditor{}; editors[i].is_pwd = (i == 4); }
+        focus = 0; err = ""; editing = false; old_name = "";
+    }
+
+    void open_edit(const Conn& c) {
+        open_add();
+        editors[0].set(c.name);
+        editors[1].set(c.host);
+        editors[2].set(c.port);
+        editors[3].set(c.user);
+        editors[4].set(c.pass);
+        editing = true; old_name = c.name;
+    }
+
+    Conn to_conn() const {
+        return {editors[0].buf, editors[1].buf, editors[2].buf,
+                editors[3].buf, editors[4].buf};
+    }
 };
 
 struct App {
@@ -278,34 +637,20 @@ struct App {
     std::vector<Conn> conns;
     Dlg dlg;
 
-    int  h_item = -1; // hovered tree item index
-    int  h_edit = -1; // hovered edit-pencil item index
+    int  h_item = -1;
+    int  h_edit = -1;
     bool h_add  = false;
 
     float mx = 0, my = 0;
 };
 
-// ── dialog ───────────────────────────────────────────────────────────────────
+// ── dialog ────────────────────────────────────────────────────────────────────
 static constexpr float DW = 440, DH = 400;
-static constexpr float FH = 28.0f;  // input field height
-static constexpr float FS_STEP = 58.0f; // vertical step per field
-
-static std::string* dlg_field(Dlg& d, int i) {
-    switch (i) {
-        case 0: return &d.c.name;
-        case 1: return &d.c.host;
-        case 2: return &d.c.port;
-        case 3: return &d.c.user;
-        case 4: return &d.c.pass;
-        default: return nullptr;
-    }
-}
+static constexpr float FH = 28.0f;
+static constexpr float FS_STEP = 58.0f;
 
 // returns 0=open, 1=saved, -1=cancelled
 static int dlg_render(SDL_Renderer* ren, Dlg& d, float mx, float my, bool click) {
-    // The window dimensions are retrieved via SDL_GetWindowSize before this call
-
-    // Overlay
     SDL_SetRenderDrawBlendMode(ren, SDL_BLENDMODE_BLEND);
     int ww, wh;
     SDL_GetCurrentRenderOutputSize(ren, &ww, &wh);
@@ -316,21 +661,15 @@ static int dlg_render(SDL_Renderer* ren, Dlg& d, float mx, float my, bool click)
     fill(ren, C_DLGBG, dx, dy, DW, DH);
     rect(ren, C_BORDER, dx, dy, DW, DH);
 
-    // Title
     const char* title = d.editing ? "Edit Connection" : "Add Connection";
     text_draw(ren, title, dx + 16, dy + 24, C_TEXT);
     sc(ren, C_BORDER);
     SDL_FRect sep{dx+1, dy+36, DW-2, 1};
     SDL_RenderFillRect(ren, &sep);
 
-    // Fields
-    struct FieldDef { const char* lbl; int idx; bool pwd; };
+    struct FieldDef { const char* lbl; int idx; };
     constexpr FieldDef fields[5] = {
-        {"Name",     0, false},
-        {"Host",     1, false},
-        {"Port",     2, false},
-        {"User",     3, false},
-        {"Password", 4, true },
+        {"Name", 0}, {"Host", 1}, {"Port", 2}, {"User", 3}, {"Password", 4}
     };
     float fw = DW - 32;
     float ct = dy + 48;
@@ -338,37 +677,26 @@ static int dlg_render(SDL_Renderer* ren, Dlg& d, float mx, float my, bool click)
     for (auto& f : fields) {
         float fy = ct + f.idx * FS_STEP;
         bool focused = (d.focus == f.idx);
-        auto* val = dlg_field(d, f.idx);
 
-        // label
         text_draw(ren, f.lbl, dx+16, fy + FS, C_DIM);
 
-        // input box
         float by = fy + FS + 6;
-        fill(ren, C_INBG, dx+16, by, fw, FH);
-        rect(ren, focused ? C_ACCENT : C_BORDER, dx+16, by, fw, FH);
+        d.editors[f.idx].draw(ren, dx+16, by, fw, FH, focused);
 
-        // text (mask for password)
-        std::string disp = f.pwd ? std::string(val->size(), '*') : *val;
-        if (focused) disp += '|';
-        // scroll right if overflowing
-        while (disp.size() > 1 && text_w(disp.c_str()) > fw - 12)
-            disp.erase(0, 1);
-        text_draw(ren, disp.c_str(), dx+22, center_baseline(by, FH), C_TEXT);
-
-        // click to focus
-        if (click && hit(mx, my, dx+16, by, fw, FH))
+        if (click && hit(mx, my, dx+16, by, fw, FH)) {
+            bool was_focused = (d.focus == f.idx);
             d.focus = f.idx;
+            bool shift = was_focused && (SDL_GetModState() & SDL_KMOD_SHIFT);
+            d.editors[f.idx].click_at(dx + 16 + 6.f, mx, shift);
+        }
     }
 
-    // Error
     if (!d.err.empty())
         text_draw(ren, d.err.c_str(), dx+16, ct + 5*FS_STEP, C_ERR);
 
-    // Buttons  ─  Save  |  Cancel
     float btn_y = dy + DH - 50;
     constexpr float BH = 30, BW_S = 90, BW_C = 80;
-    float sx = dx + DW - 16 - BW_S;
+    float sx  = dx + DW - 16 - BW_S;
     float cx2 = sx - 10 - BW_C;
 
     bool h_save = hit(mx, my, sx,  btn_y, BW_S, BH);
@@ -387,8 +715,9 @@ static int dlg_render(SDL_Renderer* ren, Dlg& d, float mx, float my, bool click)
     if (click) {
         if (h_can) return -1;
         if (h_save) {
-            if (d.c.name.empty()) { d.err = "Name is required";      return 0; }
-            if (d.c.host.empty()) { d.err = "Host is required";      return 0; }
+            Conn c = d.to_conn();
+            if (c.name.empty()) { d.err = "Name is required"; return 0; }
+            if (c.host.empty()) { d.err = "Host is required"; return 0; }
             return 1;
         }
     }
@@ -399,8 +728,8 @@ static int dlg_render(SDL_Renderer* ren, Dlg& d, float mx, float my, bool click)
 static constexpr float ITEM_H  = 30.0f;
 static constexpr float HDR_H   = 38.0f;
 static constexpr float PAD     = 10.0f;
-static constexpr float ICON_SZ = 8.0f;   // icon radius / half-size
-static constexpr float EDIT_W  = 30.0f;  // width of edit button column
+static constexpr float ICON_SZ = 8.0f;
+static constexpr float EDIT_W  = 30.0f;
 
 static void panel_render(SDL_Renderer* ren, App& app, bool click) {
     float pw = app.ww * 0.30f;
@@ -408,11 +737,9 @@ static void panel_render(SDL_Renderer* ren, App& app, bool click) {
 
     fill(ren, C_PANEL, 0, 0, pw, ph);
 
-    // ── header ────────────────────────────────────────────────────────────────
     fill(ren, C_BG, 0, 0, pw, HDR_H);
     text_draw(ren, "Connections", PAD, center_baseline(0, HDR_H), C_DIM);
 
-    // add "+" button (right side of header)
     float abx = pw - HDR_H, aby = 0;
     bool h_add = hit(app.mx, app.my, abx, aby, HDR_H, HDR_H);
     app.h_add = h_add;
@@ -420,60 +747,46 @@ static void panel_render(SDL_Renderer* ren, App& app, bool click) {
     rect(ren, C_BORDER, abx, aby, HDR_H, HDR_H);
     draw_plus(ren, abx + HDR_H*.5f, HDR_H*.5f, ICON_SZ, h_add ? C_ACCENT : C_DIM);
 
-    // separator
     sc(ren, C_BORDER);
     SDL_FRect sep{0, HDR_H-1, pw, 1};
     SDL_RenderFillRect(ren, &sep);
 
     if (click && h_add) {
-        app.dlg = Dlg{};
+        app.dlg.open_add();
         app.dlg.open = true;
-        app.dlg.editing = false;
         SDL_StartTextInput(app.win);
     }
 
-    // ── items ─────────────────────────────────────────────────────────────────
     app.h_item = -1;
     app.h_edit = -1;
 
     for (int i = 0; i < (int)app.conns.size(); i++) {
         float iy = HDR_H + i * ITEM_H;
-        bool h_row  = hit(app.mx, app.my, 0,       iy, pw - EDIT_W, ITEM_H);
-        bool h_edit = hit(app.mx, app.my, pw - EDIT_W, iy, EDIT_W,  ITEM_H);
+        bool h_row  = hit(app.mx, app.my, 0,          iy, pw - EDIT_W, ITEM_H);
+        bool h_edit = hit(app.mx, app.my, pw - EDIT_W, iy, EDIT_W,     ITEM_H);
 
         if (h_row)  app.h_item = i;
         if (h_edit) app.h_edit = i;
 
-        // row background
         if (h_row || h_edit)
             fill(ren, C_HOVER, 0, iy, pw, ITEM_H);
 
-        // name text
-        const auto& name = app.conns[i].name;
-        text_draw(ren, name.c_str(), PAD, center_baseline(iy, ITEM_H), C_TEXT);
+        text_draw(ren, app.conns[i].name.c_str(), PAD, center_baseline(iy, ITEM_H), C_TEXT);
 
-        // edit pencil button
         Clr pencil_c = h_edit ? C_ACCENT : C_DIM;
         draw_pencil(ren, pw - EDIT_W*.5f, iy + ITEM_H*.5f, ICON_SZ, pencil_c);
 
-        // item separator
         sc(ren, C_BORDER);
         SDL_FRect line{0, iy + ITEM_H - 1, pw, 1};
         SDL_RenderFillRect(ren, &line);
 
-        // click on edit button
         if (click && h_edit) {
-            app.dlg.open     = true;
-            app.dlg.editing  = true;
-            app.dlg.old_name = app.conns[i].name;
-            app.dlg.c        = app.conns[i];
-            app.dlg.focus    = 0;
-            app.dlg.err      = "";
+            app.dlg.open_edit(app.conns[i]);
+            app.dlg.open = true;
             SDL_StartTextInput(app.win);
         }
     }
 
-    // right divider
     sc(ren, C_BORDER);
     SDL_FRect div{pw - 1, 0, 1, ph};
     SDL_RenderFillRect(ren, &div);
@@ -497,15 +810,14 @@ int main(int /*argc*/, char* /*argv*/[]) {
     font_init(app.ren);
     app.conns = load_all();
 
-    // TEST: set PROBE_TEST_DIALOG=1 or PROBE_TEST_EDIT=1 to open dialog on startup
     if (SDL_GetEnvironmentVariable(SDL_GetEnvironment(), "PROBE_TEST_DIALOG")) {
-        app.dlg.open = true; app.dlg.editing = false;
+        app.dlg.open_add();
+        app.dlg.open = true;
         SDL_StartTextInput(app.win);
     } else if (SDL_GetEnvironmentVariable(SDL_GetEnvironment(), "PROBE_TEST_EDIT") &&
                !app.conns.empty()) {
-        app.dlg.open = true; app.dlg.editing = true;
-        app.dlg.old_name = app.conns[0].name;
-        app.dlg.c = app.conns[0];
+        app.dlg.open_edit(app.conns[0]);
+        app.dlg.open = true;
         SDL_StartTextInput(app.win);
     }
 
@@ -539,43 +851,42 @@ int main(int /*argc*/, char* /*argv*/[]) {
                 break;
 
             case SDL_EVENT_TEXT_INPUT:
-                if (app.dlg.open) {
-                    auto* f = dlg_field(app.dlg, app.dlg.focus);
-                    if (f) *f += ev.text.text;
-                }
+                if (app.dlg.open)
+                    app.dlg.editors[app.dlg.focus].handle_text(ev.text.text);
                 break;
 
             case SDL_EVENT_KEY_DOWN:
                 if (app.dlg.open) {
-                    auto* f = dlg_field(app.dlg, app.dlg.focus);
-                    switch (ev.key.key) {
-                    case SDLK_BACKSPACE:
-                        if (f && !f->empty()) f->pop_back();
-                        break;
-                    case SDLK_TAB:
-                        app.dlg.focus = (app.dlg.focus + 1) % 5;
-                        break;
-                    case SDLK_ESCAPE:
-                        app.dlg.open = false;
-                        SDL_StopTextInput(app.win);
-                        break;
-                    case SDLK_RETURN: case SDLK_KP_ENTER:
-                        if (app.dlg.focus < 4) {
-                            app.dlg.focus++;
-                        } else {
-                            // attempt save
-                            if (!app.dlg.c.name.empty() && !app.dlg.c.host.empty()) {
-                                save_conn(app.dlg.c, app.dlg.old_name);
-                                app.conns = load_all();
-                                app.dlg.open = false;
-                                SDL_StopTextInput(app.win);
+                    SDL_Keymod mod = ev.key.mod;
+                    bool consumed = app.dlg.editors[app.dlg.focus].handle_key(ev.key.key, mod);
+                    if (!consumed) {
+                        bool shift = (mod & SDL_KMOD_SHIFT) != 0;
+                        switch (ev.key.key) {
+                        case SDLK_TAB:
+                            app.dlg.focus = (app.dlg.focus + (shift ? 4 : 1)) % 5;
+                            break;
+                        case SDLK_ESCAPE:
+                            app.dlg.open = false;
+                            SDL_StopTextInput(app.win);
+                            break;
+                        case SDLK_RETURN: case SDLK_KP_ENTER:
+                            if (app.dlg.focus < 4) {
+                                app.dlg.focus++;
                             } else {
-                                app.dlg.err = app.dlg.c.name.empty()
-                                    ? "Name is required" : "Host is required";
+                                Conn c = app.dlg.to_conn();
+                                if (!c.name.empty() && !c.host.empty()) {
+                                    save_conn(c, app.dlg.old_name);
+                                    app.conns = load_all();
+                                    app.dlg.open = false;
+                                    SDL_StopTextInput(app.win);
+                                } else {
+                                    app.dlg.err = c.name.empty()
+                                        ? "Name is required" : "Host is required";
+                                }
                             }
+                            break;
+                        default: break;
                         }
-                        break;
-                    default: break;
                     }
                 }
                 break;
@@ -584,25 +895,21 @@ int main(int /*argc*/, char* /*argv*/[]) {
             }
         }
 
-        // ── render ────────────────────────────────────────────────────────────
         sc(app.ren, C_BG);
         SDL_RenderClear(app.ren);
 
-        // left panel (handles hover + click itself)
         panel_render(app.ren, app, click);
 
-        // right panel (stub)
         float pw = app.ww * 0.30f;
         fill(app.ren, C_BG, pw, 0, app.ww - pw, (float)app.wh);
 
-        // dialog
         if (app.dlg.open) {
             int result = dlg_render(app.ren, app.dlg,
                                     click ? click_x : app.mx,
                                     click ? click_y : app.my,
                                     click);
             if (result == 1) {
-                save_conn(app.dlg.c, app.dlg.old_name);
+                save_conn(app.dlg.to_conn(), app.dlg.old_name);
                 app.conns = load_all();
                 app.dlg.open = false;
                 SDL_StopTextInput(app.win);
@@ -613,7 +920,7 @@ int main(int /*argc*/, char* /*argv*/[]) {
         }
 
         SDL_RenderPresent(app.ren);
-        SDL_Delay(16); // ~60 fps
+        SDL_Delay(16);
     }
 
     SDL_DestroyRenderer(app.ren);
