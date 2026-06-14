@@ -210,11 +210,12 @@ void panel_render(SDL_Renderer *ren, App &app, bool click, bool rclick, bool dbl
     const bool  connected = node.conn.connected;
     float       iy        = HDR_H + row * ITEM_H;
 
-    bool h_row  = hit(app.mx, app.my, 0,          iy, pw - EDIT_W, ITEM_H);
-    bool h_edit = hit(app.mx, app.my, pw - EDIT_W, iy, EDIT_W,     ITEM_H);
-    if (h_row)  app.h_item = i;
-    if (h_edit) app.h_edit = i;
-    if (h_row || h_edit) fill(ren, C_HOVER, 0, iy, pw, ITEM_H);
+    bool h_caret = connected && hit(app.mx, app.my, 0, iy, PAD + CARET_W, ITEM_H);
+    bool h_row   = !h_caret && hit(app.mx, app.my, 0, iy, pw - EDIT_W, ITEM_H);
+    bool h_edit  = hit(app.mx, app.my, pw - EDIT_W, iy, EDIT_W, ITEM_H);
+    if (h_row || h_caret) app.h_item = i;
+    if (h_edit)           app.h_edit = i;
+    if (h_row || h_caret || h_edit) fill(ren, C_HOVER, 0, iy, pw, ITEM_H);
 
     // caret on the left (only for connected nodes)
     float caret_cx = PAD + CARET_W * .5f;
@@ -237,8 +238,9 @@ void panel_render(SDL_Renderer *ren, App &app, bool click, bool rclick, bool dbl
       app.dlg.open = true;
       SDL_StartTextInput(app.win);
     }
-    // double-click on row toggles open/close (only when connected)
-    if (dblclick && h_row && connected) {
+
+    // single-click on caret OR double-click on row toggles open/close
+    auto toggle_open = [&]() {
       if (node.open) {
         node.open = false;
       } else {
@@ -251,11 +253,13 @@ void panel_render(SDL_Renderer *ren, App &app, bool click, bool rclick, bool dbl
           app.msg_dlg = {true, "Connection error", std::move(err)};
         }
       }
-    }
+    };
+    if (click && h_caret)              toggle_open();
+    if (dblclick && h_row && connected) toggle_open();
     if (rclick && (h_row || h_edit)) {
       float mx2 = std::min(app.mx, pw - PanelMenu::W - 2.f);
       float my2 = std::min(app.my, ph - PanelMenu::N * PanelMenu::IH - 10.f);
-      app.panel_menu = PanelMenu{true, mx2, my2, i};
+      app.panel_menu = PanelMenu{true, mx2, my2, i, connected};
     }
     row++;
 
@@ -282,15 +286,23 @@ void panel_render(SDL_Renderer *ren, App &app, bool click, bool rclick, bool dbl
   bool valid_ci = ci >= 0 && ci < (int)app.conns.size();
 
   if (act == 0 && valid_ci) {
-    // Присоединиться: verify connection, mark connected, persist
     ConnNode &node = app.conns[ci];
-    auto [ok, err] = test_connection(node.conn.host, node.conn.port,
-                                     node.conn.user, node.conn.pass);
-    if (ok) {
-      node.conn.connected = true;
+    if (node.conn.connected) {
+      // Отсоединиться
+      node.conn.connected = false;
+      node.open           = false;
+      node.schemas.clear();
       save_conn(node.conn);
     } else {
-      app.msg_dlg = {true, "Connection failed", std::move(err)};
+      // Присоединиться: verify connection, mark connected, persist
+      auto [ok, err] = test_connection(node.conn.host, node.conn.port,
+                                       node.conn.user, node.conn.pass);
+      if (ok) {
+        node.conn.connected = true;
+        save_conn(node.conn);
+      } else {
+        app.msg_dlg = {true, "Connection failed", std::move(err)};
+      }
     }
   } else if (act == 1 && valid_ci) {
     app.repo_dlg.open_for(app.conns[ci].conn);

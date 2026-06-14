@@ -10,12 +10,18 @@ int PanelMenu::render(SDL_Renderer *r, float mx, float my, bool ldown, bool rdow
   if ((ldown || rdown) && !hit(mx, my, x, y, W, h)) { open = false; return -1; }
   fill(r, C_DLGBG, x, y, W, h);
   rect(r, C_BORDER, x, y, W, h);
+  static constexpr const char *fixed_labels[N] = {
+      nullptr, "Add repository", "Add", "Edit", "Delete"
+  };
   int result = -1;
   for (int i = 0; i < N; i++) {
+    const char *lbl = (i == 0)
+        ? (connected ? "Отсоединиться" : "Присоединиться")
+        : fixed_labels[i];
     float iy  = y + 2.f + i * IH;
     bool  hov = hit(mx, my, x, iy, W, IH);
     if (hov) fill(r, C_HOVER, x + 1.f, iy, W - 2.f, IH);
-    text_draw(r, labels[i], x + 12.f, center_baseline(iy, IH), C_TEXT);
+    text_draw(r, lbl, x + 12.f, center_baseline(iy, IH), C_TEXT);
     if (ldown && hov) { result = i; open = false; }
   }
   return result;
