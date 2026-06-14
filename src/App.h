@@ -1,5 +1,6 @@
 #pragma once
 #include "Conn.h"
+#include "ConfirmDlg.h"
 #include "ConnNode.h"
 #include "Dlg.h"
 #include "FormEditRepository.h"
@@ -18,18 +19,21 @@ struct App
   Dlg                   dlg;
   FormEditRepository    repo_dlg;
   MsgDlg                msg_dlg;
+  ConfirmDlg            confirm_dlg;
+  int                   pending_delete_idx = -1;
 
-  int      h_item     = -1;
-  int      h_edit     = -1;
-  bool     h_add      = false;
-  float    mx         = 0;
-  float    my         = 0;
-  bool     lmb_held   = false;
+  int       h_item   = -1;
+  int       h_edit   = -1;
+  bool      h_add    = false;
+  float     mx       = 0;
+  float     my       = 0;
+  bool      lmb_held = false;
   PanelMenu panel_menu;
 
-  void reload_conns() {
-    auto fresh = load_all();
-    std::vector<ConnNode> updated;
+  void reload_conns()
+  {
+    const std::vector<Conn> fresh = load_all();
+    std::vector<ConnNode>   updated;
     updated.reserve(fresh.size());
     for (auto &c : fresh) {
       ConnNode node{c, false, {}};

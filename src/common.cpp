@@ -319,7 +319,8 @@ void panel_render(SDL_Renderer *ren, App &app, bool click, bool rclick, bool dbl
     app.dlg.open = true;
     SDL_StartTextInput(app.win);
   } else if (act == 4 && valid_ci) {
-    delete_conn(app.conns[ci].conn.name);
-    app.reload_conns();
+    app.pending_delete_idx = ci;
+    app.confirm_dlg = {true, "Удаление соединения",
+                       "Удалить соединение \"" + app.conns[ci].conn.name + "\"?"};
   }
 }

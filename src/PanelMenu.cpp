@@ -11,7 +11,8 @@ int PanelMenu::render(SDL_Renderer *r, float mx, float my, bool ldown, bool rdow
   fill(r, C_DLGBG, x, y, W, h);
   rect(r, C_BORDER, x, y, W, h);
   static constexpr const char *fixed_labels[N] = {
-      nullptr, "Add repository", "Add", "Edit", "Delete"
+      nullptr, "Add repository",
+      "Добавить соединение", "Изменить соединение", "Удалить соединение"
   };
   int result = -1;
   for (int i = 0; i < N; i++) {

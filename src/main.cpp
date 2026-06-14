@@ -19,9 +19,15 @@ int main(int /*argc*/, char * /*argv*/[])
 
   App app{};
   app.win = SDL_CreateWindow("probe_lang", app.ww, app.wh, SDL_WINDOW_RESIZABLE);
-  if (!app.win) { SDL_Log("CreateWindow: %s", SDL_GetError()); return 1; }
+  if (!app.win) {
+    SDL_Log("CreateWindow: %s", SDL_GetError());
+    return 1;
+  }
   app.ren = SDL_CreateRenderer(app.win, nullptr);
-  if (!app.ren) { SDL_Log("CreateRenderer: %s", SDL_GetError()); return 1; }
+  if (!app.ren) {
+    SDL_Log("CreateRenderer: %s", SDL_GetError());
+    return 1;
+  }
 
   SDL_SetRenderDrawBlendMode(app.ren, SDL_BLENDMODE_NONE);
   font_init(app.ren);
@@ -31,24 +37,24 @@ int main(int /*argc*/, char * /*argv*/[])
   while (running) {
     bool  lclick = false, rclick = false;
     float lclick_x = 0, lclick_y = 0, rclick_x = 0, rclick_y = 0;
-    int   lclicks  = 1;
+    int   lclicks = 1;
 
     SDL_Event ev;
     while (SDL_PollEvent(&ev)) {
       switch (ev.type) {
         case SDL_EVENT_QUIT: running = false; break;
 
-        case SDL_EVENT_WINDOW_RESIZED:
-          SDL_GetWindowSize(app.win, &app.ww, &app.wh);
-          break;
+        case SDL_EVENT_WINDOW_RESIZED: SDL_GetWindowSize(app.win, &app.ww, &app.wh); break;
 
         case SDL_EVENT_MOUSE_MOTION:
           app.mx = ev.motion.x;
           app.my = ev.motion.y;
-          if (app.dlg.open && app.dlg.active_drag_ed >= 0 && app.lmb_held)
+          if (app.dlg.open && app.dlg.active_drag_ed >= 0 && app.lmb_held) {
             app.dlg.editors[app.dlg.active_drag_ed].on_mouse_move(ev.motion.x);
-          if (app.repo_dlg.open)
+          }
+          if (app.repo_dlg.open) {
             app.repo_dlg.err_view.on_move(ev.motion.x, ev.motion.y);
+          }
           break;
 
         case SDL_EVENT_MOUSE_BUTTON_DOWN:
@@ -73,14 +79,12 @@ int main(int /*argc*/, char * /*argv*/[])
               app.dlg.editors[app.dlg.active_drag_ed].on_mouse_release();
               app.dlg.active_drag_ed = -1;
             }
-            if (app.repo_dlg.open)
-              app.repo_dlg.err_view.on_release();
+            if (app.repo_dlg.open) app.repo_dlg.err_view.on_release();
           }
           break;
 
         case SDL_EVENT_MOUSE_WHEEL:
-          if (app.repo_dlg.open && app.repo_dlg.err_view.mouse_over(app.mx, app.my))
-            app.repo_dlg.err_view.on_scroll(ev.wheel.y);
+          if (app.repo_dlg.open && app.repo_dlg.err_view.mouse_over(app.mx, app.my)) app.repo_dlg.err_view.on_scroll(ev.wheel.y);
           break;
 
         case SDL_EVENT_TEXT_INPUT:
@@ -98,9 +102,7 @@ int main(int /*argc*/, char * /*argv*/[])
             if (!consumed) {
               bool shift = (mod & SDL_KMOD_SHIFT) != 0;
               switch (ev.key.key) {
-                case SDLK_TAB:
-                  app.dlg.focus = (app.dlg.focus + (shift ? 5 : 1)) % 6;
-                  break;
+                case SDLK_TAB: app.dlg.focus = (app.dlg.focus + (shift ? 5 : 1)) % 6; break;
                 case SDLK_ESCAPE:
                   app.dlg.open = false;
                   SDL_StopTextInput(app.win);
@@ -109,8 +111,7 @@ int main(int /*argc*/, char * /*argv*/[])
                 case SDLK_KP_ENTER:
                   if (app.dlg.focus < 5) {
                     app.dlg.focus++;
-                  } else if (Conn c = app.dlg.to_conn();
-                             !c.name.empty() && !c.host.empty()) {
+                  } else if (Conn c = app.dlg.to_conn(); !c.name.empty() && !c.host.empty()) {
                     save_conn(c, app.dlg.old_name);
                     app.reload_conns();
                     app.dlg.open = false;
@@ -125,14 +126,11 @@ int main(int /*argc*/, char * /*argv*/[])
           } else if (app.repo_dlg.open) {
             SDL_Keymod mod      = ev.key.mod;
             bool       consumed = false;
-            if (app.repo_dlg.err_view.focused)
-              consumed = app.repo_dlg.err_view.handle_key(ev.key.key, mod);
+            if (app.repo_dlg.err_view.focused) consumed = app.repo_dlg.err_view.handle_key(ev.key.key, mod);
             if (!consumed) consumed = app.repo_dlg.editors[app.repo_dlg.focus].handle_key(ev.key.key, mod);
             if (!consumed) {
               switch (ev.key.key) {
-                case SDLK_TAB:
-                  app.repo_dlg.focus = (app.repo_dlg.focus + 1) % 2;
-                  break;
+                case SDLK_TAB: app.repo_dlg.focus = (app.repo_dlg.focus + 1) % 2; break;
                 case SDLK_ESCAPE:
                   app.repo_dlg.open = false;
                   SDL_StopTextInput(app.win);
@@ -203,8 +201,21 @@ int main(int /*argc*/, char * /*argv*/[])
     }
 
     if (app.msg_dlg.open) {
-      if (app.msg_dlg.render(app.ren, app.mx, app.my, lclick))
-        app.msg_dlg.open = false;
+      if (app.msg_dlg.render(app.ren, app.mx, app.my, lclick)) app.msg_dlg.open = false;
+    }
+
+    if (app.confirm_dlg.open) {
+      int res = app.confirm_dlg.render(app.ren, app.mx, app.my, lclick);
+      if (res == 1) {
+        int idx = app.pending_delete_idx;
+        if (idx >= 0 && idx < (int)app.conns.size()) {
+          delete_conn(app.conns[idx].conn.name);
+          app.reload_conns();
+        }
+        app.pending_delete_idx = -1;
+      } else if (res == -1) {
+        app.pending_delete_idx = -1;
+      }
     }
 
     SDL_RenderPresent(app.ren);
