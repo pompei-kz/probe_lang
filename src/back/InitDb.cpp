@@ -1,4 +1,5 @@
 #include "InitDb.h"
+#include "UtilDb.h"
 
 namespace back {
 
@@ -18,6 +19,8 @@ namespace back {
     txn.exec("CREATE TABLE IF NOT EXISTS " + qsch +
              ".lang_setting "
              "(name varchar(150) PRIMARY KEY, value text)");
+    ensureCreatedAt(txn, schema, "lang_setting");
+    ensureLastModifiedAt(txn, schema, "lang_setting");
     init_folder_table(txn, pg, schema);
   }
 

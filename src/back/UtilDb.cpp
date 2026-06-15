@@ -1,0 +1,31 @@
+#include "UtilDb.h"
+
+namespace back {
+
+  void ensureCreatedAt(pqxx::work &txn, const std::string &schemaName, const std::string &tableName)
+  {
+    const std::string qtable = txn.quote_name(schemaName) + "." + txn.quote_name(tableName);
+    txn.exec("ALTER TABLE " + qtable + " ADD COLUMN IF NOT EXISTS created_at timestamp DEFAULT now()");
+  }
+
+  void ensureLastModifiedAt(pqxx::work &txn, const std::string &schemaName, const std::string &tableName)
+  {
+    const std::string qSchema = txn.quote_name(schemaName);
+    const std::string qTable  = qSchema + "." + txn.quote_name(tableName);
+
+    txn.exec("ALTER TABLE " + qTable + " ADD COLUMN IF NOT EXISTS last_modified_at timestamp");
+
+    // Trigger function (one per schema) that stamps the column on every update.
+    txn.exec("CREATE OR REPLACE FUNCTION " + qSchema +
+             ".set_last_modified_at() RETURNS trigger "
+             "LANGUAGE PlPgSql AS $$ "
+             "BEGIN NEW.last_modified_at = now(); RETURN NEW; END; $$");
+
+    // Re-create the trigger idempotently (CREATE TRIGGER has no IF NOT EXISTS
+    // on all supported server versions).
+    txn.exec("DROP TRIGGER IF EXISTS set_last_modified_at ON " + qTable);
+    txn.exec("CREATE TRIGGER set_last_modified_at BEFORE UPDATE ON " + qTable + " FOR EACH ROW EXECUTE FUNCTION " + qSchema +
+             ".set_last_modified_at()");
+  }
+
+} // namespace back
