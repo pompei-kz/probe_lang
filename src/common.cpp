@@ -1,13 +1,15 @@
 #include "common.h"
-#include "Conn.h"
-#include "ConnNode.h"
-#include "ConnTest.h"
+#include "back/Conn.h"
+#include "back/ConnNode.h"
+#include "back/Db.h"
 #include "ContextMenu.h"
 #include "FontAtlas.h"
 #include "PanelMenu.h"
 #include "SchemaMenu.h"
-#include "SchemaNode.h"
+#include "back/SchemaNode.h"
 #include "render_helpers.h"
+
+using namespace back;
 
 void draw_plus(SDL_Renderer *r, float cx, float cy, float sz, Clr c)
 {
@@ -195,8 +197,7 @@ static void render_folder_list(SDL_Renderer *ren, App &app,
     if (h_caret || h_row) fill(ren, C_HOVER, 0, iy, pw, ITEM_H);
 
     if (has_kids)
-      draw_caret(ren, ix - 9.f, iy + ITEM_H * .5f, folder.open,
-                 folder.open ? C_ACCENT : C_DIM);
+      draw_caret(ren, ix - 9.f, iy + ITEM_H * .5f, folder.open, folder.open ? C_ACCENT : C_DIM);
 
     draw_folder_icon(ren, ix, iy + ITEM_H * .5f - 3.f, C_DIM);
     text_draw(ren, folder.name.c_str(), ix + 14.f, center_baseline(iy, ITEM_H), C_TEXT);
@@ -205,6 +206,7 @@ static void render_folder_list(SDL_Renderer *ren, App &app,
     SDL_RenderFillRect(ren, &sl);
 
     if (click && h_caret)  folder.open = !folder.open;
+
     if (rclick && (h_caret || h_row)) {
       float mx2 = std::min(app.mx, pw - FolderMenu::W - 2.f);
       float my2 = std::min(app.my, ph - FolderMenu::N * FolderMenu::IH - 10.f);
@@ -213,8 +215,9 @@ static void render_folder_list(SDL_Renderer *ren, App &app,
       app.repo_menu.open  = false;
     }
     row++;
-    if (folder.open)
+    if (folder.open) {
       render_folder_list(ren, app, folder.children, ci, ri, depth + 1, row, pw, ph, click, rclick);
+    }
   }
 }
 

@@ -1,7 +1,7 @@
 #pragma once
-#include "Conn.h"
+#include "back/Conn.h"
 #include "ConfirmDlg.h"
-#include "ConnNode.h"
+#include "back/ConnNode.h"
 #include "Dlg.h"
 #include "FolderMenu.h"
 #include "FormEditFolder.h"
@@ -18,7 +18,7 @@ struct App
   SDL_Renderer *ren = nullptr;
   int           ww = 1280, wh = 720;
 
-  std::vector<ConnNode> conns;
+  std::vector<back::ConnNode> conns;
   Dlg                   dlg;
   FormEditRepository    repo_dlg;
   FormEditFolder        folder_dlg;
@@ -42,11 +42,11 @@ struct App
 
   void reload_conns()
   {
-    const std::vector<Conn> fresh = load_all();
-    std::vector<ConnNode>   updated;
+    const std::vector<back::Conn> fresh = back::load_all();
+    std::vector<back::ConnNode>   updated;
     updated.reserve(fresh.size());
     for (auto &c : fresh) {
-      ConnNode node{c, false, {}};
+      back::ConnNode node{c, false, {}};
       for (auto &old : conns) {
         if (old.conn.name == c.name) {
           node.open  = old.open;

@@ -3,6 +3,9 @@
 #include <algorithm>
 #include <fstream>
 
+namespace back
+{
+
 namespace fs = std::filesystem;
 
 static const char *PROG = "probe_lang";
@@ -64,3 +67,5 @@ void save_conn(const Conn &c, const std::string &old_name)
     << "\nuser=" << c.user << "\npass=" << c.pass
     << "\nconnected=" << (c.connected ? "YES" : "NO") << "\n";
 }
+
+} // namespace back

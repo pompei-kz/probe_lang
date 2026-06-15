@@ -1,9 +1,11 @@
 #include "FormEditFolder.h"
 #include "Clr.h"
-#include "ConnTest.h"
+#include "back/FolderDb.h"
 #include "ContextMenu.h"
 #include "FontAtlas.h"
 #include "render_helpers.h"
+
+using namespace back;
 
 static constexpr float FDW   = 380.f;
 static constexpr float FDH   = 210.f;

@@ -20,8 +20,9 @@ add_executable(probe_lang
     src/common.cpp
     src/PanelMenu.cpp
     src/FontAtlas.cpp
-    src/Conn.cpp
-    src/ConnTest.cpp
+    src/back/Conn.cpp
+    src/back/Db.cpp
+    src/back/FolderDb.cpp
     src/TextEditor.cpp
     src/ContextMenu.cpp
     src/InputField.cpp
@@ -33,8 +34,9 @@ add_executable(probe_lang
     src/SelectableText.cpp
     src/FormEditRepository.cpp
     src/FormEditFolder.cpp
-    src/CustomId.cpp
+    src/back/CustomId.cpp
 )
+target_include_directories(probe_lang PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_include_directories(probe_lang PRIVATE ${stb_SOURCE_DIR})
 target_link_libraries(probe_lang PRIVATE SDL3::SDL3)
 target_link_libraries(probe_lang PRIVATE ICU::uc ICU::i18n ICU::io ICU::data)
@@ -51,7 +53,7 @@ find_package(GTest REQUIRED)
 
 add_executable(probe_lang_tests
     src_test/TestCustomId.cpp
-    src/CustomId.cpp
+    src/back/CustomId.cpp
 )
 target_include_directories(probe_lang_tests PRIVATE src)
 target_link_libraries(probe_lang_tests PRIVATE GTest::GTest GTest::Main)

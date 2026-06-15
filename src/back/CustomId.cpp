@@ -2,6 +2,9 @@
 #include <chrono>
 #include <random>
 
+namespace back
+{
+
 // 64-symbol alphabet: 0-9 A-Z a-z $ @
 static constexpr char ALPHA[65] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
                                   "abcdefghijklmnopqrstuvwxyz"
@@ -63,3 +66,5 @@ std::string new_id()
 {
   return new_custom_id(5, 4);
 }
+
+} // namespace back

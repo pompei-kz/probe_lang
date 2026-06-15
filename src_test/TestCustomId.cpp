@@ -1,7 +1,9 @@
-#include "CustomId.h"
+#include "back/CustomId.h"
 #include <gtest/gtest.h>
 #include <set>
 #include <string>
+
+using namespace back;
 
 // ---------------------------------------------------------------------------
 // Helpers

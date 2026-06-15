@@ -1,5 +1,5 @@
 #pragma once
-#include "Conn.h"
+#include "back/Conn.h"
 #include "InputField.h"
 #include <string>
 
@@ -25,7 +25,7 @@ struct Dlg
         && fields[5].ed.buf == snap_pass;
   }
 
-  void open_add();
-  void open_edit(const Conn &c);
-  Conn to_conn() const;
+  void       open_add();
+  void       open_edit(const back::Conn &c);
+  back::Conn to_conn() const;
 };

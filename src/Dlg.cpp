@@ -1,5 +1,7 @@
 #include "Dlg.h"
 
+using namespace back;
+
 void Dlg::open_add()
 {
   for (int i = 0; i < 6; i++) {

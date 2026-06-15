@@ -2,13 +2,16 @@
 #include <SDL3/SDL_main.h>
 
 #include "App.h"
-#include "Conn.h"
-#include "ConnTest.h"
+#include "back/Conn.h"
+#include "back/Db.h"
+#include "back/FolderDb.h"
 #include "DlgMouse.h"
 #include "FontAtlas.h"
-#include "SchemaNode.h"
+#include "back/SchemaNode.h"
 #include "common.h"
 #include "render_helpers.h"
+
+using namespace back;
 
 int main(int /*argc*/, char * /*argv*/[])
 {
