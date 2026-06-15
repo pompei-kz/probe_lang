@@ -11,7 +11,7 @@ namespace front {
   using namespace back::model;
 
   static constexpr float FDW   = 380.f;
-  static constexpr float FDH   = 210.f;
+  static constexpr float FDH   = 230.f;
   static constexpr float FFH   = 28.f;
   static constexpr float ERR_H = 60.f;
 
