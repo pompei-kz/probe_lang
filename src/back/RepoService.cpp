@@ -1,5 +1,6 @@
 #include "RepoService.h"
 #include "DbInternal.h"
+#include "InitDb.h"
 
 namespace back {
 
@@ -82,18 +83,12 @@ namespace back {
       pqxx::work       txn(pg);
       std::string      qsch = pg.quote_name(schema);
 
-      txn.exec("CREATE SCHEMA IF NOT EXISTS " + qsch);
-      txn.exec("CREATE TABLE IF NOT EXISTS " + qsch +
-               ".lang_setting "
-               "(name varchar(150) PRIMARY KEY, value text)");
+      init_repo_schema(txn, pg, schema);
       txn.exec_params("INSERT INTO " + qsch +
                           ".lang_setting (name, value) "
                           "VALUES ('name', $1) "
                           "ON CONFLICT (name) DO UPDATE SET value = EXCLUDED.value",
                       repo_name);
-      txn.exec("CREATE TABLE IF NOT EXISTS " + qsch +
-               ".folder "
-               "(id varchar(32) PRIMARY KEY, parent_id varchar(32), name text)");
       txn.commit();
       return {true, ""};
     } catch (const pqxx::sql_error &e) {

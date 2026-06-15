@@ -1,6 +1,7 @@
 #include "FolderService.h"
 #include "CustomId.h"
 #include "DbInternal.h"
+#include "InitDb.h"
 #include <tuple>
 
 namespace back {
@@ -64,9 +65,7 @@ namespace back {
       std::string      qsch = pg.quote_name(schema);
 
       // Create table in case repo was added before folder feature was introduced
-      txn.exec("CREATE TABLE IF NOT EXISTS " + qsch +
-               ".folder "
-               "(id varchar(32) PRIMARY KEY, parent_id varchar(32), name text)");
+      init_folder_table(txn, pg, schema);
 
       std::string id = new_id();
       if (parent_id.empty()) {

@@ -34,6 +34,7 @@ add_executable(probe_lang
     src/back/ConnService.cpp
     src/back/RepoService.cpp
     src/back/FolderService.cpp
+    src/back/InitDb.cpp
     src/back/CustomId.cpp
 )
 target_include_directories(probe_lang PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
