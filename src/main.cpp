@@ -10,6 +10,7 @@
 #include "back/ConnService.h"
 #include "back/FolderService.h"
 #include "back/RepoService.h"
+#include "back/UnitService.h"
 #include "back/model/SchemaNode.h"
 
 using namespace front;
@@ -347,12 +348,37 @@ int main(int /*argc*/, char * /*argv*/[])
           app.pending_delete_folder_conn = -1;
           app.pending_delete_folder_repo = -1;
           app.pending_delete_folder_id.clear();
+        } else if (!app.pending_delete_unit_id.empty()) {
+          int uci = app.pending_delete_unit_conn;
+          // ReSharper disable once CppTooWideScopeInitStatement
+          int uri = app.pending_delete_unit_repo;
+          if (uci >= 0 && uci < static_cast<int>(app.conns.size()) && uri >= 0 && uri < static_cast<int>(app.conns[uci].repos.size())) {
+            auto &repo     = app.conns[uci].repos[uri];
+            // ReSharper disable once CppTooWideScopeInitStatement
+            auto [ok, err] = delete_unit(app.conns[uci].conn, repo.schema_name, app.pending_delete_unit_id);
+            if (ok) {
+              // ReSharper disable once CppTooWideScopeInitStatement
+              auto [ok2, err2] = load_repo_tree(app.conns[uci].conn, repo.schema_name, repo);
+              if (!ok2)
+                app.msg_dlg = {true, "Ошибка", std::move(err2)};
+              else
+                restore_repo_folders_open(app.conns[uci].conn.name, repo); // keep already-open folders open
+            } else {
+              app.msg_dlg = {true, "Ошибка", std::move(err)};
+            }
+          }
+          app.pending_delete_unit_conn = -1;
+          app.pending_delete_unit_repo = -1;
+          app.pending_delete_unit_id.clear();
         }
       } else if (res == -1) {
         app.pending_delete_idx         = -1;
         app.pending_delete_folder_conn = -1;
         app.pending_delete_folder_repo = -1;
         app.pending_delete_folder_id.clear();
+        app.pending_delete_unit_conn = -1;
+        app.pending_delete_unit_repo = -1;
+        app.pending_delete_unit_id.clear();
       }
     }
 

@@ -19,6 +19,9 @@ namespace back {
   std::pair<bool, std::string> edit_unit(
       const model::Conn &c, const std::string &schema, const std::string &id, const std::string &name, model::UnitType type);
 
+  // Delete a unit by id.
+  std::pair<bool, std::string> delete_unit(const model::Conn &c, const std::string &schema, const std::string &id);
+
   // Ensure the unit table exists in every repository schema of the connection.
   // Called when a connection switches to the "connected" state.
   std::pair<bool, std::string> ensure_unit_tables(const model::Conn &c);

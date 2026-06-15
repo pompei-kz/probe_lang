@@ -512,10 +512,14 @@ namespace front {
 
     if (valid_fm) {
       if (fmact == 0) {
+        app.unit_dlg.open_add(fmci, fmri, app.conns[fmci].conn, app.conns[fmci].repos[fmri].schema_name, app.folder_menu.folder_id);
+        app.unit_dlg.open = true;
+        SDL_StartTextInput(app.win);
+      } else if (fmact == 1) {
         app.folder_dlg.open_add(fmci, fmri, app.conns[fmci].conn, app.conns[fmci].repos[fmri].schema_name, app.folder_menu.folder_id);
         app.folder_dlg.open = true;
         SDL_StartTextInput(app.win);
-      } else if (fmact == 1) {
+      } else if (fmact == 2) {
         app.folder_dlg.open_edit(fmci,
                                  fmri,
                                  app.conns[fmci].conn,
@@ -524,15 +528,11 @@ namespace front {
                                  app.folder_menu.folder_name);
         app.folder_dlg.open = true;
         SDL_StartTextInput(app.win);
-      } else if (fmact == 2) {
+      } else if (fmact == 3) {
         app.pending_delete_folder_conn = fmci;
         app.pending_delete_folder_repo = fmri;
         app.pending_delete_folder_id   = app.folder_menu.folder_id;
         app.confirm_dlg                = {true, "Удаление папки", "Удалить папку \"" + app.folder_menu.folder_name + "\" и все вложенные подпапки?"};
-      } else if (fmact == 3) {
-        app.unit_dlg.open_add(fmci, fmri, app.conns[fmci].conn, app.conns[fmci].repos[fmri].schema_name, app.folder_menu.folder_id);
-        app.unit_dlg.open = true;
-        SDL_StartTextInput(app.win);
       }
     }
 
@@ -551,6 +551,11 @@ namespace front {
                              app.unit_menu.unit_type);
       app.unit_dlg.open = true;
       SDL_StartTextInput(app.win);
+    } else if (umact == 1 && valid_um) {
+      app.pending_delete_unit_conn = umci;
+      app.pending_delete_unit_repo = umri;
+      app.pending_delete_unit_id   = app.unit_menu.unit_id;
+      app.confirm_dlg              = {true, "Удаление юнита", "Удалить юнит \"" + app.unit_menu.unit_name + "\"?"};
     }
   }
 

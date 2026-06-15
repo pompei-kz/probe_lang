@@ -17,7 +17,7 @@ namespace front {
     static constexpr float IH = 26.f;
     static constexpr int   N  = 4;
 
-    // returns 0=Добавить папку, 1=Изменить, 2=Удалить, 3=Добавить юнит, -1=none
+    // returns 0=Добавить юнит, 1=Добавить папку, 2=Изменить, 3=Удалить, -1=none
     int render(SDL_Renderer *r, float mx, float my, bool ldown, bool rdown);
   };
 

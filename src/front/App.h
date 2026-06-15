@@ -34,6 +34,9 @@ namespace front {
     int         pending_delete_folder_conn = -1; // folder
     int         pending_delete_folder_repo = -1;
     std::string pending_delete_folder_id;
+    int         pending_delete_unit_conn = -1; // unit
+    int         pending_delete_unit_repo = -1;
+    std::string pending_delete_unit_id;
 
     int        h_item   = -1;
     int        h_edit   = -1;

@@ -116,6 +116,29 @@ TEST_F(UnitServiceTest, EditUnitChangesNameAndType)
 }
 
 // ---------------------------------------------------------------------------
+// delete_unit
+// ---------------------------------------------------------------------------
+
+TEST_F(UnitServiceTest, DeleteUnitRemovesIt)
+{
+  make_schema();
+  ASSERT_TRUE(create_unit(conn(), schema, "", "Doomed", UnitType::Class).first);
+  ASSERT_TRUE(create_unit(conn(), schema, "", "Survivor", UnitType::Class).first);
+  const std::string id = load_units().at(0).id; // "Doomed" sorts before "Survivor"
+
+  //
+  //
+  auto [ok, msg] = delete_unit(conn(), schema, id);
+  //
+  //
+
+  ASSERT_TRUE(ok) << msg;
+  auto units = load_units();
+  ASSERT_EQ(units.size(), 1u);
+  EXPECT_EQ(units[0].name, "Survivor");
+}
+
+// ---------------------------------------------------------------------------
 // load_units_for_schema
 // ---------------------------------------------------------------------------
 
