@@ -8,6 +8,12 @@ namespace front {
   int PanelMenu::render(SDL_Renderer *r, float mx, float my, bool ldown, bool rdown)
   {
     if (!open) return -1;
+    if (pending >= 0) {
+      int a   = pending;
+      pending = -1;
+      open    = false;
+      return a;
+    }
     float h = N * IH + 4.f;
     if ((ldown || rdown) && !hit(mx, my, x, y, W, h)) {
       open = false;
@@ -21,7 +27,7 @@ namespace front {
       const char *lbl = (i == 0) ? (connected ? "Отсоединиться" : "Присоединиться") : fixed_labels[i];
       float       iy  = y + 2.f + i * IH;
       bool        hov = hit(mx, my, x, iy, W, IH);
-      if (hov) fill(r, C_HOVER, x + 1.f, iy, W - 2.f, IH);
+      if (hov || i == hi) fill(r, C_HOVER, x + 1.f, iy, W - 2.f, IH);
       text_draw(r, lbl, x + 12.f, center_baseline(iy, IH), C_TEXT);
       if (ldown && hov) {
         result = i;

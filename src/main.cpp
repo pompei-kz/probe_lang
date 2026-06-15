@@ -179,6 +179,9 @@ int main(int /*argc*/, char * /*argv*/[])
               app.unit_dlg.open = false;
               SDL_StopTextInput(app.win);
             }
+          } else {
+            // No dialog open: tree/menu keyboard navigation.
+            panel_key_down(app, ev.key.key);
           }
           break;
 

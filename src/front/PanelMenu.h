@@ -1,4 +1,5 @@
 #pragma once
+#include "MenuNav.h"
 #include <SDL3/SDL.h>
 
 namespace front {
@@ -9,10 +10,14 @@ namespace front {
     float x = 0, y = 0;
     int   conn_idx  = -1;
     bool  connected = false;
+    int   hi        = -1; // keyboard-highlighted item
+    int   pending   = -1; // item activated via keyboard (consumed by render)
 
     static constexpr float W  = 200.f;
     static constexpr float IH = 26.f;
     static constexpr int   N  = 5;
+
+    void key(SDL_Keycode k) { menu_nav_key(N, hi, pending, open, k); }
 
     // returns 0=Присоединиться/Отсоединиться, 1=AddRepo, 2=Add, 3=Edit, 4=Delete, -1=none
     // labels[2..4] rendered as: "Добавить соединение", "Изменить соединение", "Удалить соединение"

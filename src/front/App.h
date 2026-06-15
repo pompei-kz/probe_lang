@@ -38,6 +38,8 @@ namespace front {
     int         pending_delete_unit_repo = -1;
     std::string pending_delete_unit_id;
 
+    std::string sel_key; // key of the currently-selected tree node (keyboard navigation)
+
     int        h_item   = -1;
     int        h_edit   = -1;
     bool       h_add    = false;

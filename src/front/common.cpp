@@ -159,6 +159,41 @@ namespace front {
   // Defined further down; reopens persisted descendants of a folder from disk.
   static void restore_folder_open(std::vector<std::string> prefix, FolderNode &folder);
 
+  // ── selection node keys ─────────────────────────────────────────────────────
+  // A unique in-memory key per tree node, used for the keyboard selection.
+  static std::string node_key(char kind, const std::string &a, const std::string &b = "", const std::string &c = "")
+  {
+    std::string k;
+    k += kind;
+    k += '\x1f';
+    k += a;
+    if (!b.empty()) {
+      k += '\x1f';
+      k += b;
+    }
+    if (!c.empty()) {
+      k += '\x1f';
+      k += c;
+    }
+    return k;
+  }
+  static std::string conn_key(const std::string &name)
+  {
+    return node_key('C', name);
+  }
+  static std::string repo_key(const std::string &conn, const std::string &schema)
+  {
+    return node_key('R', conn, schema);
+  }
+  static std::string folder_key(const std::string &conn, const std::string &schema, const std::string &fid)
+  {
+    return node_key('F', conn, schema, fid);
+  }
+  static std::string unit_key(const std::string &conn, const std::string &schema, const std::string &uid)
+  {
+    return node_key('U', conn, schema, uid);
+  }
+
   // Right-pointing (collapsed) or down-pointing (expanded) triangle
   static void draw_caret(SDL_Renderer *r, float cx, float cy, bool open, Clr c)
   {
@@ -214,14 +249,20 @@ namespace front {
 
   // Render a list of units (leaf rows, no caret) at the given indentation depth.
   static void render_unit_list(
-      SDL_Renderer *ren, App &app, std::vector<Unit> &units, int ci, int ri, int depth, int &row, float pw, float ph, bool rclick)
+      SDL_Renderer *ren, App &app, std::vector<Unit> &units, int ci, int ri, int depth, int &row, float pw, float ph, bool click, bool rclick)
   {
-    static constexpr float STEP = 14.f;
+    static constexpr float STEP   = 14.f;
+    const std::string     &conn   = app.conns[ci].conn.name;
+    const std::string     &schema = app.conns[ci].repos[ri].schema_name;
     for (auto &unit : units) {
-      float iy    = HDR_H + row * ITEM_H;
-      float ix    = PAD + CARET_W + (depth + 1) * STEP;
-      bool  h_row = hit(app.mx, app.my, 0, iy, pw, ITEM_H);
-      if (h_row) fill(ren, C_HOVER, 0, iy, pw, ITEM_H);
+      float             iy    = HDR_H + row * ITEM_H;
+      float             ix    = PAD + CARET_W + (depth + 1) * STEP;
+      bool              h_row = hit(app.mx, app.my, 0, iy, pw, ITEM_H);
+      const std::string ukey  = unit_key(conn, schema, unit.id);
+      if (app.sel_key == ukey)
+        fill(ren, C_SELECT, 0, iy, pw, ITEM_H);
+      else if (h_row)
+        fill(ren, C_HOVER, 0, iy, pw, ITEM_H);
 
       draw_unit_icon(ren, ix, iy + ITEM_H * .5f, unit.type, C_ACCENT);
       text_draw(ren, unit.name.c_str(), ix + 14.f, center_baseline(iy, ITEM_H), C_TEXT);
@@ -229,6 +270,7 @@ namespace front {
       SDL_FRect sl{0, iy + ITEM_H - 1, pw, 1};
       SDL_RenderFillRect(ren, &sl);
 
+      if ((click || rclick) && h_row) app.sel_key = ukey;
       if (rclick && h_row) {
         float mx2            = std::min(app.mx, pw - UnitMenu::W - 2.f);
         float my2            = std::min(app.my, ph - UnitMenu::N * UnitMenu::IH - 10.f);
@@ -257,12 +299,16 @@ namespace front {
   {
     static constexpr float STEP = 14.f;
     for (auto &folder : folders) {
-      float      iy       = HDR_H + row * ITEM_H;
-      float      ix       = PAD + CARET_W + (depth + 1) * STEP;
-      const bool has_kids = !folder.children.empty() || !folder.units.empty();
-      bool       h_caret  = has_kids && hit(app.mx, app.my, 0, iy, ix, ITEM_H);
-      bool       h_row    = !h_caret && hit(app.mx, app.my, 0, iy, pw, ITEM_H);
-      if (h_caret || h_row) fill(ren, C_HOVER, 0, iy, pw, ITEM_H);
+      float             iy       = HDR_H + row * ITEM_H;
+      float             ix       = PAD + CARET_W + (depth + 1) * STEP;
+      const bool        has_kids = !folder.children.empty() || !folder.units.empty();
+      bool              h_caret  = has_kids && hit(app.mx, app.my, 0, iy, ix, ITEM_H);
+      bool              h_row    = !h_caret && hit(app.mx, app.my, 0, iy, pw, ITEM_H);
+      const std::string fkey     = folder_key(prefix[0], prefix[1], folder.id);
+      if (app.sel_key == fkey)
+        fill(ren, C_SELECT, 0, iy, pw, ITEM_H);
+      else if (h_caret || h_row)
+        fill(ren, C_HOVER, 0, iy, pw, ITEM_H);
 
       if (has_kids) draw_caret(ren, ix - 9.f, iy + ITEM_H * .5f, folder.open, folder.open ? C_ACCENT : C_DIM);
 
@@ -271,6 +317,8 @@ namespace front {
       sc(ren, C_BORDER);
       SDL_FRect sl{0, iy + ITEM_H - 1, pw, 1};
       SDL_RenderFillRect(ren, &sl);
+
+      if ((click || rclick) && (h_caret || h_row)) app.sel_key = fkey;
 
       std::vector<std::string> path = prefix;
       path.push_back(folder.id);
@@ -299,7 +347,7 @@ namespace front {
       row++;
       if (folder.open) {
         render_folder_list(ren, app, folder.children, ci, ri, path, depth + 1, row, pw, ph, click, rclick, dblclick);
-        render_unit_list(ren, app, folder.units, ci, ri, depth + 1, row, pw, ph, rclick);
+        render_unit_list(ren, app, folder.units, ci, ri, depth + 1, row, pw, ph, click, rclick);
       }
     }
   }
@@ -339,12 +387,17 @@ namespace front {
       const bool connected = node.conn.connected;
       float      iy        = HDR_H + row * ITEM_H;
 
-      bool h_caret = connected && hit(app.mx, app.my, 0, iy, PAD + CARET_W, ITEM_H);
-      bool h_row   = !h_caret && hit(app.mx, app.my, 0, iy, pw - EDIT_W, ITEM_H);
-      bool h_edit  = hit(app.mx, app.my, pw - EDIT_W, iy, EDIT_W, ITEM_H);
+      bool              h_caret = connected && hit(app.mx, app.my, 0, iy, PAD + CARET_W, ITEM_H);
+      bool              h_row   = !h_caret && hit(app.mx, app.my, 0, iy, pw - EDIT_W, ITEM_H);
+      bool              h_edit  = hit(app.mx, app.my, pw - EDIT_W, iy, EDIT_W, ITEM_H);
+      const std::string ckey    = conn_key(node.conn.name);
       if (h_row || h_caret) app.h_item = i;
       if (h_edit) app.h_edit = i;
-      if (h_row || h_caret || h_edit) fill(ren, C_HOVER, 0, iy, pw, ITEM_H);
+      if (app.sel_key == ckey)
+        fill(ren, C_SELECT, 0, iy, pw, ITEM_H);
+      else if (h_row || h_caret || h_edit)
+        fill(ren, C_HOVER, 0, iy, pw, ITEM_H);
+      if ((click || rclick) && (h_row || h_caret || h_edit)) app.sel_key = ckey;
 
       // caret on the left (only for connected nodes)
       float caret_cx = PAD + CARET_W * .5f;
@@ -398,14 +451,19 @@ namespace front {
 
       if (node.open) {
         for (int ri = 0; ri < static_cast<int>(node.repos.size()); ri++) {
-          auto &repo     = node.repos[ri];
-          float sy       = HDR_H + row * ITEM_H;
-          float caret_x  = PAD + CARET_W; // caret zone right edge
-          bool  has_kids = !repo.folders.empty() || !repo.units.empty();
-          bool  h_caret1 = has_kids && hit(app.mx, app.my, 0, sy, caret_x, ITEM_H);
-          bool  h_row1   = !h_caret1 && hit(app.mx, app.my, 0, sy, pw, ITEM_H);
+          auto             &repo     = node.repos[ri];
+          float             sy       = HDR_H + row * ITEM_H;
+          float             caret_x  = PAD + CARET_W; // caret zone right edge
+          bool              has_kids = !repo.folders.empty() || !repo.units.empty();
+          bool              h_caret1 = has_kids && hit(app.mx, app.my, 0, sy, caret_x, ITEM_H);
+          bool              h_row1   = !h_caret1 && hit(app.mx, app.my, 0, sy, pw, ITEM_H);
+          const std::string rkey     = repo_key(node.conn.name, repo.schema_name);
 
-          if (h_caret1 || h_row1) fill(ren, C_HOVER, 0, sy, pw, ITEM_H);
+          if (app.sel_key == rkey)
+            fill(ren, C_SELECT, 0, sy, pw, ITEM_H);
+          else if (h_caret1 || h_row1)
+            fill(ren, C_HOVER, 0, sy, pw, ITEM_H);
+          if ((click || rclick) && (h_caret1 || h_row1)) app.sel_key = rkey;
 
           if (has_kids) draw_caret(ren, PAD + CARET_W * .5f, sy + ITEM_H * .5f, repo.open, repo.open ? C_ACCENT : C_DIM);
 
@@ -435,7 +493,7 @@ namespace front {
           row++;
           if (repo.open) {
             render_folder_list(ren, app, repo.folders, i, ri, {node.conn.name, repo.schema_name}, 0, row, pw, ph, click, rclick, dblclick);
-            render_unit_list(ren, app, repo.units, i, ri, 0, row, pw, ph, rclick);
+            render_unit_list(ren, app, repo.units, i, ri, 0, row, pw, ph, click, rclick);
           }
         }
       }
@@ -627,6 +685,249 @@ namespace front {
       return;
     }
     open_folder_branch_rec({conn_name, repo.schema_name}, repo.folders, parent_folder_id);
+  }
+
+  // ── keyboard navigation ─────────────────────────────────────────────────────
+
+  // A flattened view of the currently-visible tree rows, in render order.
+  struct VisNode
+  {
+    std::string              key;
+    std::vector<std::string> path;         // persistence path (conn / conn,schema / conn,schema,...folder ids)
+    int                      kind     = 0; // 0=conn, 1=repo, 2=folder, 3=unit
+    int                      conn_idx = -1;
+    int                      repo_idx = -1;
+    int                      parent   = -1; // index of the parent row in the list
+    std::string              menu_id;       // folder.id / unit.id (for the context menu)
+    std::string              menu_name;
+    UnitType                 unit_type = UnitType::Class;
+    bool                     has_kids  = false;
+    bool                    *open      = nullptr; // &node.open for conn/repo/folder; null for units
+    FolderNode              *folder    = nullptr; // for folders (to restore children on open)
+  };
+
+  static void build_units(
+      std::vector<Unit> &units, int ci, int ri, const std::string &conn, const std::string &schema, int parent, std::vector<VisNode> &out)
+  {
+    for (auto &u : units) {
+      VisNode n;
+      n.kind      = 3;
+      n.conn_idx  = ci;
+      n.repo_idx  = ri;
+      n.parent    = parent;
+      n.key       = unit_key(conn, schema, u.id);
+      n.menu_id   = u.id;
+      n.menu_name = u.name;
+      n.unit_type = u.type;
+      out.push_back(std::move(n));
+    }
+  }
+
+  static void build_folders(std::vector<FolderNode> &folders,
+                            int                      ci,
+                            int                      ri,
+                            const std::string       &conn,
+                            const std::string       &schema,
+                            std::vector<std::string> prefix,
+                            int                      parent,
+                            std::vector<VisNode>    &out)
+  {
+    for (auto &f : folders) {
+      std::vector<std::string> path = prefix;
+      path.push_back(f.id);
+      VisNode n;
+      n.kind      = 2;
+      n.conn_idx  = ci;
+      n.repo_idx  = ri;
+      n.parent    = parent;
+      n.key       = folder_key(conn, schema, f.id);
+      n.path      = path;
+      n.menu_id   = f.id;
+      n.menu_name = f.name;
+      n.has_kids  = !f.children.empty() || !f.units.empty();
+      n.open      = &f.open;
+      n.folder    = &f;
+      int idx     = static_cast<int>(out.size());
+      out.push_back(std::move(n));
+      if (f.open) {
+        build_folders(f.children, ci, ri, conn, schema, path, idx, out);
+        build_units(f.units, ci, ri, conn, schema, idx, out);
+      }
+    }
+  }
+
+  static std::vector<VisNode> build_visible(App &app)
+  {
+    std::vector<VisNode> out;
+    for (int ci = 0; ci < static_cast<int>(app.conns.size()); ci++) {
+      ConnNode &node = app.conns[ci];
+      VisNode   n;
+      n.kind     = 0;
+      n.conn_idx = ci;
+      n.key      = conn_key(node.conn.name);
+      n.path     = {node.conn.name};
+      n.has_kids = node.conn.connected;
+      n.open     = &node.open;
+      int idx    = static_cast<int>(out.size());
+      out.push_back(std::move(n));
+      if (node.open) {
+        for (int ri = 0; ri < static_cast<int>(node.repos.size()); ri++) {
+          RepoNode &repo = node.repos[ri];
+          VisNode   r;
+          r.kind     = 1;
+          r.conn_idx = ci;
+          r.repo_idx = ri;
+          r.parent   = idx;
+          r.key      = repo_key(node.conn.name, repo.schema_name);
+          r.path     = {node.conn.name, repo.schema_name};
+          r.has_kids = !repo.folders.empty() || !repo.units.empty();
+          r.open     = &repo.open;
+          int ridx   = static_cast<int>(out.size());
+          out.push_back(std::move(r));
+          if (repo.open) {
+            build_folders(repo.folders, ci, ri, node.conn.name, repo.schema_name, {node.conn.name, repo.schema_name}, ridx, out);
+            build_units(repo.units, ci, ri, node.conn.name, repo.schema_name, ridx, out);
+          }
+        }
+      }
+    }
+    return out;
+  }
+
+  // Open or close a node, persisting the change and restoring descendants from disk.
+  static void tree_set_open(App &app, const VisNode &n, bool want)
+  {
+    if (n.kind == 0) {
+      ConnNode &node = app.conns[n.conn_idx];
+      if (want && !node.open) {
+        std::vector<RepoNode> repos;
+        auto [ok, err] = connect_and_load(node.conn, repos);
+        if (ok) {
+          node.open  = true;
+          node.repos = std::move(repos);
+          open_tree_node({node.conn.name});
+          restore_open_repos_and_folders(node);
+        } else {
+          app.msg_dlg = {true, "Connection error", std::move(err)};
+        }
+      } else if (!want && node.open) {
+        node.open = false;
+        close_tree_node({node.conn.name});
+      }
+      return;
+    }
+    if (!n.open) return;
+    if (want && !*n.open) {
+      *n.open = true;
+      open_tree_node(n.path);
+      if (n.kind == 1)
+        restore_repo_folders_open(app.conns[n.conn_idx].conn.name, app.conns[n.conn_idx].repos[n.repo_idx]);
+      else if (n.folder)
+        for (auto &child : n.folder->children)
+          restore_folder_open(n.path, child);
+    } else if (!want && *n.open) {
+      *n.open = false;
+      close_tree_node(n.path);
+    }
+  }
+
+  // Open the context menu for a node at its row position.
+  static void open_menu_for(App &app, const VisNode &n, int row_idx)
+  {
+    const float pw = app.ww * 0.30f;
+    const float ph = static_cast<float>(app.wh);
+    const float ry = HDR_H + row_idx * ITEM_H + ITEM_H;
+    const float mx = PAD + CARET_W;
+
+    app.panel_menu.open = app.repo_menu.open = app.folder_menu.open = app.unit_menu.open = false;
+
+    if (n.kind == 0) {
+      float my          = std::min(ry, ph - PanelMenu::N * PanelMenu::IH - 10.f);
+      app.panel_menu    = PanelMenu{true, std::min(mx, pw - PanelMenu::W - 2.f), my, n.conn_idx, app.conns[n.conn_idx].conn.connected};
+      app.panel_menu.hi = 0;
+    } else if (n.kind == 1) {
+      float my         = std::min(ry, ph - RepoMenu::N * RepoMenu::IH - 10.f);
+      app.repo_menu    = RepoMenu{true, std::min(mx, pw - RepoMenu::W - 2.f), my, n.conn_idx, n.repo_idx};
+      app.repo_menu.hi = 0;
+    } else if (n.kind == 2) {
+      float my           = std::min(ry, ph - FolderMenu::N * FolderMenu::IH - 10.f);
+      app.folder_menu    = FolderMenu{true, std::min(mx, pw - FolderMenu::W - 2.f), my, n.conn_idx, n.repo_idx, n.menu_id, n.menu_name};
+      app.folder_menu.hi = 0;
+    } else {
+      float my         = std::min(ry, ph - UnitMenu::N * UnitMenu::IH - 10.f);
+      app.unit_menu    = UnitMenu{true, std::min(mx, pw - UnitMenu::W - 2.f), my, n.conn_idx, n.repo_idx, n.menu_id, n.menu_name, n.unit_type};
+      app.unit_menu.hi = 0;
+    }
+  }
+
+  void panel_key_down(App &app, SDL_Keycode key)
+  {
+    // An open popup menu takes the keyboard.
+    if (app.panel_menu.open) {
+      app.panel_menu.key(key);
+      return;
+    }
+    if (app.repo_menu.open) {
+      app.repo_menu.key(key);
+      return;
+    }
+    if (app.folder_menu.open) {
+      app.folder_menu.key(key);
+      return;
+    }
+    if (app.unit_menu.open) {
+      app.unit_menu.key(key);
+      return;
+    }
+
+    std::vector<VisNode> vis = build_visible(app);
+    if (vis.empty()) return;
+
+    int cur = -1;
+    for (int i = 0; i < static_cast<int>(vis.size()); i++)
+      if (vis[i].key == app.sel_key) {
+        cur = i;
+        break;
+      }
+
+    switch (key) {
+      case SDLK_DOWN:
+        cur         = (cur < 0) ? 0 : (cur + 1 < static_cast<int>(vis.size()) ? cur + 1 : cur);
+        app.sel_key = vis[cur].key;
+        break;
+      case SDLK_UP:
+        cur         = (cur <= 0) ? 0 : cur - 1;
+        app.sel_key = vis[cur].key;
+        break;
+      case SDLK_RIGHT: {
+        if (cur < 0) {
+          app.sel_key = vis[0].key;
+          break;
+        }
+        const VisNode &n       = vis[cur];
+        bool           is_open = n.open && *n.open;
+        if (n.has_kids && !is_open)
+          tree_set_open(app, n, true);
+        else if (is_open && cur + 1 < static_cast<int>(vis.size()) && vis[cur + 1].parent == cur)
+          app.sel_key = vis[cur + 1].key; // select first child
+        break;
+      }
+      case SDLK_LEFT: {
+        if (cur < 0) break;
+        const VisNode &n       = vis[cur];
+        bool           is_open = n.open && *n.open;
+        if (n.has_kids && is_open)
+          tree_set_open(app, n, false);
+        else if (n.parent >= 0)
+          app.sel_key = vis[n.parent].key; // select parent
+        break;
+      }
+      case SDLK_APPLICATION:
+      case SDLK_MENU:
+        if (cur >= 0) open_menu_for(app, vis[cur], cur);
+        break;
+      default: break;
+    }
   }
 
 } // namespace front

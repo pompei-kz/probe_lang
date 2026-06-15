@@ -30,4 +30,8 @@ namespace front {
   // visible. parent_folder_id empty means the parent is the repo itself.
   void open_added_folder_parent(const std::string &conn_name, back::model::RepoNode &repo, const std::string &parent_folder_id);
 
+  // Keyboard handling for the tree panel: routes to an open popup menu, otherwise
+  // navigates the selected node (arrows) or opens its context menu (Menu key).
+  void panel_key_down(App &app, SDL_Keycode key);
+
 } // namespace front
