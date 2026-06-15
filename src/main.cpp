@@ -288,14 +288,18 @@ int main(int /*argc*/, char * /*argv*/[])
         // ReSharper disable once CppTooWideScopeInitStatement
         int uri = app.unit_dlg.repo_idx;
         if (uci >= 0 && uci < static_cast<int>(app.conns.size()) && uri >= 0 && uri < static_cast<int>(app.conns[uci].repos.size())) {
-          auto &node = app.conns[uci];
-          auto &repo = node.repos[uri];
+          ConnNode         &node      = app.conns[uci];
+          RepoNode         &repo      = node.repos[uri];
+          const bool        editing   = app.unit_dlg.editing;
+          const std::string parent_id = app.unit_dlg.parent_folder_id;
 
           auto [ok, err] = load_repo_tree(node.conn, repo.schema_name, repo);
-          if (!ok)
+          if (!ok) {
             app.msg_dlg = {true, "Ошибка", std::move(err)};
-          else
-            restore_repo_folders_open(node.conn.name, repo); // keep already-open folders open
+          } else {
+            restore_repo_folders_open(node.conn.name, repo);                         // keep already-open folders open
+            if (!editing) open_added_folder_parent(node.conn.name, repo, parent_id); // reveal the new unit
+          }
         }
         app.unit_dlg.open = false;
         SDL_StopTextInput(app.win);
