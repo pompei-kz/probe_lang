@@ -17,23 +17,23 @@ include(cmake/EmbedResources.cmake)
 
 add_executable(probe_lang
     src/main.cpp
-    src/common.cpp
-    src/PanelMenu.cpp
-    src/FontAtlas.cpp
-    src/back/Conn.cpp
-    src/back/Db.cpp
-    src/back/FolderDb.cpp
-    src/TextEditor.cpp
-    src/ContextMenu.cpp
-    src/InputField.cpp
-    src/Dlg.cpp
-    src/MsgDlg.cpp
-    src/ConfirmDlg.cpp
-    src/SchemaMenu.cpp
-    src/FolderMenu.cpp
-    src/SelectableText.cpp
-    src/FormEditRepository.cpp
-    src/FormEditFolder.cpp
+    src/front/common.cpp
+    src/front/PanelMenu.cpp
+    src/front/FontAtlas.cpp
+    src/front/TextEditor.cpp
+    src/front/ContextMenu.cpp
+    src/front/InputField.cpp
+    src/front/Dlg.cpp
+    src/front/MsgDlg.cpp
+    src/front/ConfirmDlg.cpp
+    src/front/SchemaMenu.cpp
+    src/front/FolderMenu.cpp
+    src/front/SelectableText.cpp
+    src/front/FormEditRepository.cpp
+    src/front/FormEditFolder.cpp
+    src/back/ConnService.cpp
+    src/back/RepoService.cpp
+    src/back/FolderService.cpp
     src/back/CustomId.cpp
 )
 target_include_directories(probe_lang PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)

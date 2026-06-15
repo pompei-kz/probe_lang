@@ -1,17 +1,20 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 
-#include "App.h"
-#include "back/Conn.h"
-#include "back/Db.h"
-#include "back/FolderDb.h"
-#include "DlgMouse.h"
-#include "FontAtlas.h"
-#include "back/SchemaNode.h"
-#include "common.h"
-#include "render_helpers.h"
+#include "front/App.h"
+#include "front/DlgMouse.h"
+#include "front/FontAtlas.h"
+#include "front/common.h"
+#include "front/render_helpers.h"
 
+#include "back/ConnService.h"
+#include "back/FolderService.h"
+#include "back/RepoService.h"
+#include "back/model/SchemaNode.h"
+
+using namespace front;
 using namespace back;
+using namespace back::model;
 
 int main(int /*argc*/, char * /*argv*/[])
 {
