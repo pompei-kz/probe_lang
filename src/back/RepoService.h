@@ -1,11 +1,18 @@
 #pragma once
 #include "model/Conn.h"
 #include "model/SchemaNode.h"
+#include <pqxx/pqxx>
 #include <string>
 #include <utility>
 #include <vector>
 
 namespace back {
+
+  // Build a libpq connection string from a Conn.
+  std::string make_cs(const model::Conn &c);
+
+  // Format a pqxx::sql_error including the offending query.
+  std::string sql_err_msg(const pqxx::sql_error &e);
 
   std::pair<bool, std::string> test_connection(
       const std::string &host, const std::string &port, const std::string &dbname, const std::string &user, const std::string &pass);
