@@ -52,8 +52,10 @@ enable_testing()
 find_package(GTest REQUIRED)
 
 add_executable(probe_lang_tests
-        src_test/back/TestCustomId.cpp
+    src_test/back/TestCustomId.cpp
+    src_test/back/TestConnService.cpp
     src/back/CustomId.cpp
+    src/back/ConnService.cpp
 )
 target_include_directories(probe_lang_tests PRIVATE src)
 target_link_libraries(probe_lang_tests PRIVATE GTest::GTest GTest::Main)
