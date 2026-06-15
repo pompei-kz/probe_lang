@@ -155,6 +155,9 @@ namespace front {
   static constexpr float ITEM_H = 30.f, HDR_H = 38.f, PAD = 10.f;
   static constexpr float ICON_SZ = 8.f, EDIT_W = 30.f, CARET_W = 22.f;
 
+  // Defined further down; reopens persisted descendants of a folder from disk.
+  static void restore_folder_open(std::vector<std::string> prefix, FolderNode &folder);
+
   // Right-pointing (collapsed) or down-pointing (expanded) triangle
   static void draw_caret(SDL_Renderer *r, float cx, float cy, bool open, Clr c)
   {
@@ -220,10 +223,14 @@ namespace front {
       // caret single-click OR row double-click toggles a branch
       if (has_kids && ((click && h_caret) || (dblclick && h_row))) {
         folder.open = !folder.open;
-        if (folder.open)
+        if (folder.open) {
           open_tree_node(path);
-        else
+          // Always consult disk for which children were left open.
+          for (auto &child : folder.children)
+            restore_folder_open(path, child);
+        } else {
           close_tree_node(path);
+        }
       }
 
       if (rclick && (h_caret || h_row)) {
@@ -315,6 +322,7 @@ namespace front {
             node.open  = true;
             node.repos = std::move(repos);
             open_tree_node({node.conn.name});
+            restore_open_repos_and_folders(node); // reopen persisted repos/folders from disk
           } else {
             app.msg_dlg = {true, "Connection error", std::move(err)};
           }
@@ -352,10 +360,12 @@ namespace front {
           // caret single-click OR row double-click toggles a branch
           if (has_kids && ((click && h_caret) || (dblclick && h_row))) {
             repo.open = !repo.open;
-            if (repo.open)
+            if (repo.open) {
               open_tree_node({node.conn.name, repo.schema_name});
-            else
+              restore_repo_folders_open(node.conn.name, repo); // reopen persisted folders from disk
+            } else {
               close_tree_node({node.conn.name, repo.schema_name});
+            }
           }
           if (rclick && (h_caret || h_row)) {
             float mx2            = std::min(app.mx, pw - RepoMenu::W - 2.f);
@@ -470,6 +480,20 @@ namespace front {
     }
   }
 
+  void restore_repo_folders_open(const std::string &conn_name, RepoNode &repo)
+  {
+    for (auto &folder : repo.folders)
+      restore_folder_open({conn_name, repo.schema_name}, folder);
+  }
+
+  void restore_open_repos_and_folders(ConnNode &node)
+  {
+    for (auto &repo : node.repos) {
+      if (is_tree_node_open({node.conn.name, repo.schema_name})) repo.open = true;
+      restore_repo_folders_open(node.conn.name, repo);
+    }
+  }
+
   void restore_tree_open_state(App &app)
   {
     for (auto &node : app.conns) {
@@ -483,15 +507,35 @@ namespace front {
       node.open  = true;
       node.repos = std::move(repos);
 
-      // Repos appear once the connection is open.
-      for (auto &repo : node.repos) {
-        if (!is_tree_node_open({node.conn.name, repo.schema_name})) continue;
-        repo.open = true;
-        // Root folders appear once the repo is open.
-        for (auto &folder : repo.folders)
-          restore_folder_open({node.conn.name, repo.schema_name}, folder);
-      }
+      restore_open_repos_and_folders(node);
     }
+  }
+
+  // Find folder `target` in the tree, open it and persist its marker.
+  static bool open_folder_branch_rec(std::vector<std::string> prefix, std::vector<FolderNode> &folders, const std::string &target)
+  {
+    for (auto &folder : folders) {
+      std::vector<std::string> path = prefix;
+      path.push_back(folder.id);
+      if (folder.id == target) {
+        folder.open = true;
+        open_tree_node(path);
+        return true;
+      }
+      if (open_folder_branch_rec(path, folder.children, target)) return true;
+    }
+    return false;
+  }
+
+  void open_added_folder_parent(const std::string &conn_name, RepoNode &repo, const std::string &parent_folder_id)
+  {
+    if (parent_folder_id.empty()) {
+      // Parent is the repo itself: already open while adding, just persist.
+      repo.open = true;
+      open_tree_node({conn_name, repo.schema_name});
+      return;
+    }
+    open_folder_branch_rec({conn_name, repo.schema_name}, repo.folders, parent_folder_id);
   }
 
 } // namespace front
