@@ -38,12 +38,13 @@ int main(int /*argc*/, char * /*argv*/[])
   SDL_SetRenderDrawBlendMode(app.ren, SDL_BLENDMODE_NONE);
   font_init(app.ren);
   app.reload_conns();
+  restore_tree_open_state(app);
 
   bool running = true;
   while (running) {
-    bool  lclick = false, rclick = false;
-    float lclick_x = 0, lclick_y = 0, rclick_x = 0, rclick_y = 0;
-    int   lclicks = 1;
+    bool  l_click = false, r_click = false;
+    float l_click_x = 0, l_click_y = 0, r_click_x = 0, r_click_y = 0;
+    int   l_clicks = 1;
 
     SDL_Event ev;
     while (SDL_PollEvent(&ev)) {
@@ -70,15 +71,15 @@ int main(int /*argc*/, char * /*argv*/[])
         case SDL_EVENT_MOUSE_BUTTON_DOWN:
           if (ev.button.button == SDL_BUTTON_LEFT) {
             app.lmb_held = true;
-            lclick       = true;
-            lclick_x     = ev.button.x;
-            lclick_y     = ev.button.y;
-            lclicks      = ev.button.clicks;
+            l_click       = true;
+            l_click_x     = ev.button.x;
+            l_click_y     = ev.button.y;
+            l_clicks      = ev.button.clicks;
           }
           if (ev.button.button == SDL_BUTTON_RIGHT) {
-            rclick   = true;
-            rclick_x = ev.button.x;
-            rclick_y = ev.button.y;
+            r_click   = true;
+            r_click_x = ev.button.x;
+            r_click_y = ev.button.y;
           }
           break;
 
@@ -112,9 +113,11 @@ int main(int /*argc*/, char * /*argv*/[])
 
         case SDL_EVENT_KEY_DOWN:
           if (app.dlg.open) {
-            for (auto &f : app.dlg.fields)
+            // ReSharper disable once CppUseStructuredBinding
+            for (InputField &f : app.dlg.fields)
               f.ctx.open = false;
             SDL_Keymod mod      = ev.key.mod;
+            // ReSharper disable once CppTooWideScopeInitStatement
             bool       consumed = app.dlg.fields[app.dlg.focus].handle_key(ev.key.key, mod);
             if (!consumed) {
               bool shift = (mod & SDL_KMOD_SHIFT) != 0;
@@ -157,6 +160,7 @@ int main(int /*argc*/, char * /*argv*/[])
             }
           } else if (app.folder_dlg.open) {
             SDL_Keymod mod      = ev.key.mod;
+            // ReSharper disable once CppTooWideScopeInitStatement
             bool       consumed = app.folder_dlg.name_field.handle_key(ev.key.key, mod);
             if (!consumed && ev.key.key == SDLK_ESCAPE) {
               app.folder_dlg.open = false;
@@ -170,22 +174,22 @@ int main(int /*argc*/, char * /*argv*/[])
     }
 
     // ── render ────────────────────────────────────────────────────────────────
-    bool dblclick = lclick && lclicks >= 2;
+    bool dblclick = l_click && l_clicks >= 2;
 
     sc(app.ren, C_BG);
     SDL_RenderClear(app.ren);
-    panel_render(app.ren, app, lclick, rclick, dblclick);
+    panel_render(app.ren, app, l_click, r_click, dblclick);
 
     float pw = app.ww * 0.30f;
-    fill(app.ren, C_BG, pw, 0, app.ww - pw, (float)app.wh);
+    fill(app.ren, C_BG, pw, 0, app.ww - pw, static_cast<float>(app.wh));
 
     if (app.dlg.open) {
       DlgMouse dm;
-      dm.mx     = lclick ? lclick_x : (rclick ? rclick_x : app.mx);
-      dm.my     = lclick ? lclick_y : (rclick ? rclick_y : app.my);
-      dm.ldown  = lclick;
-      dm.rdown  = rclick;
-      dm.clicks = lclicks;
+      dm.mx     = l_click ? l_click_x : (r_click ? r_click_x : app.mx);
+      dm.my     = l_click ? l_click_y : (r_click ? r_click_y : app.my);
+      dm.ldown  = l_click;
+      dm.rdown  = r_click;
+      dm.clicks = l_clicks;
 
       if (int result = dlg_render(app.ren, app.dlg, dm); result == 1) {
         save_conn(app.dlg.to_conn(), app.dlg.old_name);
@@ -199,11 +203,13 @@ int main(int /*argc*/, char * /*argv*/[])
     }
 
     if (app.repo_dlg.open) {
-      float mx2 = lclick ? lclick_x : app.mx;
-      float my2 = lclick ? lclick_y : app.my;
-      int   res = app.repo_dlg.render(app.ren, mx2, my2, lclick, rclick, lclicks);
+      float mx2 = l_click ? l_click_x : app.mx;
+      float my2 = l_click ? l_click_y : app.my;
+      // ReSharper disable once CppTooWideScopeInitStatement
+      int   res = app.repo_dlg.render(app.ren, mx2, my2, l_click, r_click, l_clicks);
       if (res == 1) {
-        for (auto &node : app.conns) {
+        // ReSharper disable once CppUseStructuredBinding
+        for (ConnNode &node : app.conns) {
           if (node.conn.name == app.repo_dlg.conn.name) {
             if (!app.repo_dlg.editing) {
               node.conn.connected = true;
@@ -211,6 +217,7 @@ int main(int /*argc*/, char * /*argv*/[])
             }
             if (node.open) {
               std::vector<RepoNode> repos;
+              // ReSharper disable once CppTooWideScopeInitStatement
               auto [ok, err] = connect_and_load(node.conn, repos);
               if (ok) node.repos = std::move(repos);
             }
@@ -226,14 +233,17 @@ int main(int /*argc*/, char * /*argv*/[])
     }
 
     if (app.folder_dlg.open) {
-      float mx2 = lclick ? lclick_x : app.mx;
-      float my2 = lclick ? lclick_y : app.my;
-      int   res = app.folder_dlg.render(app.ren, mx2, my2, lclick, rclick, lclicks);
+      float mx2 = l_click ? l_click_x : app.mx;
+      float my2 = l_click ? l_click_y : app.my;
+      // ReSharper disable once CppTooWideScopeInitStatement
+      int   res = app.folder_dlg.render(app.ren, mx2, my2, l_click, r_click, l_clicks);
       if (res == 1) {
         int fci = app.folder_dlg.conn_idx;
+        // ReSharper disable once CppTooWideScopeInitStatement
         int fri = app.folder_dlg.repo_idx;
-        if (fci >= 0 && fci < (int)app.conns.size() && fri >= 0 && fri < (int)app.conns[fci].repos.size()) {
+        if (fci >= 0 && fci < static_cast<int>(app.conns.size()) && fri >= 0 && fri < static_cast<int>(app.conns[fci].repos.size())) {
           auto &repo     = app.conns[fci].repos[fri];
+          // ReSharper disable once CppTooWideScopeInitStatement
           auto [ok, err] = load_repo_folders(app.conns[fci].conn, repo.schema_name, repo.folders);
           if (!ok) app.msg_dlg = {true, "Ошибка", std::move(err)};
         }
@@ -246,26 +256,31 @@ int main(int /*argc*/, char * /*argv*/[])
     }
 
     if (app.msg_dlg.open) {
-      if (app.msg_dlg.render(app.ren, app.mx, app.my, lclick)) app.msg_dlg.open = false;
+      if (app.msg_dlg.render(app.ren, app.mx, app.my, l_click)) app.msg_dlg.open = false;
     }
 
     if (app.confirm_dlg.open) {
-      int res = app.confirm_dlg.render(app.ren, app.mx, app.my, lclick);
+      // ReSharper disable once CppTooWideScopeInitStatement
+      int res = app.confirm_dlg.render(app.ren, app.mx, app.my, l_click);
       if (res == 1) {
         if (app.pending_delete_idx >= 0) {
+          // ReSharper disable once CppTooWideScopeInitStatement
           int idx = app.pending_delete_idx;
-          if (idx < (int)app.conns.size()) {
+          if (idx < static_cast<int>(app.conns.size())) {
             delete_conn(app.conns[idx].conn.name);
             app.reload_conns();
           }
           app.pending_delete_idx = -1;
         } else if (!app.pending_delete_folder_id.empty()) {
           int fci = app.pending_delete_folder_conn;
+          // ReSharper disable once CppTooWideScopeInitStatement
           int fri = app.pending_delete_folder_repo;
-          if (fci >= 0 && fci < (int)app.conns.size() && fri >= 0 && fri < (int)app.conns[fci].repos.size()) {
+          if (fci >= 0 && fci < static_cast<int>(app.conns.size()) && fri >= 0 && fri < static_cast<int>(app.conns[fci].repos.size())) {
             auto &repo     = app.conns[fci].repos[fri];
+            // ReSharper disable once CppTooWideScopeInitStatement
             auto [ok, err] = delete_folder_recursive(app.conns[fci].conn, repo.schema_name, app.pending_delete_folder_id);
             if (ok) {
+              // ReSharper disable once CppTooWideScopeInitStatement
               auto [ok2, err2] = load_repo_folders(app.conns[fci].conn, repo.schema_name, repo.folders);
               if (!ok2) app.msg_dlg = {true, "Ошибка", std::move(err2)};
             } else {

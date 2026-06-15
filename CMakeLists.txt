@@ -36,6 +36,7 @@ add_executable(probe_lang
     src/back/FolderService.cpp
     src/back/InitDb.cpp
     src/back/UtilDb.cpp
+    src/back/ProjectTreeService.cpp
     src/back/CustomId.cpp
 )
 target_include_directories(probe_lang PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
@@ -60,12 +61,14 @@ add_executable(probe_lang_tests
     src_test/back/TestInitDb.cpp
     src_test/back/TestRepoService.cpp
     src_test/back/TestFolderService.cpp
+    src_test/back/TestProjectTreeService.cpp
     src/back/CustomId.cpp
     src/back/ConnService.cpp
     src/back/UtilDb.cpp
     src/back/InitDb.cpp
     src/back/RepoService.cpp
     src/back/FolderService.cpp
+    src/back/ProjectTreeService.cpp
 )
 target_include_directories(probe_lang_tests PRIVATE src)
 target_include_directories(probe_lang_tests PRIVATE src_test)

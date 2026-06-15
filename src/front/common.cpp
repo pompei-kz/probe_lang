@@ -4,6 +4,7 @@
 #include "PanelMenu.h"
 #include "SchemaMenu.h"
 #include "back/ConnService.h"
+#include "back/ProjectTreeService.h"
 #include "back/RepoService.h"
 #include "back/model/ConnNode.h"
 #include "render_helpers.h"
@@ -182,8 +183,19 @@ namespace front {
     SDL_RenderFillRect(r, &body);
   }
 
-  static void render_folder_list(
-      SDL_Renderer *ren, App &app, std::vector<FolderNode> &folders, int ci, int ri, int depth, int &row, float pw, float ph, bool click, bool rclick)
+  static void render_folder_list(SDL_Renderer                   *ren,
+                                 App                            &app,
+                                 std::vector<FolderNode>        &folders,
+                                 int                             ci,
+                                 int                             ri,
+                                 const std::vector<std::string> &prefix,
+                                 int                             depth,
+                                 int                            &row,
+                                 float                           pw,
+                                 float                           ph,
+                                 bool                            click,
+                                 bool                            rclick,
+                                 bool                            dblclick)
   {
     static constexpr float STEP = 14.f;
     for (auto &folder : folders) {
@@ -202,7 +214,17 @@ namespace front {
       SDL_FRect sl{0, iy + ITEM_H - 1, pw, 1};
       SDL_RenderFillRect(ren, &sl);
 
-      if (click && h_caret) folder.open = !folder.open;
+      std::vector<std::string> path = prefix;
+      path.push_back(folder.id);
+
+      // caret single-click OR row double-click toggles a branch
+      if (has_kids && ((click && h_caret) || (dblclick && h_row))) {
+        folder.open = !folder.open;
+        if (folder.open)
+          open_tree_node(path);
+        else
+          close_tree_node(path);
+      }
 
       if (rclick && (h_caret || h_row)) {
         float mx2           = std::min(app.mx, pw - FolderMenu::W - 2.f);
@@ -213,7 +235,7 @@ namespace front {
       }
       row++;
       if (folder.open) {
-        render_folder_list(ren, app, folder.children, ci, ri, depth + 1, row, pw, ph, click, rclick);
+        render_folder_list(ren, app, folder.children, ci, ri, path, depth + 1, row, pw, ph, click, rclick, dblclick);
       }
     }
   }
@@ -285,12 +307,14 @@ namespace front {
       auto toggle_open = [&]() {
         if (node.open) {
           node.open = false;
+          close_tree_node({node.conn.name});
         } else {
           std::vector<RepoNode> repos;
           auto [ok, err] = connect_and_load(node.conn, repos);
           if (ok) {
             node.open  = true;
             node.repos = std::move(repos);
+            open_tree_node({node.conn.name});
           } else {
             app.msg_dlg = {true, "Connection error", std::move(err)};
           }
@@ -325,7 +349,14 @@ namespace front {
           SDL_FRect sl{0, sy + ITEM_H - 1, pw, 1};
           SDL_RenderFillRect(ren, &sl);
 
-          if (click && h_caret) repo.open = !repo.open;
+          // caret single-click OR row double-click toggles a branch
+          if (has_kids && ((click && h_caret) || (dblclick && h_row))) {
+            repo.open = !repo.open;
+            if (repo.open)
+              open_tree_node({node.conn.name, repo.schema_name});
+            else
+              close_tree_node({node.conn.name, repo.schema_name});
+          }
           if (rclick && (h_caret || h_row)) {
             float mx2            = std::min(app.mx, pw - RepoMenu::W - 2.f);
             float my2            = std::min(app.my, ph - RepoMenu::N * RepoMenu::IH - 10.f);
@@ -334,7 +365,8 @@ namespace front {
             app.folder_menu.open = false;
           }
           row++;
-          if (repo.open) render_folder_list(ren, app, repo.folders, i, ri, 0, row, pw, ph, click, rclick);
+          if (repo.open)
+            render_folder_list(ren, app, repo.folders, i, ri, {node.conn.name, repo.schema_name}, 0, row, pw, ph, click, rclick, dblclick);
         }
       }
     }
@@ -355,6 +387,7 @@ namespace front {
         node.open           = false;
         node.repos.clear();
         save_conn(node.conn);
+        close_tree_node({node.conn.name});
       } else {
         // Присоединиться: verify connection, mark connected, persist
         auto [ok, err] = test_connection(node.conn.host, node.conn.port, node.conn.dbname, node.conn.user, node.conn.pass);
@@ -421,6 +454,42 @@ namespace front {
         app.pending_delete_folder_repo = fmri;
         app.pending_delete_folder_id   = app.folder_menu.folder_id;
         app.confirm_dlg                = {true, "Удаление папки", "Удалить папку \"" + app.folder_menu.folder_name + "\" и все вложенные подпапки?"};
+      }
+    }
+  }
+
+  // Recursively reopen folders whose marker file exists. A folder's children
+  // only "appear" once the folder itself is open, so we descend only then.
+  static void restore_folder_open(std::vector<std::string> prefix, FolderNode &folder)
+  {
+    prefix.push_back(folder.id);
+    if (is_tree_node_open(prefix)) {
+      folder.open = true;
+      for (auto &child : folder.children)
+        restore_folder_open(prefix, child);
+    }
+  }
+
+  void restore_tree_open_state(App &app)
+  {
+    for (auto &node : app.conns) {
+      // Roots: only connected connections whose marker file exists.
+      if (!node.conn.connected) continue;
+      if (!is_tree_node_open({node.conn.name})) continue;
+
+      std::vector<RepoNode> repos;
+      auto [ok, err] = connect_and_load(node.conn, repos);
+      if (!ok) continue;
+      node.open  = true;
+      node.repos = std::move(repos);
+
+      // Repos appear once the connection is open.
+      for (auto &repo : node.repos) {
+        if (!is_tree_node_open({node.conn.name, repo.schema_name})) continue;
+        repo.open = true;
+        // Root folders appear once the repo is open.
+        for (auto &folder : repo.folders)
+          restore_folder_open({node.conn.name, repo.schema_name}, folder);
       }
     }
   }

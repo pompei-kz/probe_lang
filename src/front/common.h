@@ -14,4 +14,8 @@ namespace front {
   int  dlg_render(SDL_Renderer *ren, Dlg &d, const DlgMouse &m);
   void panel_render(SDL_Renderer *ren, App &app, bool click, bool rclick, bool dblclick);
 
+  // Reopen the branches that were open last time (persisted by ProjectTreeService).
+  // Call once after the connections are loaded, before the first render.
+  void restore_tree_open_state(App &app);
+
 } // namespace front
