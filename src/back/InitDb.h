@@ -14,4 +14,8 @@ namespace back {
   // feature was introduced).
   void init_folder_table(pqxx::work &txn, pqxx::connection &pg, const std::string &schema);
 
+  // Ensure just the unit table exists (for repos created before the unit
+  // feature was introduced).
+  void init_unit_table(pqxx::work &txn, pqxx::connection &pg, const std::string &schema);
+
 } // namespace back

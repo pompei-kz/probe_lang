@@ -1,11 +1,11 @@
-#include "FolderMenu.h"
+#include "UnitMenu.h"
 #include "Clr.h"
 #include "FontAtlas.h"
 #include "render_helpers.h"
 
 namespace front {
 
-  int FolderMenu::render(SDL_Renderer *r, float mx, float my, bool ldown, bool rdown)
+  int UnitMenu::render(SDL_Renderer *r, float mx, float my, bool ldown, bool rdown)
   {
     if (!open) return -1;
     float h = N * IH + 4.f;
@@ -16,7 +16,7 @@ namespace front {
     fill(r, C_DLGBG, x, y, W, h);
     rect(r, C_BORDER, x, y, W, h);
 
-    static const char *labels[N] = {"Добавить папку", "Изменить эту папку", "Удалить эту папку", "Добавить юнит"};
+    static const char *labels[N] = {"Изменить юнит"};
     for (int i = 0; i < N; i++) {
       float iy  = y + 2.f + i * IH;
       bool  hov = hit(mx, my, x, iy, W, IH);

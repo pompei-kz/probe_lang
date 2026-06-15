@@ -6,6 +6,7 @@
 #include "back/ConnService.h"
 #include "back/ProjectTreeService.h"
 #include "back/RepoService.h"
+#include "back/UnitService.h"
 #include "back/model/ConnNode.h"
 #include "render_helpers.h"
 
@@ -186,6 +187,60 @@ namespace front {
     SDL_RenderFillRect(r, &body);
   }
 
+  // Distinct glyph per unit type, drawn left-aligned and vertically centered at yc.
+  static void draw_unit_icon(SDL_Renderer *r, float x, float yc, UnitType t, Clr c)
+  {
+    sc(r, c);
+    switch (t) {
+      case UnitType::Class: {
+        SDL_FRect b{x, yc - 4.f, 9.f, 9.f}; // filled square
+        SDL_RenderFillRect(r, &b);
+        break;
+      }
+      case UnitType::Interface: {
+        SDL_FRect b{x, yc - 4.f, 9.f, 9.f}; // hollow square
+        SDL_RenderRect(r, &b);
+        break;
+      }
+      case UnitType::Enum: {
+        for (int i = 0; i < 3; i++) { // three stacked bars
+          SDL_FRect bar{x, yc - 4.f + i * 3.5f, 9.f, 1.6f};
+          SDL_RenderFillRect(r, &bar);
+        }
+        break;
+      }
+    }
+  }
+
+  // Render a list of units (leaf rows, no caret) at the given indentation depth.
+  static void render_unit_list(
+      SDL_Renderer *ren, App &app, std::vector<Unit> &units, int ci, int ri, int depth, int &row, float pw, float ph, bool rclick)
+  {
+    static constexpr float STEP = 14.f;
+    for (auto &unit : units) {
+      float iy    = HDR_H + row * ITEM_H;
+      float ix    = PAD + CARET_W + (depth + 1) * STEP;
+      bool  h_row = hit(app.mx, app.my, 0, iy, pw, ITEM_H);
+      if (h_row) fill(ren, C_HOVER, 0, iy, pw, ITEM_H);
+
+      draw_unit_icon(ren, ix, iy + ITEM_H * .5f, unit.type, C_ACCENT);
+      text_draw(ren, unit.name.c_str(), ix + 14.f, center_baseline(iy, ITEM_H), C_TEXT);
+      sc(ren, C_BORDER);
+      SDL_FRect sl{0, iy + ITEM_H - 1, pw, 1};
+      SDL_RenderFillRect(ren, &sl);
+
+      if (rclick && h_row) {
+        float mx2            = std::min(app.mx, pw - UnitMenu::W - 2.f);
+        float my2            = std::min(app.my, ph - UnitMenu::N * UnitMenu::IH - 10.f);
+        app.unit_menu        = {true, mx2, my2, ci, ri, unit.id, unit.name, unit.type};
+        app.panel_menu.open  = false;
+        app.repo_menu.open   = false;
+        app.folder_menu.open = false;
+      }
+      row++;
+    }
+  }
+
   static void render_folder_list(SDL_Renderer                   *ren,
                                  App                            &app,
                                  std::vector<FolderNode>        &folders,
@@ -204,7 +259,7 @@ namespace front {
     for (auto &folder : folders) {
       float      iy       = HDR_H + row * ITEM_H;
       float      ix       = PAD + CARET_W + (depth + 1) * STEP;
-      const bool has_kids = !folder.children.empty();
+      const bool has_kids = !folder.children.empty() || !folder.units.empty();
       bool       h_caret  = has_kids && hit(app.mx, app.my, 0, iy, ix, ITEM_H);
       bool       h_row    = !h_caret && hit(app.mx, app.my, 0, iy, pw, ITEM_H);
       if (h_caret || h_row) fill(ren, C_HOVER, 0, iy, pw, ITEM_H);
@@ -235,8 +290,8 @@ namespace front {
       }
 
       if (rclick && (h_caret || h_row)) {
-        float mx_2           = std::min(app.mx, pw - FolderMenu::W - 2.f);
-        float my_2           = std::min(app.my, ph - FolderMenu::N * FolderMenu::IH - 10.f);
+        float mx_2          = std::min(app.mx, pw - FolderMenu::W - 2.f);
+        float my_2          = std::min(app.my, ph - FolderMenu::N * FolderMenu::IH - 10.f);
         app.folder_menu     = {true, mx_2, my_2, ci, ri, folder.id, folder.name};
         app.panel_menu.open = false;
         app.repo_menu.open  = false;
@@ -244,6 +299,7 @@ namespace front {
       row++;
       if (folder.open) {
         render_folder_list(ren, app, folder.children, ci, ri, path, depth + 1, row, pw, ph, click, rclick, dblclick);
+        render_unit_list(ren, app, folder.units, ci, ri, depth + 1, row, pw, ph, rclick);
       }
     }
   }
@@ -345,7 +401,7 @@ namespace front {
           auto &repo     = node.repos[ri];
           float sy       = HDR_H + row * ITEM_H;
           float caret_x  = PAD + CARET_W; // caret zone right edge
-          bool  has_kids = !repo.folders.empty();
+          bool  has_kids = !repo.folders.empty() || !repo.units.empty();
           bool  h_caret1 = has_kids && hit(app.mx, app.my, 0, sy, caret_x, ITEM_H);
           bool  h_row1   = !h_caret1 && hit(app.mx, app.my, 0, sy, pw, ITEM_H);
 
@@ -379,6 +435,7 @@ namespace front {
           row++;
           if (repo.open) {
             render_folder_list(ren, app, repo.folders, i, ri, {node.conn.name, repo.schema_name}, 0, row, pw, ph, click, rclick, dblclick);
+            render_unit_list(ren, app, repo.units, i, ri, 0, row, pw, ph, rclick);
           }
         }
       }
@@ -407,6 +464,7 @@ namespace front {
         if (ok) {
           node.conn.connected = true;
           save_conn(node.conn);
+          ensure_unit_tables(node.conn); // create the unit table in every repo schema
         } else {
           app.msg_dlg = {true, "Connection failed", std::move(err)};
         }
@@ -441,6 +499,10 @@ namespace front {
       app.folder_dlg.open_add(rci, rri, app.conns[rci].conn, app.conns[rci].repos[rri].schema_name, "");
       app.folder_dlg.open = true;
       SDL_StartTextInput(app.win);
+    } else if (ract == 2 && valid_rci) {
+      app.unit_dlg.open_add(rci, rri, app.conns[rci].conn, app.conns[rci].repos[rri].schema_name, "");
+      app.unit_dlg.open = true;
+      SDL_StartTextInput(app.win);
     }
 
     int  fmact    = app.folder_menu.render(ren, app.mx, app.my, click, rclick);
@@ -467,7 +529,28 @@ namespace front {
         app.pending_delete_folder_repo = fmri;
         app.pending_delete_folder_id   = app.folder_menu.folder_id;
         app.confirm_dlg                = {true, "Удаление папки", "Удалить папку \"" + app.folder_menu.folder_name + "\" и все вложенные подпапки?"};
+      } else if (fmact == 3) {
+        app.unit_dlg.open_add(fmci, fmri, app.conns[fmci].conn, app.conns[fmci].repos[fmri].schema_name, app.folder_menu.folder_id);
+        app.unit_dlg.open = true;
+        SDL_StartTextInput(app.win);
       }
+    }
+
+    int  umact    = app.unit_menu.render(ren, app.mx, app.my, click, rclick);
+    int  umci     = app.unit_menu.conn_idx;
+    int  umri     = app.unit_menu.repo_idx;
+    bool valid_um = umci >= 0 && umci < (int)app.conns.size() && umri >= 0 && umri < (int)app.conns[umci].repos.size();
+
+    if (umact == 0 && valid_um) {
+      app.unit_dlg.open_edit(umci,
+                             umri,
+                             app.conns[umci].conn,
+                             app.conns[umci].repos[umri].schema_name,
+                             app.unit_menu.unit_id,
+                             app.unit_menu.unit_name,
+                             app.unit_menu.unit_type);
+      app.unit_dlg.open = true;
+      SDL_StartTextInput(app.win);
     }
   }
 

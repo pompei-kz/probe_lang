@@ -66,6 +66,7 @@ int main(int /*argc*/, char * /*argv*/[])
             app.repo_dlg.err_view.on_move(ev.motion.x, ev.motion.y);
           }
           if (app.folder_dlg.open && app.lmb_held) app.folder_dlg.name_field.on_move(ev.motion.x);
+          if (app.unit_dlg.open && app.lmb_held) app.unit_dlg.name_field.on_move(ev.motion.x);
           break;
 
         case SDL_EVENT_MOUSE_BUTTON_DOWN:
@@ -95,6 +96,7 @@ int main(int /*argc*/, char * /*argv*/[])
               app.repo_dlg.err_view.on_release();
             }
             if (app.folder_dlg.open) app.folder_dlg.name_field.on_release();
+            if (app.unit_dlg.open) app.unit_dlg.name_field.on_release();
           }
           break;
 
@@ -109,6 +111,8 @@ int main(int /*argc*/, char * /*argv*/[])
             app.repo_dlg.fields[app.repo_dlg.focus].handle_text(ev.text.text);
           else if (app.folder_dlg.open)
             app.folder_dlg.name_field.handle_text(ev.text.text);
+          else if (app.unit_dlg.open)
+            app.unit_dlg.name_field.handle_text(ev.text.text);
           break;
 
         case SDL_EVENT_KEY_DOWN:
@@ -164,6 +168,14 @@ int main(int /*argc*/, char * /*argv*/[])
             bool consumed  = app.folder_dlg.name_field.handle_key(ev.key.key, mod);
             if (!consumed && ev.key.key == SDLK_ESCAPE) {
               app.folder_dlg.open = false;
+              SDL_StopTextInput(app.win);
+            }
+          } else if (app.unit_dlg.open) {
+            SDL_Keymod mod = ev.key.mod;
+            // ReSharper disable once CppTooWideScopeInitStatement
+            bool consumed  = app.unit_dlg.name_field.handle_key(ev.key.key, mod);
+            if (!consumed && ev.key.key == SDLK_ESCAPE) {
+              app.unit_dlg.open = false;
               SDL_StopTextInput(app.win);
             }
           }
@@ -250,7 +262,7 @@ int main(int /*argc*/, char * /*argv*/[])
           const bool        editing   = app.folder_dlg.editing;
           const std::string parent_id = app.folder_dlg.parent_folder_id;
 
-          auto [ok, err] = load_repo_folders(node.conn, repo.schema_name, repo.folders);
+          auto [ok, err] = load_repo_tree(node.conn, repo.schema_name, repo);
           if (!ok) {
             app.msg_dlg = {true, "Ошибка", std::move(err)};
           } else {
@@ -262,6 +274,33 @@ int main(int /*argc*/, char * /*argv*/[])
         SDL_StopTextInput(app.win);
       } else if (res == -1) {
         app.folder_dlg.open = false;
+        SDL_StopTextInput(app.win);
+      }
+    }
+
+    if (app.unit_dlg.open) {
+      float mx2 = l_click ? l_click_x : app.mx;
+      float my2 = l_click ? l_click_y : app.my;
+      // ReSharper disable once CppTooWideScopeInitStatement
+      int res   = app.unit_dlg.render(app.ren, mx2, my2, l_click, r_click, l_clicks);
+      if (res == 1) {
+        int uci = app.unit_dlg.conn_idx;
+        // ReSharper disable once CppTooWideScopeInitStatement
+        int uri = app.unit_dlg.repo_idx;
+        if (uci >= 0 && uci < static_cast<int>(app.conns.size()) && uri >= 0 && uri < static_cast<int>(app.conns[uci].repos.size())) {
+          auto &node = app.conns[uci];
+          auto &repo = node.repos[uri];
+
+          auto [ok, err] = load_repo_tree(node.conn, repo.schema_name, repo);
+          if (!ok)
+            app.msg_dlg = {true, "Ошибка", std::move(err)};
+          else
+            restore_repo_folders_open(node.conn.name, repo); // keep already-open folders open
+        }
+        app.unit_dlg.open = false;
+        SDL_StopTextInput(app.win);
+      } else if (res == -1) {
+        app.unit_dlg.open = false;
         SDL_StopTextInput(app.win);
       }
     }
@@ -292,7 +331,7 @@ int main(int /*argc*/, char * /*argv*/[])
             auto [ok, err] = delete_folder_recursive(app.conns[fci].conn, repo.schema_name, app.pending_delete_folder_id);
             if (ok) {
               // ReSharper disable once CppTooWideScopeInitStatement
-              auto [ok2, err2] = load_repo_folders(app.conns[fci].conn, repo.schema_name, repo.folders);
+              auto [ok2, err2] = load_repo_tree(app.conns[fci].conn, repo.schema_name, repo);
               if (!ok2)
                 app.msg_dlg = {true, "Ошибка", std::move(err2)};
               else

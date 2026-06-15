@@ -16,7 +16,7 @@ namespace front {
     fill(r, C_DLGBG, x, y, W, h);
     rect(r, C_BORDER, x, y, W, h);
 
-    static const char *labels[N] = {"Изменить репозиторий", "Добавить папку"};
+    static const char *labels[N] = {"Изменить репозиторий", "Добавить папку", "Добавить юнит"};
     for (int i = 0; i < N; i++) {
       float iy  = y + 2.f + i * IH;
       bool  hov = hit(mx, my, x, iy, W, IH);

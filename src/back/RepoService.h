@@ -17,8 +17,11 @@ namespace back {
   std::pair<bool, std::string> test_connection(
       const std::string &host, const std::string &port, const std::string &dbname, const std::string &user, const std::string &pass);
 
-  // Connect and load repos + their root folders
+  // Connect and load repos + their folders and units
   std::pair<bool, std::string> connect_and_load(const model::Conn &c, std::vector<model::RepoNode> &repos);
+
+  // Reload one repo's folder tree and units into `repo` (open flags reset).
+  std::pair<bool, std::string> load_repo_tree(const model::Conn &c, const std::string &schema, model::RepoNode &repo);
 
   // Create a repository: a schema with the lang_setting and folder tables
   std::pair<bool, std::string> create_repository(const model::Conn &c, const std::string &schema, const std::string &repo_name);

@@ -31,12 +31,15 @@ add_executable(probe_lang
     src/front/SelectableText.cpp
     src/front/FormEditRepository.cpp
     src/front/FormEditFolder.cpp
+    src/front/FormEditUnit.cpp
+    src/front/UnitMenu.cpp
     src/back/ConnService.cpp
     src/back/RepoService.cpp
     src/back/FolderService.cpp
     src/back/InitDb.cpp
     src/back/UtilDb.cpp
     src/back/ProjectTreeService.cpp
+    src/back/UnitService.cpp
     src/back/CustomId.cpp
 )
 target_include_directories(probe_lang PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
@@ -62,6 +65,7 @@ add_executable(probe_lang_tests
     src_test/back/TestRepoService.cpp
     src_test/back/TestFolderService.cpp
     src_test/back/TestProjectTreeService.cpp
+    src_test/back/TestUnitService.cpp
     src/back/CustomId.cpp
     src/back/ConnService.cpp
     src/back/UtilDb.cpp
@@ -69,6 +73,7 @@ add_executable(probe_lang_tests
     src/back/RepoService.cpp
     src/back/FolderService.cpp
     src/back/ProjectTreeService.cpp
+    src/back/UnitService.cpp
 )
 target_include_directories(probe_lang_tests PRIVATE src)
 target_include_directories(probe_lang_tests PRIVATE src_test)

@@ -12,9 +12,9 @@ namespace front {
 
     static constexpr float W  = 210.f;
     static constexpr float IH = 26.f;
-    static constexpr int   N  = 2;
+    static constexpr int   N  = 3;
 
-    // returns 0=Изменить репозиторий, 1=Добавить папку, -1=none
+    // returns 0=Изменить репозиторий, 1=Добавить папку, 2=Добавить юнит, -1=none
     int render(SDL_Renderer *r, float mx, float my, bool ldown, bool rdown);
   };
 

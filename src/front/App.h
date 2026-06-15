@@ -4,9 +4,11 @@
 #include "FolderMenu.h"
 #include "FormEditFolder.h"
 #include "FormEditRepository.h"
+#include "FormEditUnit.h"
 #include "MsgDlg.h"
 #include "PanelMenu.h"
 #include "SchemaMenu.h"
+#include "UnitMenu.h"
 #include "back/ConnService.h"
 #include "back/model/ConnNode.h"
 #include <SDL3/SDL.h>
@@ -24,6 +26,7 @@ namespace front {
     Dlg                                dlg;
     FormEditRepository                 repo_dlg;
     FormEditFolder                     folder_dlg;
+    FormEditUnit                       unit_dlg;
     MsgDlg                             msg_dlg;
     ConfirmDlg                         confirm_dlg;
 
@@ -41,6 +44,7 @@ namespace front {
     PanelMenu  panel_menu;
     RepoMenu   repo_menu;
     FolderMenu folder_menu;
+    UnitMenu   unit_menu;
 
     void reload_conns()
     {
