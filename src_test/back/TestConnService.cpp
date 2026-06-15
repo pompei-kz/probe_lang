@@ -74,7 +74,13 @@ protected:
 
 TEST_F(ConnServiceTest, WsDirIsUnderHome)
 {
-  EXPECT_EQ(back::ws_dir(), tmp_home / ".config" / "probe_lang" / "workspace");
+  //
+  //
+  const fs::path dir = back::ws_dir();
+  //
+  //
+
+  EXPECT_EQ(dir, tmp_home / ".config" / "probe_lang" / "workspace");
 }
 
 // ---------------------------------------------------------------------------
@@ -84,13 +90,26 @@ TEST_F(ConnServiceTest, WsDirIsUnderHome)
 TEST_F(ConnServiceTest, LoadAllOnMissingDirReturnsEmpty)
 {
   // Workspace dir does not exist yet.
-  EXPECT_TRUE(back::load_all().empty());
+  //
+  //
+  const std::vector<Conn> all = back::load_all();
+  //
+  //
+
+  EXPECT_TRUE(all.empty());
 }
 
 TEST_F(ConnServiceTest, LoadAllOnEmptyDirReturnsEmpty)
 {
   fs::create_directories(back::ws_dir());
-  EXPECT_TRUE(back::load_all().empty());
+
+  //
+  //
+  const std::vector<Conn> all = back::load_all();
+  //
+  //
+
+  EXPECT_TRUE(all.empty());
 }
 
 // ---------------------------------------------------------------------------
@@ -99,14 +118,24 @@ TEST_F(ConnServiceTest, LoadAllOnEmptyDirReturnsEmpty)
 
 TEST_F(ConnServiceTest, SaveCreatesFile)
 {
+  //
+  //
   back::save_conn(make_conn("prod"));
+  //
+  //
+
   EXPECT_TRUE(fs::exists(conn_file("prod")));
 }
 
 TEST_F(ConnServiceTest, SaveThenLoadRoundTripsAllFields)
 {
   Conn c = make_conn("prod");
+
+  //
+  //
   back::save_conn(c);
+  //
+  //
 
   std::vector<Conn> all = back::load_all();
   ASSERT_EQ(all.size(), 1u);
@@ -127,7 +156,12 @@ TEST_F(ConnServiceTest, ConnectedFalseRoundTrips)
 {
   Conn c      = make_conn("local");
   c.connected = false;
+
+  //
+  //
   back::save_conn(c);
+  //
+  //
 
   const std::vector<Conn> all = back::load_all();
   ASSERT_EQ(all.size(), 1u);
@@ -138,7 +172,12 @@ TEST_F(ConnServiceTest, EmptyOptionalFieldsRoundTrip)
 {
   Conn c;
   c.name = "minimal"; // everything else empty, connected=false
+
+  //
+  //
   back::save_conn(c);
+  //
+  //
 
   std::vector<Conn> all = back::load_all();
   ASSERT_EQ(all.size(), 1u);
@@ -155,9 +194,13 @@ TEST_F(ConnServiceTest, SaveOverwritesExisting)
 {
   Conn c = make_conn("prod");
   back::save_conn(c);
-
   c.host = "new-host";
+
+  //
+  //
   back::save_conn(c);
+  //
+  //
 
   const std::vector<Conn> all = back::load_all();
   ASSERT_EQ(all.size(), 1u);
@@ -173,8 +216,11 @@ TEST_F(ConnServiceTest, SaveWithRenameRemovesOldFile)
   back::save_conn(make_conn("old"));
   ASSERT_TRUE(fs::exists(conn_file("old")));
 
-  const Conn renamed = make_conn("new");
-  back::save_conn(renamed, "old");
+  //
+  //
+  back::save_conn(make_conn("new"), "old");
+  //
+  //
 
   EXPECT_FALSE(fs::exists(conn_file("old")));
   EXPECT_TRUE(fs::exists(conn_file("new")));
@@ -188,7 +234,12 @@ TEST_F(ConnServiceTest, SaveWithSameOldNameKeepsFile)
 {
   const Conn c = make_conn("same");
   back::save_conn(c);
+
+  //
+  //
   back::save_conn(c, "same"); // old_name == new name: must not delete itself
+  //
+  //
 
   EXPECT_TRUE(fs::exists(conn_file("same")));
   EXPECT_EQ(back::load_all().size(), 1u);
@@ -203,7 +254,12 @@ TEST_F(ConnServiceTest, DeleteRemovesFile)
   back::save_conn(make_conn("doomed"));
   ASSERT_TRUE(fs::exists(conn_file("doomed")));
 
+  //
+  //
   back::delete_conn("doomed");
+  //
+  //
+
   EXPECT_FALSE(fs::exists(conn_file("doomed")));
   EXPECT_TRUE(back::load_all().empty());
 }
@@ -218,7 +274,12 @@ TEST_F(ConnServiceTest, LoadAllReturnsSortedByName)
   back::save_conn(make_conn("alpha"));
   back::save_conn(make_conn("bravo"));
 
+  //
+  //
   const std::vector<Conn> all = back::load_all();
+  //
+  //
+
   ASSERT_EQ(all.size(), 3u);
   EXPECT_EQ(all[0].name, "alpha");
   EXPECT_EQ(all[1].name, "bravo");
@@ -233,7 +294,12 @@ TEST_F(ConnServiceTest, LoadAllIgnoresForeignExtensions)
   const fs::path stray = back::ws_dir() / "notes.txt";
   std::ofstream(stray) << "host=should-be-ignored\n";
 
+  //
+  //
   const std::vector<Conn> all = back::load_all();
+  //
+  //
+
   ASSERT_EQ(all.size(), 1u);
   EXPECT_EQ(all[0].name, "real");
 }
@@ -248,7 +314,12 @@ TEST_F(ConnServiceTest, LoadAllIgnoresUnknownKeysAndBlankLines)
                                                       << "port=1234\n"
                                                       << "connected=YES\n";
 
+  //
+  //
   const std::vector<Conn> all = back::load_all();
+  //
+  //
+
   ASSERT_EQ(all.size(), 1u);
   EXPECT_EQ(all[0].name, "manual");
   EXPECT_EQ(all[0].host, "h");
@@ -261,7 +332,12 @@ TEST_F(ConnServiceTest, ConnectedNonYesParsesAsFalse)
   fs::create_directories(back::ws_dir());
   std::ofstream(back::ws_dir() / "weird.pg-connect") << "connected=maybe\n";
 
+  //
+  //
   const std::vector<Conn> all = back::load_all();
+  //
+  //
+
   ASSERT_EQ(all.size(), 1u);
   EXPECT_FALSE(all[0].connected); // only the literal "YES" means connected
 }

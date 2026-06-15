@@ -57,9 +57,9 @@ protected:
     pqxx::work txn(*pg);
     auto       r = txn.exec_params("SELECT 1 FROM information_schema.columns "
                                    "WHERE table_schema=$1 AND table_name=$2 AND column_name=$3",
-                             schema,
-                             table,
-                             col);
+                                   schema,
+                                   table,
+                                   col);
     return !r.empty();
   }
 };
@@ -71,26 +71,38 @@ protected:
 TEST_F(UtilDbTest, EnsureCreatedAtAddsColumn)
 {
   create_table("t", "id int");
+
   {
     pqxx::work txn(*pg);
+    //
+    //
     ensureCreatedAt(txn, schema, "t");
+    //
+    //
     txn.commit();
   }
+
   EXPECT_TRUE(column_exists("t", "created_at"));
 }
 
 TEST_F(UtilDbTest, EnsureCreatedAtIsTimestampWithNowDefault)
 {
   create_table("t", "id int");
+
   {
     pqxx::work txn(*pg);
+    //
+    //
     ensureCreatedAt(txn, schema, "t");
+    //
+    //
     txn.commit();
   }
+
   pqxx::work txn(*pg);
   auto       r = txn.exec_params("SELECT data_type, column_default FROM information_schema.columns "
                                  "WHERE table_schema=$1 AND table_name='t' AND column_name='created_at'",
-                           schema);
+                                 schema);
   ASSERT_EQ(r.size(), 1u);
   EXPECT_EQ(r[0]["data_type"].as<std::string>(), "timestamp without time zone");
   ASSERT_FALSE(r[0]["column_default"].is_null());
@@ -100,11 +112,17 @@ TEST_F(UtilDbTest, EnsureCreatedAtIsTimestampWithNowDefault)
 TEST_F(UtilDbTest, EnsureCreatedAtPopulatedOnInsert)
 {
   create_table("t", "id int");
+
   {
     pqxx::work txn(*pg);
+    //
+    //
     ensureCreatedAt(txn, schema, "t");
+    //
+    //
     txn.commit();
   }
+
   pqxx::work txn(*pg);
   txn.exec("INSERT INTO " + qual("t") + " (id) VALUES (1)");
   auto r = txn.exec("SELECT created_at FROM " + qual("t") + " WHERE id=1");
@@ -118,18 +136,24 @@ TEST_F(UtilDbTest, EnsureCreatedAtIsIdempotent)
   create_table("t", "id int");
   {
     pqxx::work txn(*pg);
-    ensureCreatedAt(txn, schema, "t");
+    ensureCreatedAt(txn, schema, "t"); // first call
     txn.commit();
   }
+
   {
     pqxx::work txn(*pg);
+    //
+    //
     EXPECT_NO_THROW(ensureCreatedAt(txn, schema, "t"));
+    //
+    //
     txn.commit();
   }
+
   pqxx::work txn(*pg);
   auto       r = txn.exec_params("SELECT count(*) FROM information_schema.columns "
                                  "WHERE table_schema=$1 AND table_name='t' AND column_name='created_at'",
-                           schema);
+                                 schema);
   EXPECT_EQ(r[0][0].as<int>(), 1);
 }
 
@@ -140,27 +164,40 @@ TEST_F(UtilDbTest, EnsureCreatedAtIsIdempotent)
 TEST_F(UtilDbTest, EnsureLastModifiedAtAddsColumn)
 {
   create_table("t", "id int primary key, val text");
+
   {
     pqxx::work txn(*pg);
+    //
+    //
     ensureLastModifiedAt(txn, schema, "t");
+    //
+    //
     txn.commit();
   }
+
   EXPECT_TRUE(column_exists("t", "last_modified_at"));
 }
 
 TEST_F(UtilDbTest, LastModifiedAtNullBeforeUpdate)
 {
   create_table("t", "id int primary key, val text");
+
   {
     pqxx::work txn(*pg);
+    //
+    //
     ensureLastModifiedAt(txn, schema, "t");
+    //
+    //
     txn.commit();
   }
+
   {
     pqxx::work txn(*pg);
     txn.exec("INSERT INTO " + qual("t") + " (id, val) VALUES (1, 'a')");
     txn.commit();
   }
+
   // Trigger fires only BEFORE UPDATE, so a freshly inserted row has no stamp.
   pqxx::work txn(*pg);
   auto       r = txn.exec("SELECT last_modified_at FROM " + qual("t") + " WHERE id=1");
@@ -171,11 +208,17 @@ TEST_F(UtilDbTest, LastModifiedAtNullBeforeUpdate)
 TEST_F(UtilDbTest, LastModifiedAtSetWhenAnotherFieldChanges)
 {
   create_table("t", "id int primary key, val text");
+
   {
     pqxx::work txn(*pg);
+    //
+    //
     ensureLastModifiedAt(txn, schema, "t");
+    //
+    //
     txn.commit();
   }
+
   {
     pqxx::work txn(*pg);
     txn.exec("INSERT INTO " + qual("t") + " (id, val) VALUES (1, 'a')");
@@ -186,6 +229,7 @@ TEST_F(UtilDbTest, LastModifiedAtSetWhenAnotherFieldChanges)
     txn.exec("UPDATE " + qual("t") + " SET val='b' WHERE id=1");
     txn.commit();
   }
+
   pqxx::work txn(*pg);
   auto       r = txn.exec("SELECT last_modified_at FROM " + qual("t") + " WHERE id=1");
   ASSERT_EQ(r.size(), 1u);
@@ -195,11 +239,17 @@ TEST_F(UtilDbTest, LastModifiedAtSetWhenAnotherFieldChanges)
 TEST_F(UtilDbTest, LastModifiedAtAdvancesOnSubsequentUpdate)
 {
   create_table("t", "id int primary key, val text");
+
   {
     pqxx::work txn(*pg);
+    //
+    //
     ensureLastModifiedAt(txn, schema, "t");
+    //
+    //
     txn.commit();
   }
+
   {
     pqxx::work txn(*pg);
     txn.exec("INSERT INTO " + qual("t") + " (id, val) VALUES (1, 'a')");
@@ -234,15 +284,21 @@ TEST_F(UtilDbTest, EnsureLastModifiedAtIsIdempotent)
   create_table("t", "id int primary key, val text");
   {
     pqxx::work txn(*pg);
-    ensureLastModifiedAt(txn, schema, "t");
+    ensureLastModifiedAt(txn, schema, "t"); // first call
     txn.commit();
   }
+
   // Second call must not throw (trigger/function are re-created cleanly).
   {
     pqxx::work txn(*pg);
+    //
+    //
     EXPECT_NO_THROW(ensureLastModifiedAt(txn, schema, "t"));
+    //
+    //
     txn.commit();
   }
+
   // Exactly one trigger remains on the table.
   pqxx::work txn(*pg);
   const auto r = txn.exec_params("SELECT count(*) FROM information_schema.triggers "

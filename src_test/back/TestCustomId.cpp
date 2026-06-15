@@ -2,6 +2,8 @@
 #include <gtest/gtest.h>
 #include <set>
 #include <string>
+#include <utility>
+#include <vector>
 
 using namespace back;
 
@@ -30,43 +32,85 @@ static int expected_len(int t, int r)
 
 TEST(EncodeIdBytesTest, EmptyInput)
 {
-  EXPECT_EQ(encode_id_bytes({}), "");
+  //
+  //
+  const std::string id = encode_id_bytes({});
+  //
+  //
+
+  EXPECT_EQ(id, "");
 }
 
 TEST(EncodeIdBytesTest, SingleZeroByte)
 {
   // 0x00 = 00000000 → char0: 000000=0→'0', char1: 00+pad→0→'0'
-  EXPECT_EQ(encode_id_bytes({0x00}), "00");
+  //
+  //
+  const std::string id = encode_id_bytes({0x00});
+  //
+  //
+
+  EXPECT_EQ(id, "00");
 }
 
 TEST(EncodeIdBytesTest, SingleFFByte)
 {
   // 0xFF = 11111111 → char0: 111111=63→'@', char1: 11+0000=48→'m'
-  EXPECT_EQ(encode_id_bytes({0xFF}), "@m");
+  //
+  //
+  const std::string id = encode_id_bytes({0xFF});
+  //
+  //
+
+  EXPECT_EQ(id, "@m");
 }
 
 TEST(EncodeIdBytesTest, Single0x80)
 {
   // 0x80 = 10000000 → char0: 100000=32→'W', char1: 00+0000=0→'0'
-  EXPECT_EQ(encode_id_bytes({0x80}), "W0");
+  //
+  //
+  const std::string id = encode_id_bytes({0x80});
+  //
+  //
+
+  EXPECT_EQ(id, "W0");
 }
 
 TEST(EncodeIdBytesTest, Single0x01)
 {
   // 0x01 = 00000001 → char0: 000000=0→'0', char1: 01+0000=16→'G'
-  EXPECT_EQ(encode_id_bytes({0x01}), "0G");
+  //
+  //
+  const std::string id = encode_id_bytes({0x01});
+  //
+  //
+
+  EXPECT_EQ(id, "0G");
 }
 
 TEST(EncodeIdBytesTest, ThreeZeroBytes)
 {
   // 24 bits, exactly 4 groups of 6 — all zero → "0000"
-  EXPECT_EQ(encode_id_bytes({0x00, 0x00, 0x00}), "0000");
+  //
+  //
+  const std::string id = encode_id_bytes({0x00, 0x00, 0x00});
+  //
+  //
+
+  EXPECT_EQ(id, "0000");
 }
 
 TEST(EncodeIdBytesTest, ThreeFFBytes)
 {
   // 24 bits, exactly 4 groups of 6 — all ones → "@@@@"
-  EXPECT_EQ(encode_id_bytes({0xFF, 0xFF, 0xFF}), "@@@@");
+  //
+  //
+  const std::string id = encode_id_bytes({0xFF, 0xFF, 0xFF});
+  //
+  //
+
+  EXPECT_EQ(id, "@@@@");
 }
 
 TEST(EncodeIdBytesTest, TwoBytes0xFC00)
@@ -75,7 +119,13 @@ TEST(EncodeIdBytesTest, TwoBytes0xFC00)
   // char0: 111111=63→'@'
   // char1: 00(from FC)+0000(from 00)=0→'0'
   // char2: 0000(from 00)+00pad=0→'0'
-  EXPECT_EQ(encode_id_bytes({0xFC, 0x00}), "@00");
+  //
+  //
+  const std::string id = encode_id_bytes({0xFC, 0x00});
+  //
+  //
+
+  EXPECT_EQ(id, "@00");
 }
 
 TEST(EncodeIdBytesTest, TwoBytes0x0102)
@@ -84,19 +134,37 @@ TEST(EncodeIdBytesTest, TwoBytes0x0102)
   // char0: 000000=0→'0'
   // char1: 01(from 01)+0000(from 02)=010000=16→'G'
   // char2: 0010(from 02)+00pad=001000=8→'8'
-  EXPECT_EQ(encode_id_bytes({0x01, 0x02}), "0G8");
+  //
+  //
+  const std::string id = encode_id_bytes({0x01, 0x02});
+  //
+  //
+
+  EXPECT_EQ(id, "0G8");
 }
 
 TEST(EncodeIdBytesTest, SixBytesAllZero)
 {
   // 48 bits = exactly 8 chars, all '0'
-  EXPECT_EQ(encode_id_bytes({0, 0, 0, 0, 0, 0}), "00000000");
+  //
+  //
+  const std::string id = encode_id_bytes({0, 0, 0, 0, 0, 0});
+  //
+  //
+
+  EXPECT_EQ(id, "00000000");
 }
 
 TEST(EncodeIdBytesTest, SixBytesAllFF)
 {
   // 48 bits = exactly 8 chars, all '@'
-  EXPECT_EQ(encode_id_bytes({0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}), "@@@@@@@@");
+  //
+  //
+  const std::string id = encode_id_bytes({0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF});
+  //
+  //
+
+  EXPECT_EQ(id, "@@@@@@@@");
 }
 
 // ---------------------------------------------------------------------------
@@ -107,8 +175,15 @@ TEST(EncodeIdBytesTest, LengthFormula)
 {
   for (int n = 0; n <= 20; n++) {
     std::vector<uint8_t> v(n, 0);
-    int                  want = (n * 8 + 5) / 6;
-    EXPECT_EQ((int)encode_id_bytes(v).size(), want) << "n=" << n;
+    const int            want = (n * 8 + 5) / 6;
+
+    //
+    //
+    const std::string id = encode_id_bytes(v);
+    //
+    //
+
+    EXPECT_EQ((int)id.size(), want) << "n=" << n;
   }
 }
 
@@ -118,37 +193,79 @@ TEST(EncodeIdBytesTest, LengthFormula)
 
 TEST(NewCustomIdTest, LengthZeroZero)
 {
-  EXPECT_EQ((int)new_custom_id(0, 0).size(), expected_len(0, 0));
+  //
+  //
+  const std::string id = new_custom_id(0, 0);
+  //
+  //
+
+  EXPECT_EQ((int)id.size(), expected_len(0, 0));
 }
 
 TEST(NewCustomIdTest, LengthOneZero)
 {
-  EXPECT_EQ((int)new_custom_id(1, 0).size(), expected_len(1, 0)); // 2
+  //
+  //
+  const std::string id = new_custom_id(1, 0);
+  //
+  //
+
+  EXPECT_EQ((int)id.size(), expected_len(1, 0)); // 2
 }
 
 TEST(NewCustomIdTest, LengthZeroOne)
 {
-  EXPECT_EQ((int)new_custom_id(0, 1).size(), expected_len(0, 1)); // 2
+  //
+  //
+  const std::string id = new_custom_id(0, 1);
+  //
+  //
+
+  EXPECT_EQ((int)id.size(), expected_len(0, 1)); // 2
 }
 
 TEST(NewCustomIdTest, LengthThreeZero)
 {
-  EXPECT_EQ((int)new_custom_id(3, 0).size(), expected_len(3, 0)); // 4
+  //
+  //
+  const std::string id = new_custom_id(3, 0);
+  //
+  //
+
+  EXPECT_EQ((int)id.size(), expected_len(3, 0)); // 4
 }
 
 TEST(NewCustomIdTest, LengthOneOne)
 {
-  EXPECT_EQ((int)new_custom_id(1, 1).size(), expected_len(1, 1)); // 3
+  //
+  //
+  const std::string id = new_custom_id(1, 1);
+  //
+  //
+
+  EXPECT_EQ((int)id.size(), expected_len(1, 1)); // 3
 }
 
 TEST(NewCustomIdTest, LengthFiveFour)
 {
-  EXPECT_EQ((int)new_custom_id(5, 4).size(), expected_len(5, 4)); // 12
+  //
+  //
+  const std::string id = new_custom_id(5, 4);
+  //
+  //
+
+  EXPECT_EQ((int)id.size(), expected_len(5, 4)); // 12
 }
 
 TEST(NewCustomIdTest, LengthEightEight)
 {
-  EXPECT_EQ((int)new_custom_id(8, 8).size(), expected_len(8, 8)); // 22
+  //
+  //
+  const std::string id = new_custom_id(8, 8);
+  //
+  //
+
+  EXPECT_EQ((int)id.size(), expected_len(8, 8)); // 22
 }
 
 // ---------------------------------------------------------------------------
@@ -157,16 +274,28 @@ TEST(NewCustomIdTest, LengthEightEight)
 
 TEST(NewCustomIdTest, ValidChars)
 {
-  EXPECT_TRUE(all_valid_chars(new_custom_id(5, 4)));
-  EXPECT_TRUE(all_valid_chars(new_custom_id(1, 1)));
-  EXPECT_TRUE(all_valid_chars(new_custom_id(0, 8)));
-  EXPECT_TRUE(all_valid_chars(new_custom_id(8, 0)));
+  for (auto [t, r] : {std::pair{5, 4}, std::pair{1, 1}, std::pair{0, 8}, std::pair{8, 0}}) {
+    //
+    //
+    const std::string id = new_custom_id(t, r);
+    //
+    //
+
+    EXPECT_TRUE(all_valid_chars(id)) << "t=" << t << " r=" << r;
+  }
 }
 
 TEST(NewCustomIdTest, AllAlphabetCharsAreValid)
 {
-  for (int i = 0; i < 200; i++)
-    EXPECT_TRUE(all_valid_chars(new_id())) << "iteration " << i;
+  for (int i = 0; i < 200; i++) {
+    //
+    //
+    const std::string id = new_id();
+    //
+    //
+
+    EXPECT_TRUE(all_valid_chars(id)) << "iteration " << i;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -176,8 +305,15 @@ TEST(NewCustomIdTest, AllAlphabetCharsAreValid)
 TEST(NewCustomIdTest, Uniqueness100)
 {
   std::set<std::string> ids;
-  for (int i = 0; i < 100; i++)
-    ids.insert(new_id());
+  for (int i = 0; i < 100; i++) {
+    //
+    //
+    const std::string id = new_id();
+    //
+    //
+
+    ids.insert(id);
+  }
   // Probability of collision with 4 random bytes (2^32) is negligible
   EXPECT_EQ((int)ids.size(), 100);
 }
@@ -185,8 +321,15 @@ TEST(NewCustomIdTest, Uniqueness100)
 TEST(NewCustomIdTest, RandomOnlyUniqueness)
 {
   std::set<std::string> ids;
-  for (int i = 0; i < 50; i++)
-    ids.insert(new_custom_id(0, 8));
+  for (int i = 0; i < 50; i++) {
+    //
+    //
+    const std::string id = new_custom_id(0, 8);
+    //
+    //
+
+    ids.insert(id);
+  }
   EXPECT_EQ((int)ids.size(), 50);
 }
 
@@ -197,15 +340,17 @@ TEST(NewCustomIdTest, RandomOnlyUniqueness)
 
 TEST(NewCustomIdTest, TimeOnlyNonDecreasing)
 {
-  // Generate several IDs with only time bytes.
   // Because the time bytes are MSB-first big-endian and the alphabet indices
-  // are ordered 0..63, lexicographic comparison of the encoded strings is
-  // NOT guaranteed to match numeric order ($ and @ have different ASCII values).
-  // We therefore decode back to compare numerically.
-  // Simpler approach: just verify the IDs are of the right length.
+  // are ordered 0..63, lexicographic comparison of the encoded strings is NOT
+  // guaranteed to match numeric order. We therefore just verify the length.
   const int N = 10;
   for (int i = 0; i < N; i++) {
-    std::string id = new_custom_id(5, 0);
+    //
+    //
+    const std::string id = new_custom_id(5, 0);
+    //
+    //
+
     EXPECT_EQ((int)id.size(), expected_len(5, 0)); // 7
   }
 }
@@ -216,23 +361,48 @@ TEST(NewCustomIdTest, TimeOnlyNonDecreasing)
 
 TEST(NewIdTest, Length)
 {
-  EXPECT_EQ((int)new_id().size(), 12);
+  //
+  //
+  const std::string id = new_id();
+  //
+  //
+
+  EXPECT_EQ((int)id.size(), 12);
 }
 
 TEST(NewIdTest, ValidChars)
 {
-  EXPECT_TRUE(all_valid_chars(new_id()));
+  //
+  //
+  const std::string id = new_id();
+  //
+  //
+
+  EXPECT_TRUE(all_valid_chars(id));
 }
 
 TEST(NewIdTest, SameLengthAsCustomId54)
 {
-  EXPECT_EQ(new_id().size(), new_custom_id(5, 4).size());
+  //
+  //
+  const std::string id = new_id();
+  //
+  //
+
+  EXPECT_EQ(id.size(), new_custom_id(5, 4).size());
 }
 
 TEST(NewIdTest, Unique)
 {
   std::set<std::string> ids;
-  for (int i = 0; i < 50; i++)
-    ids.insert(new_id());
+  for (int i = 0; i < 50; i++) {
+    //
+    //
+    const std::string id = new_id();
+    //
+    //
+
+    ids.insert(id);
+  }
   EXPECT_EQ((int)ids.size(), 50);
 }

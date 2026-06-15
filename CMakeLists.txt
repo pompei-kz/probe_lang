@@ -57,9 +57,15 @@ add_executable(probe_lang_tests
     src_test/back/TestCustomId.cpp
     src_test/back/TestConnService.cpp
     src_test/back/TestUtilDb.cpp
+    src_test/back/TestInitDb.cpp
+    src_test/back/TestRepoService.cpp
+    src_test/back/TestFolderService.cpp
     src/back/CustomId.cpp
     src/back/ConnService.cpp
     src/back/UtilDb.cpp
+    src/back/InitDb.cpp
+    src/back/RepoService.cpp
+    src/back/FolderService.cpp
 )
 target_include_directories(probe_lang_tests PRIVATE src)
 target_include_directories(probe_lang_tests PRIVATE src_test)
