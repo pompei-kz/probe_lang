@@ -27,7 +27,7 @@ services:
     ports:
       - "18402:5432"
     volumes:
-      - ${APP_DATA_ROOT}/postgres-data:/var/lib/postgresql
+      - ${APP_DATA_ROOT}/postgres-data-test:/var/lib/postgresql
       - ./pg-init-test:/docker-entrypoint-initdb.d:ro
     networks:
       - probe-lang

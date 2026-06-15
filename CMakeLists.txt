@@ -56,11 +56,16 @@ find_package(GTest REQUIRED)
 add_executable(probe_lang_tests
     src_test/back/TestCustomId.cpp
     src_test/back/TestConnService.cpp
+    src_test/back/TestUtilDb.cpp
     src/back/CustomId.cpp
     src/back/ConnService.cpp
+    src/back/UtilDb.cpp
 )
 target_include_directories(probe_lang_tests PRIVATE src)
+target_include_directories(probe_lang_tests PRIVATE src_test)
+target_include_directories(probe_lang_tests PRIVATE ${PQXX_INCLUDE_DIRS})
 target_link_libraries(probe_lang_tests PRIVATE GTest::GTest GTest::Main)
+target_link_libraries(probe_lang_tests PRIVATE ${PQXX_LINK_LIBRARIES})
 
 include(GoogleTest)
 gtest_discover_tests(probe_lang_tests)
