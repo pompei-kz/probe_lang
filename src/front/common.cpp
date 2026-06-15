@@ -226,17 +226,18 @@ namespace front {
         if (folder.open) {
           open_tree_node(path);
           // Always consult disk for which children were left open.
-          for (auto &child : folder.children)
+          for (FolderNode &child : folder.children) {
             restore_folder_open(path, child);
+          }
         } else {
           close_tree_node(path);
         }
       }
 
       if (rclick && (h_caret || h_row)) {
-        float mx2           = std::min(app.mx, pw - FolderMenu::W - 2.f);
-        float my2           = std::min(app.my, ph - FolderMenu::N * FolderMenu::IH - 10.f);
-        app.folder_menu     = {true, mx2, my2, ci, ri, folder.id, folder.name};
+        float mx_2           = std::min(app.mx, pw - FolderMenu::W - 2.f);
+        float my_2           = std::min(app.my, ph - FolderMenu::N * FolderMenu::IH - 10.f);
+        app.folder_menu     = {true, mx_2, my_2, ci, ri, folder.id, folder.name};
         app.panel_menu.open = false;
         app.repo_menu.open  = false;
       }
@@ -250,7 +251,7 @@ namespace front {
   void panel_render(SDL_Renderer *ren, App &app, bool click, bool rclick, bool dblclick)
   {
     const float pw = app.ww * 0.30f;
-    const float ph = (float)app.wh;
+    const float ph = static_cast<float>(app.wh);
 
     fill(ren, C_PANEL, 0, 0, pw, ph);
     fill(ren, C_BG, 0, 0, pw, HDR_H);
@@ -277,7 +278,7 @@ namespace front {
     app.h_edit = -1;
     int row    = 0;
 
-    for (int i = 0; i < (int)app.conns.size(); i++) {
+    for (int i = 0; i < static_cast<int>(app.conns.size()); i++) {
       ConnNode  &node      = app.conns[i];
       const bool connected = node.conn.connected;
       float      iy        = HDR_H + row * ITEM_H;
@@ -340,14 +341,15 @@ namespace front {
       row++;
 
       if (node.open) {
-        for (int ri = 0; ri < (int)node.repos.size(); ri++) {
+        for (int ri = 0; ri < static_cast<int>(node.repos.size()); ri++) {
           auto &repo     = node.repos[ri];
           float sy       = HDR_H + row * ITEM_H;
           float caret_x  = PAD + CARET_W; // caret zone right edge
           bool  has_kids = !repo.folders.empty();
-          bool  h_caret  = has_kids && hit(app.mx, app.my, 0, sy, caret_x, ITEM_H);
-          bool  h_row    = !h_caret && hit(app.mx, app.my, 0, sy, pw, ITEM_H);
-          if (h_caret || h_row) fill(ren, C_HOVER, 0, sy, pw, ITEM_H);
+          bool  h_caret1 = has_kids && hit(app.mx, app.my, 0, sy, caret_x, ITEM_H);
+          bool  h_row1   = !h_caret1 && hit(app.mx, app.my, 0, sy, pw, ITEM_H);
+
+          if (h_caret1 || h_row1) fill(ren, C_HOVER, 0, sy, pw, ITEM_H);
 
           if (has_kids) draw_caret(ren, PAD + CARET_W * .5f, sy + ITEM_H * .5f, repo.open, repo.open ? C_ACCENT : C_DIM);
 
@@ -358,7 +360,7 @@ namespace front {
           SDL_RenderFillRect(ren, &sl);
 
           // caret single-click OR row double-click toggles a branch
-          if (has_kids && ((click && h_caret) || (dblclick && h_row))) {
+          if (has_kids && ((click && h_caret1) || (dblclick && h_row1))) {
             repo.open = !repo.open;
             if (repo.open) {
               open_tree_node({node.conn.name, repo.schema_name});
@@ -367,7 +369,7 @@ namespace front {
               close_tree_node({node.conn.name, repo.schema_name});
             }
           }
-          if (rclick && (h_caret || h_row)) {
+          if (rclick && (h_caret1 || h_row1)) {
             float mx2            = std::min(app.mx, pw - RepoMenu::W - 2.f);
             float my2            = std::min(app.my, ph - RepoMenu::N * RepoMenu::IH - 10.f);
             app.repo_menu        = RepoMenu{true, mx2, my2, i, ri};
@@ -375,8 +377,9 @@ namespace front {
             app.folder_menu.open = false;
           }
           row++;
-          if (repo.open)
+          if (repo.open) {
             render_folder_list(ren, app, repo.folders, i, ri, {node.conn.name, repo.schema_name}, 0, row, pw, ph, click, rclick, dblclick);
+          }
         }
       }
     }
@@ -387,7 +390,7 @@ namespace front {
 
     int  act      = app.panel_menu.render(ren, app.mx, app.my, click, rclick);
     int  ci       = app.panel_menu.conn_idx;
-    bool valid_ci = ci >= 0 && ci < (int)app.conns.size();
+    bool valid_ci = ci >= 0 && ci < static_cast<int>(app.conns.size());
 
     if (act == 0 && valid_ci) {
       ConnNode &node = app.conns[ci];
