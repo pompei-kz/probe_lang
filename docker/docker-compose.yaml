@@ -17,3 +17,17 @@ services:
       - ./pg-init:/docker-entrypoint-initdb.d:ro
     networks:
       - probe-lang
+
+  pg-test:
+    image: postgres:18.4-alpine3.23
+    container_name: probe-lang-pg-test
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: "xHy4Jy3AyGFEiHt6IirT"
+    ports:
+      - "18402:5432"
+    volumes:
+      - ${APP_DATA_ROOT}/postgres-data:/var/lib/postgresql
+      - ./pg-init-test:/docker-entrypoint-initdb.d:ro
+    networks:
+      - probe-lang
