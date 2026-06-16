@@ -135,4 +135,20 @@ namespace back {
     }
   }
 
+  std::pair<bool, std::string> update_statement_size(
+      const Conn &c, const std::string &schema, const std::string &id, float width, float height)
+  {
+    try {
+      pqxx::connection pg(make_cs(c));
+      pqxx::work       txn(pg);
+      txn.exec_params("UPDATE " + pg.quote_name(schema) + ".unit_st SET width = $1, height = $2 WHERE id = $3", width, height, id);
+      txn.commit();
+      return {true, ""};
+    } catch (const pqxx::sql_error &e) {
+      return {false, sql_err_msg(e)};
+    } catch (const std::exception &e) {
+      return {false, e.what()};
+    }
+  }
+
 } // namespace back

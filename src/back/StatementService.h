@@ -40,4 +40,9 @@ namespace back {
   std::pair<bool, std::string> update_statement_name(
       const model::Conn &c, const std::string &schema, const std::string &id, model::StatementType type, const std::string &name);
 
+  // Update a statement's box size (unit_st.width / height). The geom column is
+  // regenerated automatically.
+  std::pair<bool, std::string> update_statement_size(
+      const model::Conn &c, const std::string &schema, const std::string &id, float width, float height);
+
 } // namespace back

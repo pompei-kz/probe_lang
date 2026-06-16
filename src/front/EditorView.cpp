@@ -80,6 +80,15 @@ namespace front {
   }
 
   // `scale` scales the text (name + badge letter) with the box; 1 == unzoomed.
+  // Unscaled (world-unit) box width needed to fit `name`: matches box_geo's
+  // horizontal layout (left pad + badge + gap + text + right pad).
+  static float fit_width(float height, const std::string &name)
+  {
+    const float badge0 = std::clamp(height - 6.f, 8.f, 22.f);
+    const float w      = 5.f + badge0 + 6.f + text_w(name.c_str()) + 6.f;
+    return std::max(w, 60.f);
+  }
+
   static void draw_box(SDL_Renderer *ren, const BoxGeo &g, char letter, const char *name, bool hovered, float scale)
   {
     fill(ren, hovered ? C_HOVER : C_PANEL, g.bx, g.by, g.bw, g.bh);
@@ -205,7 +214,19 @@ namespace front {
   {
     if (!editing) return;
     EditorTab *t = cur();
-    if (t) update_statement_name(t->conn, t->schema, edit_id, edit_type, edit_field.ed.buf);
+    if (t) {
+      const std::string &name = edit_field.ed.buf;
+      update_statement_name(t->conn, t->schema, edit_id, edit_type, name);
+
+      // Recompute the box width to fit the new name (height unchanged) and persist it.
+      float height = DEF_H;
+      for (const Statement &s : t->stmts)
+        if (s.id == edit_id) {
+          height = s.height;
+          break;
+        }
+      update_statement_size(t->conn, t->schema, edit_id, fit_width(height, name), height);
+    }
     editing = false;
     reload();
   }

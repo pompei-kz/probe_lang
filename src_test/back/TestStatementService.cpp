@@ -236,3 +236,27 @@ TEST_F(StatementServiceTest, UpdateStatementNamePersists)
   ASSERT_TRUE(ok) << err;
   EXPECT_EQ(detail_name("unit_st_method", id), "renamed");
 }
+
+// ---------------------------------------------------------------------------
+// update_statement_size
+// ---------------------------------------------------------------------------
+
+TEST_F(StatementServiceTest, UpdateStatementSizePersists)
+{
+  make_schema();
+  auto [id, msg] = create_statement(conn(), schema, "u1", StatementType::Method, 0, 0, 50, 20, "m");
+  ASSERT_FALSE(id.empty()) << msg;
+
+  //
+  //
+  auto [ok, err] = update_statement_size(conn(), schema, id, 222, 33);
+  //
+  //
+
+  ASSERT_TRUE(ok) << err;
+  auto [stmts, lerr] = load_statements_in_view(conn(), schema, "u1", -1000, -1000, 1000, 1000);
+  ASSERT_TRUE(lerr.empty()) << lerr;
+  ASSERT_EQ(stmts.size(), 1u);
+  EXPECT_FLOAT_EQ(stmts[0].width, 222);
+  EXPECT_FLOAT_EQ(stmts[0].height, 33);
+}
