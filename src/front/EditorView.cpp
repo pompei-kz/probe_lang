@@ -154,10 +154,12 @@ namespace front {
     }
   }
 
-  // The "add argument" control: a +-glyph inside an accent circle.
+  // The "add argument" control: a +-glyph inside an accent circle. On hover the
+  // circle darkens slightly (a dimmed accent, not the near-black panel hover).
   static void draw_plus(SDL_Renderer *ren, const BoxGeo &g, bool hovered)
   {
-    fill_circle(ren, hovered ? C_HOVER : C_ACCENT, g.plus_cx, g.plus_cy, g.plus_r);
+    constexpr Clr C_ACCENT_HOV{0x6f, 0x90, 0xc8}; // ~0.8 * C_ACCENT
+    fill_circle(ren, hovered ? C_ACCENT_HOV : C_ACCENT, g.plus_cx, g.plus_cy, g.plus_r);
     const float arm   = g.plus_r * .55f;
     const float thick = std::max(1.5f, g.plus_r * .28f);
     fill(ren, C_PANEL, g.plus_cx - arm, g.plus_cy - thick * .5f, 2.f * arm, thick);
