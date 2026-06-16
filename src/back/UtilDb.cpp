@@ -30,11 +30,19 @@ namespace back {
 
   bool hasSchema(pqxx::work &txn, const std::string &schemaName)
   {
-    // TODO нужно реализовать
+    pqxx::result check = txn.exec_params("SELECT 1 FROM information_schema.schemata "
+                                         "WHERE schema_name = $1 LIMIT 1",
+                                         schemaName);
+    return !check.empty();
   }
+
   bool hasTable(pqxx::work &txn, const std::string &schemaName, const std::string &tableName)
   {
-    // TODO нужно реализовать
+    pqxx::result check = txn.exec_params("SELECT 1 FROM information_schema.tables "
+                                         "WHERE table_schema = $1 AND table_name = $2 LIMIT 1",
+                                         schemaName,
+                                         tableName);
+    return !check.empty();
   }
 
 } // namespace back

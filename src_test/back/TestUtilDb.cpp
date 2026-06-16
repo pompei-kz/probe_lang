@@ -307,3 +307,94 @@ TEST_F(UtilDbTest, EnsureLastModifiedAtIsIdempotent)
                                  schema);
   EXPECT_EQ(r[0][0].as<int>(), 1);
 }
+
+// ---------------------------------------------------------------------------
+// hasSchema
+// ---------------------------------------------------------------------------
+
+TEST_F(UtilDbTest, HasSchemaTrueForExistingSchema)
+{
+  // The fixture's SetUp() already created `schema`.
+  pqxx::work txn(*pg);
+  //
+  //
+  const bool result = hasSchema(txn, schema);
+  //
+  //
+  EXPECT_TRUE(result);
+}
+
+TEST_F(UtilDbTest, HasSchemaFalseForMissingSchema)
+{
+  pqxx::work txn(*pg);
+  //
+  //
+  const bool result = hasSchema(txn, schema + "_does_not_exist");
+  //
+  //
+  EXPECT_FALSE(result);
+}
+
+TEST_F(UtilDbTest, HasSchemaTrueForBuiltinPublicSchema)
+{
+  pqxx::work txn(*pg);
+  //
+  //
+  const bool result = hasSchema(txn, "public");
+  //
+  //
+  EXPECT_TRUE(result);
+}
+
+// ---------------------------------------------------------------------------
+// hasTable
+// ---------------------------------------------------------------------------
+
+TEST_F(UtilDbTest, HasTableTrueForExistingTable)
+{
+  create_table("t", "id int");
+
+  pqxx::work txn(*pg);
+  //
+  //
+  const bool result = hasTable(txn, schema, "t");
+  //
+  //
+  EXPECT_TRUE(result);
+}
+
+TEST_F(UtilDbTest, HasTableFalseForMissingTable)
+{
+  pqxx::work txn(*pg);
+  //
+  //
+  const bool result = hasTable(txn, schema, "no_such_table");
+  //
+  //
+  EXPECT_FALSE(result);
+}
+
+TEST_F(UtilDbTest, HasTableFalseWhenTableInDifferentSchema)
+{
+  // Table `t` lives in `schema`, so it must not be found via `public`.
+  create_table("t", "id int");
+
+  pqxx::work txn(*pg);
+  //
+  //
+  const bool result = hasTable(txn, "public", "t");
+  //
+  //
+  EXPECT_FALSE(result);
+}
+
+TEST_F(UtilDbTest, HasTableFalseForMissingSchema)
+{
+  pqxx::work txn(*pg);
+  //
+  //
+  const bool result = hasTable(txn, schema + "_does_not_exist", "t");
+  //
+  //
+  EXPECT_FALSE(result);
+}
