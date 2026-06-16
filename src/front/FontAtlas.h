@@ -39,8 +39,13 @@ namespace front {
   void  font_init(SDL_Renderer *ren);
   float text_draw(SDL_Renderer *ren, const char *s, float x, float y, Clr c);
   float text_draw_n(SDL_Renderer *ren, const char *s, int32_t byte_len, float x, float y, Clr c);
+  // Like text_draw, but every glyph (size, bearing and advance) is multiplied by
+  // `scale`. scale == 1 is identical to text_draw.
+  float text_draw_scaled(SDL_Renderer *ren, const char *s, float x, float y, Clr c, float scale);
   float text_w_n(const char *s, int32_t byte_len);
   float text_w(const char *s);
   float center_baseline(float box_y, float box_h);
+  // Baseline for vertically centring text scaled by `scale` in a box.
+  float center_baseline_scaled(float box_y, float box_h, float scale);
 
 } // namespace front

@@ -126,6 +126,27 @@ namespace front {
     return px - x;
   }
 
+  float text_draw_scaled(SDL_Renderer *ren, const char *s, float x, float y, Clr c, float scale)
+  {
+    SDL_SetTextureColorMod(g_atlas.tex, c.r, c.g, c.b);
+    SDL_SetTextureAlphaMod(g_atlas.tex, c.a);
+    float   px = x;
+    int32_t i = 0, len = static_cast<int32_t>(strlen(s));
+    while (i < len) {
+      UChar32 cp;
+      U8_NEXT(reinterpret_cast<const uint8_t *>(s), i, len, cp);
+      if (cp < 0) continue;
+      const auto &g = g_atlas.get(cp);
+      if (g.visible) {
+        SDL_FRect src{(float)g.tx, (float)g.ty, (float)g.tw, (float)g.th};
+        SDL_FRect dst{px + g.bx * scale, y + g.by * scale, g.tw * scale, g.th * scale};
+        SDL_RenderTexture(ren, g_atlas.tex, &src, &dst);
+      }
+      px += g.adv * scale;
+    }
+    return px - x;
+  }
+
   float text_w_n(const char *s, int32_t byte_len)
   {
     float   px = 0;
@@ -147,6 +168,11 @@ namespace front {
   float center_baseline(float box_y, float box_h)
   {
     return box_y + (box_h + g_atlas.asc + g_atlas.desc) * 0.5f;
+  }
+
+  float center_baseline_scaled(float box_y, float box_h, float scale)
+  {
+    return box_y + (box_h + (g_atlas.asc + g_atlas.desc) * scale) * 0.5f;
   }
 
 } // namespace front

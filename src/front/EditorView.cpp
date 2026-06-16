@@ -56,36 +56,40 @@ namespace front {
     float nx, ny, nw, nh;
   };
 
+  // Layout is computed at scale 1 (world/unzoomed) and multiplied by the zoom,
+  // so the box and everything inside it scale together.
   static BoxGeo box_geo(const EditorView &e, const Statement &s)
   {
-    const double z = e.cur() ? e.cur()->zoom : 1.0;
-    BoxGeo       g{};
+    const float z = static_cast<float>(e.cur() ? e.cur()->zoom : 1.0);
+    BoxGeo      g{};
     g.bx = e.to_screen_x(s.x);
     g.by = e.to_screen_y(s.y);
-    g.bw = static_cast<float>(s.width * z);
-    g.bh = static_cast<float>(s.height * z);
+    g.bw = s.width * z;
+    g.bh = s.height * z;
 
-    g.badge   = std::clamp(g.bh - 6.f, 8.f, 22.f);
-    g.badge_x = g.bx + 5.f;
-    g.badge_y = g.by + (g.bh - g.badge) * .5f;
+    const float badge0 = std::clamp(s.height - 6.f, 8.f, 22.f); // unscaled badge
+    g.badge            = badge0 * z;
+    g.badge_x          = g.bx + 5.f * z;
+    g.badge_y          = g.by + (g.bh - g.badge) * .5f;
 
-    g.nx = g.badge_x + g.badge + 6.f;
+    g.nx = g.bx + (5.f + badge0 + 6.f) * z;
     g.nh = std::min(g.bh - 6.f, FS + 8.f);
     g.ny = g.by + (g.bh - g.nh) * .5f;
-    g.nw = std::max(g.bx + g.bw - g.nx - 6.f, 10.f);
+    g.nw = std::max(g.bx + g.bw - g.nx - 6.f * z, 10.f);
     return g;
   }
 
-  static void draw_box(SDL_Renderer *ren, const BoxGeo &g, char letter, const char *name, bool hovered)
+  // `scale` scales the text (name + badge letter) with the box; 1 == unzoomed.
+  static void draw_box(SDL_Renderer *ren, const BoxGeo &g, char letter, const char *name, bool hovered, float scale)
   {
     fill(ren, hovered ? C_HOVER : C_PANEL, g.bx, g.by, g.bw, g.bh);
     rect(ren, C_BORDER, g.bx, g.by, g.bw, g.bh);
 
     fill(ren, C_ACCENT, g.badge_x, g.badge_y, g.badge, g.badge);
     const char ls[2] = {letter, '\0'};
-    text_draw(ren, ls, g.badge_x + (g.badge - text_w(ls)) * .5f, center_baseline(g.badge_y, g.badge), C_PANEL);
+    text_draw_scaled(ren, ls, g.badge_x + (g.badge - text_w(ls) * scale) * .5f, center_baseline_scaled(g.badge_y, g.badge, scale), C_PANEL, scale);
 
-    if (name && *name) text_draw(ren, name, g.nx, center_baseline(g.by, g.bh), C_TEXT);
+    if (name && *name) text_draw_scaled(ren, name, g.nx, center_baseline_scaled(g.by, g.bh, scale), C_TEXT, scale);
   }
 
   // ── lifecycle ────────────────────────────────────────────────────────────────
@@ -304,7 +308,7 @@ namespace front {
       g.badge_y = g.by + (g.bh - g.badge) * .5f;
       g.nx      = g.badge_x + g.badge + 6.f;
       bool hov  = hit(mx, my, g.bx, g.by, g.bw, g.bh);
-      draw_box(ren, g, letter, name, hov);
+      draw_box(ren, g, letter, name, hov, 1.f);
       return hov;
     };
 
@@ -411,14 +415,14 @@ namespace front {
       const char letter = s.type == StatementType::Field ? 'F' : 'M';
 
       if (editing && s.id == edit_id) {
-        draw_box(ren, g, letter, "", false);
+        draw_box(ren, g, letter, "", false, static_cast<float>(t->zoom));
         edit_bx = g.nx;
         edit_bw = g.nw;
         edit_bh = std::min(g.bh - 6.f, FS + 8.f);
         edit_by = g.by + (g.bh - edit_bh) * .5f;
         edit_field.draw(ren, edit_bx, edit_by, edit_bw, edit_bh, true);
       } else {
-        draw_box(ren, g, letter, s.name.c_str(), hov);
+        draw_box(ren, g, letter, s.name.c_str(), hov, static_cast<float>(t->zoom));
       }
     }
 
