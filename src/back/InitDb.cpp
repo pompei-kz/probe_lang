@@ -90,7 +90,7 @@ namespace back {
                "("
                "  id varchar(32) primary key,"
                "  next_unit_id varchar(32),"
-               "  commented bool default false,"
+               "  disabled bool default false,"
                "  name text"
                ")");
 
