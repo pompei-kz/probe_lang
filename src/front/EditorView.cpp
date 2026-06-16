@@ -1,7 +1,7 @@
 #include "EditorView.h"
 #include "Clr.h"
 #include "FontAtlas.h"
-#include "back/StatementService.h"
+#include "back/BlockService.h"
 #include "back/UnitEditorState.h"
 #include "render_helpers.h"
 
@@ -52,7 +52,7 @@ namespace front {
     return std::clamp(10.f + 14.f + text_w(t.unit_name.c_str()) + 10.f, 90.f, 240.f);
   }
 
-  // ── statement box geometry / drawing ─────────────────────────────────────────
+  // ── block box geometry / drawing ─────────────────────────────────────────
   struct BoxGeo
   {
     float bx, by, bw, bh;
@@ -62,7 +62,7 @@ namespace front {
 
   // Layout is computed at scale 1 (world/unzoomed) and multiplied by the zoom,
   // so the box and everything inside it scale together.
-  static BoxGeo box_geo(const EditorView &e, const Statement &s)
+  static BoxGeo box_geo(const EditorView &e, const Block &s)
   {
     const float z = static_cast<float>(e.cur() ? e.cur()->zoom : 1.0);
     BoxGeo      g{};
@@ -176,7 +176,7 @@ namespace front {
       t->cam_y = saved->cam_y;
     } else {
       t->zoom         = 1.0;
-      auto [box, err] = statement_bbox_for_unit(t->conn, t->schema, t->unit_id);
+      auto [box, err] = block_bbox_for_unit(t->conn, t->schema, t->unit_id);
       if (box) {
         const double mx = (box->min_x + box->max_x) * .5;
         const double my = (box->min_y + box->max_y) * .5;
@@ -207,11 +207,11 @@ namespace front {
     const float miny = static_cast<float>(t->cam_y);
     const float maxx = static_cast<float>(t->cam_x + cw / t->zoom);
     const float maxy = static_cast<float>(t->cam_y + ch / t->zoom);
-    auto [rows, err] = load_statements_in_view(t->conn, t->schema, t->unit_id, minx, miny, maxx, maxy);
-    t->stmts         = std::move(rows);
+    auto [rows, err] = load_blocks_in_view(t->conn, t->schema, t->unit_id, minx, miny, maxx, maxy);
+    t->blocks         = std::move(rows);
   }
 
-  void EditorView::start_edit(const Statement &s, float fbx, float fby, float fbw, float fbh)
+  void EditorView::start_edit(const Block &s, float fbx, float fby, float fbw, float fbh)
   {
     editing       = true;
     edit_id       = s.id;
@@ -231,9 +231,9 @@ namespace front {
     EditorTab *t = cur();
     if (t) {
       const std::string &name = edit_field.ed.buf;
-      update_statement_name(t->conn, t->schema, edit_id, edit_type, name);
+      update_block_name(t->conn, t->schema, edit_id, edit_type, name);
       // Resize the box to fit the new name; height is the compact BOX_H.
-      update_statement_size(t->conn, t->schema, edit_id, fit_width(name), BOX_H);
+      update_block_size(t->conn, t->schema, edit_id, fit_width(name), BOX_H);
     }
     editing = false;
     reload();
@@ -267,7 +267,7 @@ namespace front {
       const float dx = mx - drag_last_x;
       const float dy = my - drag_last_y;
       if (dx != 0 || dy != 0) {
-        for (Statement &s : t->stmts)
+        for (Block &s : t->blocks)
           if (s.id == drag_id) {
             s.x += static_cast<float>(dx / t->zoom);
             s.y += static_cast<float>(dy / t->zoom);
@@ -299,9 +299,9 @@ namespace front {
     if (dragging) {
       EditorTab *t = cur();
       if (t && drag_moved) {
-        for (const Statement &s : t->stmts)
+        for (const Block &s : t->blocks)
           if (s.id == drag_id) {
-            update_statement_position(t->conn, t->schema, s.id, s.x, s.y);
+            update_block_position(t->conn, t->schema, s.id, s.x, s.y);
             break;
           }
         reload();
@@ -396,10 +396,10 @@ namespace front {
 
     if (ldown) {
       if (hm) {
-        create_statement(t->conn,
+        create_block(t->conn,
                          t->schema,
                          t->unit_id,
-                         StatementType::Method,
+                         BlockType::Method,
                          e.chooser_wx,
                          e.chooser_wy,
                          fit_width("newMethod"),
@@ -408,7 +408,7 @@ namespace front {
         e.chooser_open = false;
         e.reload();
       } else if (hf) {
-        create_statement(t->conn, t->schema, t->unit_id, StatementType::Field, e.chooser_wx, e.chooser_wy, fit_width("newField"), BOX_H, "newField");
+        create_block(t->conn, t->schema, t->unit_id, BlockType::Field, e.chooser_wx, e.chooser_wy, fit_width("newField"), BOX_H, "newField");
         e.chooser_open = false;
         e.reload();
       } else {
@@ -496,11 +496,11 @@ namespace front {
       }
     }
 
-    // Statement boxes.
-    for (const Statement &s : t->stmts) {
+    // Block boxes.
+    for (const Block &s : t->blocks) {
       BoxGeo     g      = box_geo(*this, s);
       const bool hov    = !editing && !chooser_open && !tab_clicked && hit(mx, my, g.bx, g.by, g.bw, g.bh);
-      const char letter = s.type == StatementType::Field ? 'F' : 'M';
+      const char letter = s.type == BlockType::Field ? 'F' : 'M';
 
       if (editing && s.id == edit_id) {
         draw_box(ren, g, letter, "", false, static_cast<float>(t->zoom));
@@ -540,9 +540,9 @@ namespace front {
 
     // Double-click: edit a box's name, or open the chooser on empty canvas.
     if (dbl && hit(mx, my, cx, cy, cw, ch)) {
-      const Statement *target = nullptr;
+      const Block *target = nullptr;
       BoxGeo           tgeo{};
-      for (const Statement &s : t->stmts) {
+      for (const Block &s : t->blocks) {
         BoxGeo g = box_geo(*this, s);
         if (hit(mx, my, g.bx, g.by, g.bw, g.bh)) {
           target = &s;
@@ -564,11 +564,11 @@ namespace front {
       return;
     }
 
-    // Single click on a statement begins dragging it (canvas is panned with the
+    // Single click on a block begins dragging it (canvas is panned with the
     // middle button instead).
     if (ldown && hit(mx, my, cx, cy, cw, ch)) {
-      const Statement *target = nullptr;
-      for (const Statement &s : t->stmts) {
+      const Block *target = nullptr;
+      for (const Block &s : t->blocks) {
         BoxGeo g = box_geo(*this, s);
         if (hit(mx, my, g.bx, g.by, g.bw, g.bh)) target = &s; // last hit wins (topmost)
       }

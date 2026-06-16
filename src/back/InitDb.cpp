@@ -31,7 +31,7 @@ namespace back {
     ensureCreatedAt(txn, schema, "unit");
     ensureLastModifiedAt(txn, schema, "unit");
 
-    init_unit_st_tables(txn, pg, schema);
+    init_unit_bl_tables(txn, pg, schema);
   }
 
   void init_repo_schema(pqxx::work &txn, pqxx::connection &pg, const std::string &schema)
@@ -48,10 +48,10 @@ namespace back {
 
     init_folder_table(txn, pg, schema);
     init_unit_table(txn, pg, schema);
-    init_unit_st_tables(txn, pg, schema);
+    init_unit_bl_tables(txn, pg, schema);
   }
 
-  void init_unit_st_tables(pqxx::work &txn, pqxx::connection &pg, const std::string &schema)
+  void init_unit_bl_tables(pqxx::work &txn, pqxx::connection &pg, const std::string &schema)
   {
     const std::string schemaQuoted = pg.quote_name(schema);
 
@@ -59,9 +59,9 @@ namespace back {
       txn.exec("CREATE SCHEMA " + schemaQuoted);
     }
 
-    if (!hasTable(txn, schema, "unit_st")) {
+    if (!hasTable(txn, schema, "unit_bl")) {
       txn.exec("CREATE TABLE " + schemaQuoted +
-               ".unit_st "
+               ".unit_bl "
                "("
                "  id        VARCHAR(32) primary key,"
                "  unit_id   VARCHAR(32) not null,"
@@ -77,16 +77,16 @@ namespace back {
                ")");
     }
 
-    if (!hasIndex(txn, schema, "unit_st_geom")) {
-      txn.exec("CREATE INDEX unit_st_geom ON " + schemaQuoted + ".unit_st USING GIST(geom)");
+    if (!hasIndex(txn, schema, "unit_bl_geom")) {
+      txn.exec("CREATE INDEX unit_bl_geom ON " + schemaQuoted + ".unit_bl USING GIST(geom)");
     }
 
-    ensureCreatedAt(txn, schema, "unit_st");
-    ensureLastModifiedAt(txn, schema, "unit_st");
+    ensureCreatedAt(txn, schema, "unit_bl");
+    ensureLastModifiedAt(txn, schema, "unit_bl");
 
-    if (!hasTable(txn, schema, "unit_st_method")) {
+    if (!hasTable(txn, schema, "unit_bl_method")) {
       txn.exec("CREATE TABLE " + schemaQuoted +
-               ".unit_st_method "
+               ".unit_bl_method "
                "("
                "  id varchar(32) primary key,"
                "  next_unit_id varchar(32),"
@@ -94,26 +94,26 @@ namespace back {
                "  name text"
                ")");
 
-      ensureCreatedAt(txn, schema, "unit_st_method");
-      ensureLastModifiedAt(txn, schema, "unit_st_method");
+      ensureCreatedAt(txn, schema, "unit_bl_method");
+      ensureLastModifiedAt(txn, schema, "unit_bl_method");
     }
 
-    if (!hasTable(txn, schema, "unit_st_method_arg")) {
+    if (!hasTable(txn, schema, "unit_bl_method_arg")) {
       txn.exec("CREATE TABLE " + schemaQuoted +
-               ".unit_st_method_arg "
+               ".unit_bl_method_arg "
                "("
                "  id varchar(32) primary key,"
                "  owner_method_id varchar(32) not null,"
                "  name text"
                ")");
 
-      ensureCreatedAt(txn, schema, "unit_st_method_arg");
-      ensureLastModifiedAt(txn, schema, "unit_st_method_arg");
+      ensureCreatedAt(txn, schema, "unit_bl_method_arg");
+      ensureLastModifiedAt(txn, schema, "unit_bl_method_arg");
     }
 
-    if (!hasTable(txn, schema, "unit_st_field")) {
+    if (!hasTable(txn, schema, "unit_bl_field")) {
       txn.exec("CREATE TABLE " + schemaQuoted +
-               ".unit_st_field "
+               ".unit_bl_field "
                "("
                "  id varchar(32) primary key,"
                "  next_unit_id varchar(32),"
@@ -121,8 +121,8 @@ namespace back {
                "  name text"
                ")");
 
-      ensureCreatedAt(txn, schema, "unit_st_field");
-      ensureLastModifiedAt(txn, schema, "unit_st_field");
+      ensureCreatedAt(txn, schema, "unit_bl_field");
+      ensureLastModifiedAt(txn, schema, "unit_bl_field");
     }
 
 

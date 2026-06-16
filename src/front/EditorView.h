@@ -1,7 +1,7 @@
 #pragma once
 #include "InputField.h"
 #include "back/model/Conn.h"
-#include "back/model/Statement.h"
+#include "back/model/Block.h"
 #include "back/model/Unit.h"
 #include <SDL3/SDL.h>
 #include <string>
@@ -9,7 +9,7 @@
 
 namespace front {
 
-  // One open unit in the editor: its own canvas (statements scoped to this unit)
+  // One open unit in the editor: its own canvas (blocks scoped to this unit)
   // plus an independent camera (pan/zoom remembered per tab).
   struct EditorTab
   {
@@ -23,12 +23,12 @@ namespace front {
     bool   cam_init = false;
     float  last_cw = -1, last_ch = -1;
 
-    std::vector<back::model::Statement> stmts;
+    std::vector<back::model::Block> blocks;
   };
 
   // Tabbed graphical canvas in the right pane. A tab is opened by double-clicking
   // a unit in the tree; tabs are selected with the left button and closed with
-  // the middle button. The canvas shows the active unit's statements within the
+  // the middle button. The canvas shows the active unit's blocks within the
   // visible world rectangle (spatial query), with pan (drag) and zoom (wheel).
   struct EditorView
   {
@@ -44,7 +44,7 @@ namespace front {
     bool  panning = false, panned = false;
     float pan_last_x = 0, pan_last_y = 0;
 
-    // Statement drag (left button).
+    // Block drag (left button).
     bool        dragging = false, drag_moved = false;
     std::string drag_id;
     float       drag_last_x = 0, drag_last_y = 0;
@@ -57,7 +57,7 @@ namespace front {
     // Inline name editing.
     bool                       editing = false;
     std::string                edit_id;
-    back::model::StatementType edit_type = back::model::StatementType::Method;
+    back::model::BlockType edit_type = back::model::BlockType::Method;
     InputField                 edit_field;
     float                      edit_bx = 0, edit_by = 0, edit_bw = 0, edit_bh = 0;
 
@@ -85,7 +85,7 @@ namespace front {
     // Event hooks driven from the main loop.
     void on_wheel(float dy, float mx, float my);
     void on_mouse_move(float mx, float my);
-    void on_mouse_up();                       // left button up: finish a statement drag
+    void on_mouse_up();                       // left button up: finish a block drag
     void on_middle_down(float mx, float my);  // close a tab, or begin panning the canvas
     void on_middle_up();                      // middle button up: finish panning
     bool handle_key(SDL_Keycode key, SDL_Keymod mod);
@@ -94,7 +94,7 @@ namespace front {
   private:
     void init_camera();
     void save_view_state(); // persist the active tab's zoom + offset
-    void start_edit(const back::model::Statement &s, float fbx, float fby, float fbw, float fbh);
+    void start_edit(const back::model::Block &s, float fbx, float fby, float fbw, float fbh);
     void commit_edit();
   };
 
