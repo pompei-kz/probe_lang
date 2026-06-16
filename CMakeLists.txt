@@ -42,6 +42,7 @@ add_executable(probe_lang
         src/back/ProjectTreeService.cpp
         src/back/UnitService.cpp
         src/back/StatementService.cpp
+        src/back/UnitEditorState.cpp
         src/back/CustomId.cpp
         src/back/model/RowChange.h
 )
@@ -70,6 +71,7 @@ add_executable(probe_lang_tests
         src_test/back/TestProjectTreeService.cpp
         src_test/back/TestUnitService.cpp
         src_test/back/TestStatementService.cpp
+        src_test/back/TestUnitEditorState.cpp
         src/back/CustomId.cpp
         src/back/ConnService.cpp
         src/back/UtilDb.cpp
@@ -79,6 +81,7 @@ add_executable(probe_lang_tests
         src/back/ProjectTreeService.cpp
         src/back/UnitService.cpp
         src/back/StatementService.cpp
+        src/back/UnitEditorState.cpp
         src/back/model/RowChange.h
 )
 target_include_directories(probe_lang_tests PRIVATE src)

@@ -2,6 +2,7 @@
 #include "Clr.h"
 #include "FontAtlas.h"
 #include "back/StatementService.h"
+#include "back/UnitEditorState.h"
 #include "render_helpers.h"
 
 #include <algorithm>
@@ -167,21 +168,35 @@ namespace front {
   {
     EditorTab *t = cur();
     if (!t) return;
-    t->zoom         = 1.0;
-    auto [box, err] = statement_bbox_for_unit(t->conn, t->schema, t->unit_id);
-    if (box) {
-      const double mx = (box->min_x + box->max_x) * .5;
-      const double my = (box->min_y + box->max_y) * .5;
-      t->cam_x        = mx - (cw * .5) / t->zoom;
-      t->cam_y        = my - (ch * .5) / t->zoom;
+
+    if (auto saved = load_unit_editor_coord(t->unit_id)) {
+      // Restore the persisted coordinate system for this unit.
+      t->zoom  = std::clamp(saved->zoom, static_cast<double>(ZOOM_MIN), static_cast<double>(ZOOM_MAX));
+      t->cam_x = saved->cam_x;
+      t->cam_y = saved->cam_y;
     } else {
-      t->cam_x = -(cw * .5) / t->zoom;
-      t->cam_y = -(ch * .5) / t->zoom;
+      t->zoom         = 1.0;
+      auto [box, err] = statement_bbox_for_unit(t->conn, t->schema, t->unit_id);
+      if (box) {
+        const double mx = (box->min_x + box->max_x) * .5;
+        const double my = (box->min_y + box->max_y) * .5;
+        t->cam_x        = mx - (cw * .5) / t->zoom;
+        t->cam_y        = my - (ch * .5) / t->zoom;
+      } else {
+        t->cam_x = -(cw * .5) / t->zoom;
+        t->cam_y = -(ch * .5) / t->zoom;
+      }
     }
     t->cam_init = true;
     t->last_cw  = cw;
     t->last_ch  = ch;
     reload();
+  }
+
+  void EditorView::save_view_state()
+  {
+    EditorTab *t = cur();
+    if (t) save_unit_editor_coord(t->unit_id, {t->zoom, t->cam_x, t->cam_y});
   }
 
   void EditorView::reload()
@@ -245,6 +260,7 @@ namespace front {
     t->cam_x            = wx - (mx - cx) / t->zoom;
     t->cam_y            = wy - (my - cy) / t->zoom;
     reload();
+    save_view_state();
   }
 
   void EditorView::on_mouse_move(float mx, float my)
@@ -324,7 +340,10 @@ namespace front {
     if (!open) return;
     if (panning) {
       panning = false;
-      if (panned) reload();
+      if (panned) {
+        reload();
+        save_view_state();
+      }
       panned = false;
     }
   }

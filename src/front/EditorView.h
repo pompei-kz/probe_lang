@@ -93,6 +93,7 @@ namespace front {
 
   private:
     void init_camera();
+    void save_view_state(); // persist the active tab's zoom + offset
     void start_edit(const back::model::Statement &s, float fbx, float fby, float fbw, float fbh);
     void commit_edit();
   };
