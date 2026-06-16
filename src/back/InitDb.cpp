@@ -90,6 +90,7 @@ namespace back {
                "("
                "  id           varchar(32) primary key,"
                "  type         text CHECK (type IN ('Inner','Static','Constructor','Destructor')) default 'Inner',"
+               "  access       text CHECK (access IN ('Public','Protected','Private')) default 'Private',"
                "  next_unit_id varchar(32),"
                "  disabled     bool default false,"
                "  name         text"
