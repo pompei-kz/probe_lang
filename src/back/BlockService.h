@@ -35,6 +35,15 @@ namespace back {
   std::pair<bool, std::string> update_block_name(
       const model::Conn &c, const std::string &schema, const std::string &id, model::BlockType type, const std::string &name);
 
+  // Create one argument of a method block (a unit_bl_method_arg row).
+  // Returns the new id on success (first element empty on failure).
+  std::pair<std::string, std::string> create_method_arg(
+      const model::Conn &c, const std::string &schema, const std::string &owner_method_id, double order_index, const std::string &name);
+
+  // Update a method argument's name (unit_bl_method_arg.name).
+  std::pair<bool, std::string> update_method_arg_name(
+      const model::Conn &c, const std::string &schema, const std::string &id, const std::string &name);
+
   // Update a block's box size (unit_bl.width / height). The geom column is
   // regenerated automatically.
   std::pair<bool, std::string> update_block_size(

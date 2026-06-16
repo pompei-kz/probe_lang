@@ -21,6 +21,10 @@ namespace front {
   // Compact box height: the badge plus equal top/bottom padding (== PAD == left).
   static constexpr float BOX_H = BADGE + 2.f * PAD;
   static constexpr float TAB_H = 30.f;
+  // Below a method's header come the "add argument" (+) row and one row per
+  // argument; ROW_H is the (world-unit) height of each, PLUS_D the +-circle.
+  static constexpr float ROW_H  = FS + 6.f;
+  static constexpr float PLUS_D = 9.f;
 
   // ── unit-type glyph (mirrors the tree's draw_unit_icon) ──────────────────────
   static void draw_unit_icon(SDL_Renderer *r, float x, float yc, UnitType t, Clr c)
@@ -55,10 +59,24 @@ namespace front {
   // ── block box geometry / drawing ─────────────────────────────────────────
   struct BoxGeo
   {
+    float z;             // active zoom (screen px per world unit)
     float bx, by, bw, bh;
     float badge_x, badge_y, badge;
     float nx, ny, nw, nh;
+    // Method-only: the "add argument" (+) circle, in screen coordinates.
+    float plus_cx, plus_cy, plus_r;
   };
+
+  // (World-unit) height of a method box for the given argument count: the
+  // compact header, the + row, one row per argument, plus a bottom margin.
+  static float method_height_for(int n_args) { return BOX_H + ROW_H * (1.f + static_cast<float>(n_args)) + PAD; }
+
+  // (World-unit) height of a block: methods grow to hold their + row and args;
+  // fields stay compact.
+  static float box_height(const Block &s)
+  {
+    return s.type == BlockType::Method ? method_height_for(static_cast<int>(s.args.size())) : BOX_H;
+  }
 
   // Layout is computed at scale 1 (world/unzoomed) and multiplied by the zoom,
   // so the box and everything inside it scale together.
@@ -66,21 +84,32 @@ namespace front {
   {
     const float z = static_cast<float>(e.cur() ? e.cur()->zoom : 1.0);
     BoxGeo      g{};
+    g.z  = z;
     g.bx = e.to_screen_x(s.x);
     g.by = e.to_screen_y(s.y);
     g.bw = s.width * z;
-    g.bh = BOX_H * z; // compact: height hugs the badge with PAD top/bottom
+    g.bh = box_height(s) * z;
 
     g.badge   = BADGE * z;
     g.badge_x = g.bx + PAD * z;
     g.badge_y = g.by + PAD * z; // top padding == PAD == left
 
     g.nx = g.bx + (PAD + BADGE + GAP) * z;
-    g.nh = std::min(g.bh - 6.f, FS + 8.f);
-    g.ny = g.by + (g.bh - g.nh) * .5f;
+    g.nh = std::min(BOX_H * z - 6.f, FS + 8.f);
+    g.ny = g.by + (BOX_H * z - g.nh) * .5f;
     g.nw = std::max(g.bx + g.bw - g.nx - GAP * z, 10.f);
+
+    // The + circle sits in its own row below the argument rows, centred under
+    // the badge.
+    const int n_args = static_cast<int>(s.args.size());
+    g.plus_cx        = g.bx + (PAD + BADGE * .5f) * z;
+    g.plus_cy        = g.by + (BOX_H + ROW_H * static_cast<float>(n_args) + ROW_H * .5f) * z;
+    g.plus_r         = PLUS_D * .5f * z;
     return g;
   }
+
+  // Top (screen y) of argument row `i` for a method box (rows follow the header).
+  static float arg_row_y(const BoxGeo &g, int i) { return g.by + (BOX_H + ROW_H * i) * g.z; }
 
   // Unscaled (world-unit) box width needed to fit `name`: matches box_geo's
   // horizontal layout (left pad + badge + gap + text + right pad).
@@ -88,6 +117,14 @@ namespace front {
   {
     const float w = PAD + BADGE + GAP + text_w(name.c_str()) + GAP;
     return std::max(w, 60.f);
+  }
+
+  // Width needed to fit a block's name and (for methods) every argument name.
+  static float block_fit_width(const Block &s)
+  {
+    float w = fit_width(s.name);
+    for (const MethodArg &a : s.args) w = std::max(w, fit_width(a.name));
+    return w;
   }
 
   static void draw_box(SDL_Renderer *ren, const BoxGeo &g, char letter, const char *name, bool hovered, float scale)
@@ -99,7 +136,88 @@ namespace front {
     const char ls[2] = {letter, '\0'};
     text_draw_scaled(ren, ls, g.badge_x + (g.badge - text_w(ls) * scale) * .5f, center_baseline_scaled(g.badge_y, g.badge, scale), C_PANEL, scale);
 
-    if (name && *name) text_draw_scaled(ren, name, g.nx, center_baseline_scaled(g.by, g.bh, scale), C_TEXT, scale);
+    // Centre the name in the header band (the badge plus its top/bottom pad),
+    // not in the full box — methods extend below with the + row and args.
+    const float header_h = 2.f * (g.badge_y - g.by) + g.badge;
+    if (name && *name) text_draw_scaled(ren, name, g.nx, center_baseline_scaled(g.by, header_h, scale), C_TEXT, scale);
+  }
+
+  // Filled circle via horizontal scanlines (SDL has no circle primitive).
+  static void fill_circle(SDL_Renderer *r, Clr c, float cx, float cy, float rad)
+  {
+    sc(r, c);
+    const int r0 = static_cast<int>(std::ceil(rad));
+    for (int dy = -r0; dy <= r0; dy++) {
+      const float dx = std::sqrt(std::max(0.f, rad * rad - static_cast<float>(dy) * dy));
+      SDL_FRect   line{cx - dx, cy + static_cast<float>(dy), 2.f * dx, 1.f};
+      SDL_RenderFillRect(r, &line);
+    }
+  }
+
+  // The "add argument" control: a +-glyph inside an accent circle.
+  static void draw_plus(SDL_Renderer *ren, const BoxGeo &g, bool hovered)
+  {
+    fill_circle(ren, hovered ? C_HOVER : C_ACCENT, g.plus_cx, g.plus_cy, g.plus_r);
+    const float arm   = g.plus_r * .55f;
+    const float thick = std::max(1.5f, g.plus_r * .28f);
+    fill(ren, C_PANEL, g.plus_cx - arm, g.plus_cy - thick * .5f, 2.f * arm, thick);
+    fill(ren, C_PANEL, g.plus_cx - thick * .5f, g.plus_cy - arm, thick, 2.f * arm);
+  }
+
+  static bool hit_circle(float mx, float my, float cx, float cy, float r)
+  {
+    const float dx = mx - cx, dy = my - cy;
+    return dx * dx + dy * dy <= r * r;
+  }
+
+  // Index of the argument row under the cursor for a method box, or -1.
+  static int arg_row_at(const BoxGeo &g, const Block &s, float mx, float my)
+  {
+    if (s.type != BlockType::Method) return -1;
+    for (int i = 0; i < static_cast<int>(s.args.size()); i++)
+      if (hit(mx, my, g.bx, arg_row_y(g, i), g.bw, ROW_H * g.z)) return i;
+    return -1;
+  }
+
+  // Draw a canvas block: box, per-element hover highlight, badge, name and (for
+  // methods) the argument rows plus the + control. `skip_arg_id`, when
+  // non-empty, is the argument being edited inline (drawn as the input field
+  // instead). hov_name / hov_arg / hov_plus pick which element is highlighted.
+  static void draw_block(SDL_Renderer      *ren,
+                         const BoxGeo      &g,
+                         const Block       &s,
+                         char               letter,
+                         bool               blank_name,
+                         const std::string &skip_arg_id,
+                         bool               hov_name,
+                         int                hov_arg,
+                         bool               hov_plus)
+  {
+    const float z = g.z;
+    fill(ren, C_PANEL, g.bx, g.by, g.bw, g.bh);
+    rect(ren, C_BORDER, g.bx, g.by, g.bw, g.bh);
+
+    // Per-element hover highlight: a full-width band behind the text.
+    if (hov_name) fill(ren, C_HOVER, g.bx + 1.f, g.by + 1.f, g.bw - 2.f, BOX_H * z - 2.f);
+    if (hov_arg >= 0) fill(ren, C_HOVER, g.bx + 1.f, arg_row_y(g, hov_arg), g.bw - 2.f, ROW_H * z);
+
+    // Badge (drawn on top of any highlight).
+    fill(ren, C_ACCENT, g.badge_x, g.badge_y, g.badge, g.badge);
+    const char ls[2] = {letter, '\0'};
+    text_draw_scaled(ren, ls, g.badge_x + (g.badge - text_w(ls) * z) * .5f, center_baseline_scaled(g.badge_y, g.badge, z), C_PANEL, z);
+
+    // Name, centred in the header band.
+    const float header_h = 2.f * (g.badge_y - g.by) + g.badge;
+    if (!blank_name && !s.name.empty())
+      text_draw_scaled(ren, s.name.c_str(), g.nx, center_baseline_scaled(g.by, header_h, z), C_TEXT, z);
+
+    if (s.type != BlockType::Method) return;
+
+    for (int i = 0; i < static_cast<int>(s.args.size()); i++) {
+      if (s.args[i].id == skip_arg_id) continue;
+      text_draw_scaled(ren, s.args[i].name.c_str(), g.nx, center_baseline_scaled(arg_row_y(g, i), ROW_H * z, z), C_TEXT, z);
+    }
+    draw_plus(ren, g, hov_plus);
   }
 
   // ── lifecycle ────────────────────────────────────────────────────────────────
@@ -211,9 +329,11 @@ namespace front {
     t->blocks         = std::move(rows);
   }
 
-  void EditorView::start_edit(const Block &s, float fbx, float fby, float fbw, float fbh)
+  void EditorView::start_edit_name(const Block &s, float fbx, float fby, float fbw, float fbh)
   {
     editing       = true;
+    edit_is_arg   = false;
+    edit_arg_id.clear();
     edit_id       = s.id;
     edit_type     = s.type;
     edit_field.ed = TextEditor{};
@@ -225,17 +345,66 @@ namespace front {
     edit_bh             = fbh;
   }
 
+  void EditorView::start_edit_arg(const Block &m, const MethodArg &a, float fbx, float fby, float fbw, float fbh)
+  {
+    editing       = true;
+    edit_is_arg   = true;
+    edit_arg_id   = a.id;
+    edit_id       = m.id; // owning method (used to resize the box on commit)
+    edit_type     = m.type;
+    edit_field.ed = TextEditor{};
+    edit_field.ed.set(a.name);
+    edit_field.ctx.open = false;
+    edit_bx             = fbx;
+    edit_by             = fby;
+    edit_bw             = fbw;
+    edit_bh             = fbh;
+  }
+
+  void EditorView::add_arg(const Block &m)
+  {
+    EditorTab *t = cur();
+    if (!t) return;
+    const double order_index = static_cast<double>(m.args.size());
+    auto [id, err]           = create_method_arg(t->conn, t->schema, m.id, order_index, "новыйАргумент");
+    if (id.empty()) return;
+    // Resize the box for the extra row and persist before reloading.
+    const float w = std::max(block_fit_width(m), fit_width("новыйАргумент"));
+    const float h = method_height_for(static_cast<int>(m.args.size()) + 1);
+    update_block_size(t->conn, t->schema, m.id, w, h);
+    reload();
+  }
+
   void EditorView::commit_edit()
   {
     if (!editing) return;
     EditorTab *t = cur();
     if (t) {
-      const std::string &name = edit_field.ed.buf;
-      update_block_name(t->conn, t->schema, edit_id, edit_type, name);
-      // Resize the box to fit the new name; height is the compact BOX_H.
-      update_block_size(t->conn, t->schema, edit_id, fit_width(name), BOX_H);
+      const std::string name = edit_field.ed.buf;
+      if (edit_is_arg)
+        update_method_arg_name(t->conn, t->schema, edit_arg_id, name);
+      else
+        update_block_name(t->conn, t->schema, edit_id, edit_type, name);
+
+      // Recompute and persist the owning block's size from in-memory state with
+      // the edit applied (the name just changed may be the widest entry).
+      for (Block &b : t->blocks) {
+        if (b.id != edit_id) continue;
+        if (edit_is_arg) {
+          for (MethodArg &a : b.args)
+            if (a.id == edit_arg_id) {
+              a.name = name;
+              break;
+            }
+        } else {
+          b.name = name;
+        }
+        update_block_size(t->conn, t->schema, b.id, block_fit_width(b), box_height(b));
+        break;
+      }
     }
-    editing = false;
+    editing     = false;
+    edit_is_arg = false;
     reload();
   }
 
@@ -403,7 +572,7 @@ namespace front {
                          e.chooser_wx,
                          e.chooser_wy,
                          fit_width("newMethod"),
-                         BOX_H,
+                         method_height_for(0),
                          "newMethod");
         e.chooser_open = false;
         e.reload();
@@ -498,19 +667,49 @@ namespace front {
 
     // Block boxes.
     for (const Block &s : t->blocks) {
-      BoxGeo     g      = box_geo(*this, s);
-      const bool hov    = !editing && !chooser_open && !tab_clicked && hit(mx, my, g.bx, g.by, g.bw, g.bh);
-      const char letter = s.type == BlockType::Field ? 'F' : 'M';
+      BoxGeo      g            = box_geo(*this, s);
+      const float z            = static_cast<float>(t->zoom);
+      const bool  hov          = !editing && !chooser_open && !tab_clicked && hit(mx, my, g.bx, g.by, g.bw, g.bh);
+      const char  letter       = s.type == BlockType::Field ? 'F' : 'M';
+      const bool  editing_this = editing && s.id == edit_id;
+      const bool  blank_name   = editing_this && !edit_is_arg;
 
-      if (editing && s.id == edit_id) {
-        draw_box(ren, g, letter, "", false, static_cast<float>(t->zoom));
+      // Resolve which sub-element the cursor is over for a precise highlight.
+      bool hov_name = false, hov_plus = false;
+      int  hov_arg = -1;
+      if (hov) {
+        if (s.type == BlockType::Method) {
+          if (hit_circle(mx, my, g.plus_cx, g.plus_cy, g.plus_r))
+            hov_plus = true;
+          else if (int ai = arg_row_at(g, s, mx, my); ai >= 0)
+            hov_arg = ai;
+          else if (hit(mx, my, g.bx, g.by, g.bw, BOX_H * z))
+            hov_name = true;
+        } else {
+          hov_name = true; // a field is a single name row
+        }
+      }
+
+      draw_block(ren, g, s, letter, blank_name, editing_this && edit_is_arg ? edit_arg_id : std::string{}, hov_name, hov_arg, hov_plus);
+
+      if (editing_this) {
         edit_bx = g.nx;
         edit_bw = g.nw;
-        edit_bh = std::min(g.bh - 6.f, FS + 8.f);
-        edit_by = g.by + (g.bh - edit_bh) * .5f;
+        edit_bh = std::min(ROW_H * static_cast<float>(t->zoom) - 2.f, FS + 8.f);
+        if (edit_is_arg) {
+          int ai = 0;
+          for (int i = 0; i < static_cast<int>(s.args.size()); i++)
+            if (s.args[i].id == edit_arg_id) {
+              ai = i;
+              break;
+            }
+          const float ay = arg_row_y(g, ai);
+          edit_by        = ay + (ROW_H * static_cast<float>(t->zoom) - edit_bh) * .5f;
+        } else {
+          edit_bh = std::min(BOX_H * static_cast<float>(t->zoom) - 6.f, FS + 8.f);
+          edit_by = g.by + (BOX_H * static_cast<float>(t->zoom) - edit_bh) * .5f;
+        }
         edit_field.draw(ren, edit_bx, edit_by, edit_bw, edit_bh, true);
-      } else {
-        draw_box(ren, g, letter, s.name.c_str(), hov, static_cast<float>(t->zoom));
       }
     }
 
@@ -538,10 +737,11 @@ namespace front {
       return;
     }
 
-    // Double-click: edit a box's name, or open the chooser on empty canvas.
+    // Double-click: edit an argument, edit a box's name, or open the chooser on
+    // empty canvas.
     if (dbl && hit(mx, my, cx, cy, cw, ch)) {
       const Block *target = nullptr;
-      BoxGeo           tgeo{};
+      BoxGeo       tgeo{};
       for (const Block &s : t->blocks) {
         BoxGeo g = box_geo(*this, s);
         if (hit(mx, my, g.bx, g.by, g.bw, g.bh)) {
@@ -550,9 +750,18 @@ namespace front {
         }
       }
       if (target) {
-        float fbh = std::min(tgeo.bh - 6.f, FS + 8.f);
-        float fby = tgeo.by + (tgeo.bh - fbh) * .5f;
-        start_edit(*target, tgeo.nx, fby, tgeo.nw, fbh);
+        const int ai = arg_row_at(tgeo, *target, mx, my);
+        if (ai >= 0) {
+          const float ay  = arg_row_y(tgeo, ai);
+          const float fbh = std::min(ROW_H * tgeo.z - 2.f, FS + 8.f);
+          const float fby = ay + (ROW_H * tgeo.z - fbh) * .5f;
+          start_edit_arg(*target, target->args[ai], tgeo.nx, fby, tgeo.nw, fbh);
+        } else if (hit(mx, my, tgeo.bx, tgeo.by, tgeo.bw, BOX_H * tgeo.z)) {
+          const float fbh = std::min(BOX_H * tgeo.z - 6.f, FS + 8.f);
+          const float fby = tgeo.by + (BOX_H * tgeo.z - fbh) * .5f;
+          start_edit_name(*target, tgeo.nx, fby, tgeo.nw, fbh);
+        }
+        // A double-click on the + row falls through without editing.
       } else {
         chooser_open = true;
         chooser_wx   = static_cast<float>(to_world_x(mx));
@@ -564,20 +773,28 @@ namespace front {
       return;
     }
 
-    // Single click on a block begins dragging it (canvas is panned with the
-    // middle button instead).
+    // Single click on a method's + adds an argument; otherwise a click on a
+    // block begins dragging it (the canvas is panned with the middle button).
     if (ldown && hit(mx, my, cx, cy, cw, ch)) {
       const Block *target = nullptr;
+      BoxGeo       tgeo{};
       for (const Block &s : t->blocks) {
         BoxGeo g = box_geo(*this, s);
-        if (hit(mx, my, g.bx, g.by, g.bw, g.bh)) target = &s; // last hit wins (topmost)
+        if (hit(mx, my, g.bx, g.by, g.bw, g.bh)) {
+          target = &s; // last hit wins (topmost)
+          tgeo   = g;
+        }
       }
       if (target) {
-        dragging    = true;
-        drag_moved  = false;
-        drag_id     = target->id;
-        drag_last_x = mx;
-        drag_last_y = my;
+        if (target->type == BlockType::Method && hit_circle(mx, my, tgeo.plus_cx, tgeo.plus_cy, tgeo.plus_r)) {
+          add_arg(*target);
+        } else {
+          dragging    = true;
+          drag_moved  = false;
+          drag_id     = target->id;
+          drag_last_x = mx;
+          drag_last_y = my;
+        }
       }
     }
 

@@ -45,6 +45,29 @@ namespace back {
         s.name    = row[7].c_str();
         out.push_back(std::move(s));
       }
+
+      // Attach method arguments. One query for the whole unit (joined through
+      // unit_bl), then distributed to the in-view method blocks by owner id.
+      if (hasTable(txn, schema, "unit_bl_method_arg")) {
+        pqxx::result args = txn.exec_params(
+            "SELECT a.id, a.owner_method_id, a.name "
+            "FROM " + qs + ".unit_bl_method_arg a "
+            "JOIN " + qs + ".unit_bl s ON s.id = a.owner_method_id "
+            "WHERE s.unit_id = $1 "
+            "ORDER BY a.owner_method_id, a.order_index, a.id",
+            unit_id);
+        for (const pqxx::row &row : args) {
+          const std::string owner = row[1].c_str();
+          for (Block &b : out) {
+            if (b.id != owner) continue;
+            MethodArg a{};
+            a.id   = row[0].c_str();
+            a.name = row[2].c_str();
+            b.args.push_back(std::move(a));
+            break;
+          }
+        }
+      }
       return {std::move(out), ""};
     } catch (const pqxx::sql_error &e) {
       return {{}, sql_err_msg(e)};
@@ -115,6 +138,48 @@ namespace back {
       return {"", sql_err_msg(e)};
     } catch (const std::exception &e) {
       return {"", e.what()};
+    }
+  }
+
+  std::pair<std::string, std::string> create_method_arg(
+      const Conn &c, const std::string &schema, const std::string &owner_method_id, double order_index, const std::string &name)
+  {
+    try {
+      pqxx::connection pg(make_cs(c));
+      pqxx::work       txn(pg);
+
+      // Create the unit_bl tables in case the repo predates this feature.
+      init_unit_bl_tables(txn, pg, schema);
+
+      const std::string id = new_id();
+      txn.exec_params("INSERT INTO " + pg.quote_name(schema) +
+                          ".unit_bl_method_arg (id, owner_method_id, order_index, name) VALUES ($1, $2, $3, $4)",
+                      id,
+                      owner_method_id,
+                      order_index,
+                      name);
+      txn.commit();
+      return {id, ""};
+    } catch (const pqxx::sql_error &e) {
+      return {"", sql_err_msg(e)};
+    } catch (const std::exception &e) {
+      return {"", e.what()};
+    }
+  }
+
+  std::pair<bool, std::string> update_method_arg_name(
+      const Conn &c, const std::string &schema, const std::string &id, const std::string &name)
+  {
+    try {
+      pqxx::connection pg(make_cs(c));
+      pqxx::work       txn(pg);
+      txn.exec_params("UPDATE " + pg.quote_name(schema) + ".unit_bl_method_arg SET name = $1 WHERE id = $2", name, id);
+      txn.commit();
+      return {true, ""};
+    } catch (const pqxx::sql_error &e) {
+      return {false, sql_err_msg(e)};
+    } catch (const std::exception &e) {
+      return {false, e.what()};
     }
   }
 

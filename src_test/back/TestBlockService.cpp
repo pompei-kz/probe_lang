@@ -284,3 +284,63 @@ TEST_F(BlockServiceTest, UpdateBlockPositionPersists)
   EXPECT_FLOAT_EQ(blocks[0].x, 123);
   EXPECT_FLOAT_EQ(blocks[0].y, 456);
 }
+
+// ---------------------------------------------------------------------------
+// create_method_arg / update_method_arg_name / arg loading
+// ---------------------------------------------------------------------------
+
+TEST_F(BlockServiceTest, CreateMethodArgInsertsRow)
+{
+  make_schema();
+  auto [mid, mmsg] = create_block(conn(), schema, "u1", BlockType::Method, 0, 0, 50, 20, "m");
+  ASSERT_FALSE(mid.empty()) << mmsg;
+
+  //
+  //
+  auto [aid, amsg] = create_method_arg(conn(), schema, mid, 0, "arg0");
+  //
+  //
+
+  ASSERT_FALSE(aid.empty()) << amsg;
+  EXPECT_EQ(detail_name("unit_bl_method_arg", aid), "arg0");
+}
+
+TEST_F(BlockServiceTest, LoadAttachesArgsToMethodsInOrder)
+{
+  make_schema();
+  auto [mid, mmsg] = create_block(conn(), schema, "u1", BlockType::Method, 0, 0, 50, 20, "m");
+  ASSERT_FALSE(mid.empty()) << mmsg;
+  // Insert out of order; load must sort by order_index.
+  ASSERT_FALSE(create_method_arg(conn(), schema, mid, 1, "second").first.empty());
+  ASSERT_FALSE(create_method_arg(conn(), schema, mid, 0, "first").first.empty());
+
+  //
+  //
+  auto [blocks, err] = load_blocks_in_view(conn(), schema, "u1", -1000, -1000, 1000, 1000);
+  //
+  //
+
+  ASSERT_TRUE(err.empty()) << err;
+  ASSERT_EQ(blocks.size(), 1u);
+  ASSERT_EQ(blocks[0].args.size(), 2u);
+  EXPECT_EQ(blocks[0].args[0].name, "first");
+  EXPECT_EQ(blocks[0].args[1].name, "second");
+}
+
+TEST_F(BlockServiceTest, UpdateMethodArgNamePersists)
+{
+  make_schema();
+  auto [mid, mmsg] = create_block(conn(), schema, "u1", BlockType::Method, 0, 0, 50, 20, "m");
+  ASSERT_FALSE(mid.empty()) << mmsg;
+  auto [aid, amsg] = create_method_arg(conn(), schema, mid, 0, "old");
+  ASSERT_FALSE(aid.empty()) << amsg;
+
+  //
+  //
+  auto [ok, err] = update_method_arg_name(conn(), schema, aid, "renamed");
+  //
+  //
+
+  ASSERT_TRUE(ok) << err;
+  EXPECT_EQ(detail_name("unit_bl_method_arg", aid), "renamed");
+}

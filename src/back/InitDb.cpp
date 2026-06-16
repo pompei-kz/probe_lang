@@ -104,6 +104,7 @@ namespace back {
                "("
                "  id varchar(32) primary key,"
                "  owner_method_id varchar(32) not null,"
+               "  order_index float8 not null,"
                "  name text"
                ")");
 

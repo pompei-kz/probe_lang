@@ -54,12 +54,15 @@ namespace front {
     float chooser_wx = 0, chooser_wy = 0; // world coords of the remembered click
     float chooser_sx = 0, chooser_sy = 0; // screen coords for the popup
 
-    // Inline name editing.
-    bool                       editing = false;
-    std::string                edit_id;
+    // Inline name editing. When edit_is_arg is set the field edits a method
+    // argument (edit_arg_id); edit_id then holds the owning method's block id.
+    bool                   editing = false;
+    std::string            edit_id;
     back::model::BlockType edit_type = back::model::BlockType::Method;
-    InputField                 edit_field;
-    float                      edit_bx = 0, edit_by = 0, edit_bw = 0, edit_bh = 0;
+    bool                   edit_is_arg = false;
+    std::string            edit_arg_id;
+    InputField             edit_field;
+    float                  edit_bx = 0, edit_by = 0, edit_bw = 0, edit_bh = 0;
 
     // Open a unit (focus its tab if already open, else add a new one).
     void open_for(const back::model::Conn &c, const std::string &schema, const std::string &uid, const std::string &uname, back::model::UnitType utype);
@@ -94,7 +97,9 @@ namespace front {
   private:
     void init_camera();
     void save_view_state(); // persist the active tab's zoom + offset
-    void start_edit(const back::model::Block &s, float fbx, float fby, float fbw, float fbh);
+    void start_edit_name(const back::model::Block &s, float fbx, float fby, float fbw, float fbh);
+    void start_edit_arg(const back::model::Block &m, const back::model::MethodArg &a, float fbx, float fby, float fbw, float fbh);
+    void add_arg(const back::model::Block &m);  // append a new argument, persist, resize
     void commit_edit();
   };
 
