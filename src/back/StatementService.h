@@ -26,15 +26,15 @@ namespace back {
 
   // Create a statement: a unit_st row plus its unit_st_method / unit_st_field
   // detail row. Returns the new id on success (first element empty on failure).
-  std::pair<std::string, std::string> create_statement(const model::Conn  &c,
-                                                        const std::string  &schema,
-                                                        const std::string  &unit_id,
-                                                        model::StatementType type,
-                                                        float                x,
-                                                        float                y,
-                                                        float                width,
-                                                        float                height,
-                                                        const std::string  &name);
+  std::pair<std::string, std::string> create_statement(const model::Conn   &c,
+                                                       const std::string   &schema,
+                                                       const std::string   &unit_id,
+                                                       model::StatementType type,
+                                                       float                x,
+                                                       float                y,
+                                                       float                width,
+                                                       float                height,
+                                                       const std::string   &name);
 
   // Update a statement's name in its detail table (chosen by `type`).
   std::pair<bool, std::string> update_statement_name(
@@ -44,5 +44,9 @@ namespace back {
   // regenerated automatically.
   std::pair<bool, std::string> update_statement_size(
       const model::Conn &c, const std::string &schema, const std::string &id, float width, float height);
+
+  // Update a statement's top-left position (unit_st.x / y). The geom column is
+  // regenerated automatically.
+  std::pair<bool, std::string> update_statement_position(const model::Conn &c, const std::string &schema, const std::string &id, float x, float y);
 
 } // namespace back

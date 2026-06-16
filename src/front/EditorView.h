@@ -40,9 +40,14 @@ namespace front {
     float px = 0, py = 0, pw = 0, ph = 0;
     float cx = 0, cy = 0, cw = 0, ch = 0;
 
-    // Pan drag.
+    // Pan drag (middle button).
     bool  panning = false, panned = false;
     float pan_last_x = 0, pan_last_y = 0;
+
+    // Statement drag (left button).
+    bool        dragging = false, drag_moved = false;
+    std::string drag_id;
+    float       drag_last_x = 0, drag_last_y = 0;
 
     // Type-chooser popup (double-click on empty canvas).
     bool  chooser_open = false;
@@ -80,8 +85,9 @@ namespace front {
     // Event hooks driven from the main loop.
     void on_wheel(float dy, float mx, float my);
     void on_mouse_move(float mx, float my);
-    void on_mouse_up();
-    void on_middle_down(float mx, float my); // close the tab under the cursor
+    void on_mouse_up();                       // left button up: finish a statement drag
+    void on_middle_down(float mx, float my);  // close a tab, or begin panning the canvas
+    void on_middle_up();                      // middle button up: finish panning
     bool handle_key(SDL_Keycode key, SDL_Keymod mod);
     void handle_text(const char *t);
 

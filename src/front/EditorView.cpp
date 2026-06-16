@@ -252,7 +252,25 @@ namespace front {
     if (!open) return;
     if (editing) edit_field.on_move(mx);
     EditorTab *t = cur();
-    if (panning && t) {
+    if (!t) return;
+
+    if (dragging) {
+      const float dx = mx - drag_last_x;
+      const float dy = my - drag_last_y;
+      if (dx != 0 || dy != 0) {
+        for (Statement &s : t->stmts)
+          if (s.id == drag_id) {
+            s.x += static_cast<float>(dx / t->zoom);
+            s.y += static_cast<float>(dy / t->zoom);
+            break;
+          }
+        drag_moved = true;
+      }
+      drag_last_x = mx;
+      drag_last_y = my;
+    }
+
+    if (panning) {
       const float dx = mx - pan_last_x;
       const float dy = my - pan_last_y;
       if (dx != 0 || dy != 0) {
@@ -269,10 +287,18 @@ namespace front {
   {
     if (!open) return;
     if (editing) edit_field.on_release();
-    if (panning) {
-      panning = false;
-      if (panned) reload();
-      panned = false;
+    if (dragging) {
+      EditorTab *t = cur();
+      if (t && drag_moved) {
+        for (const Statement &s : t->stmts)
+          if (s.id == drag_id) {
+            update_statement_position(t->conn, t->schema, s.id, s.x, s.y);
+            break;
+          }
+        reload();
+      }
+      dragging   = false;
+      drag_moved = false;
     }
   }
 
@@ -280,7 +306,27 @@ namespace front {
   {
     if (!open) return;
     int i = tab_at(mx, my);
-    if (i >= 0) close_tab(i);
+    if (i >= 0) {
+      close_tab(i);
+      return;
+    }
+    // Middle-drag pans the canvas.
+    if (hit(mx, my, cx, cy, cw, ch)) {
+      panning    = true;
+      panned     = false;
+      pan_last_x = mx;
+      pan_last_y = my;
+    }
+  }
+
+  void EditorView::on_middle_up()
+  {
+    if (!open) return;
+    if (panning) {
+      panning = false;
+      if (panned) reload();
+      panned = false;
+    }
   }
 
   bool EditorView::handle_key(SDL_Keycode key, SDL_Keymod mod)
@@ -497,12 +543,21 @@ namespace front {
       return;
     }
 
-    // Single click on the canvas begins a pan.
+    // Single click on a statement begins dragging it (canvas is panned with the
+    // middle button instead).
     if (ldown && hit(mx, my, cx, cy, cw, ch)) {
-      panning    = true;
-      panned     = false;
-      pan_last_x = mx;
-      pan_last_y = my;
+      const Statement *target = nullptr;
+      for (const Statement &s : t->stmts) {
+        BoxGeo g = box_geo(*this, s);
+        if (hit(mx, my, g.bx, g.by, g.bw, g.bh)) target = &s; // last hit wins (topmost)
+      }
+      if (target) {
+        dragging    = true;
+        drag_moved  = false;
+        drag_id     = target->id;
+        drag_last_x = mx;
+        drag_last_y = my;
+      }
     }
 
     SDL_SetRenderClipRect(ren, nullptr);

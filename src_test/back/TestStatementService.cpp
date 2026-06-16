@@ -260,3 +260,27 @@ TEST_F(StatementServiceTest, UpdateStatementSizePersists)
   EXPECT_FLOAT_EQ(stmts[0].width, 222);
   EXPECT_FLOAT_EQ(stmts[0].height, 33);
 }
+
+// ---------------------------------------------------------------------------
+// update_statement_position
+// ---------------------------------------------------------------------------
+
+TEST_F(StatementServiceTest, UpdateStatementPositionPersists)
+{
+  make_schema();
+  auto [id, msg] = create_statement(conn(), schema, "u1", StatementType::Method, 0, 0, 50, 20, "m");
+  ASSERT_FALSE(id.empty()) << msg;
+
+  //
+  //
+  auto [ok, err] = update_statement_position(conn(), schema, id, 123, 456);
+  //
+  //
+
+  ASSERT_TRUE(ok) << err;
+  auto [stmts, lerr] = load_statements_in_view(conn(), schema, "u1", 100, 400, 200, 500);
+  ASSERT_TRUE(lerr.empty()) << lerr;
+  ASSERT_EQ(stmts.size(), 1u);
+  EXPECT_FLOAT_EQ(stmts[0].x, 123);
+  EXPECT_FLOAT_EQ(stmts[0].y, 456);
+}

@@ -151,4 +151,20 @@ namespace back {
     }
   }
 
+  std::pair<bool, std::string> update_statement_position(
+      const Conn &c, const std::string &schema, const std::string &id, float x, float y)
+  {
+    try {
+      pqxx::connection pg(make_cs(c));
+      pqxx::work       txn(pg);
+      txn.exec_params("UPDATE " + pg.quote_name(schema) + ".unit_st SET x = $1, y = $2 WHERE id = $3", x, y, id);
+      txn.commit();
+      return {true, ""};
+    } catch (const pqxx::sql_error &e) {
+      return {false, sql_err_msg(e)};
+    } catch (const std::exception &e) {
+      return {false, e.what()};
+    }
+  }
+
 } // namespace back

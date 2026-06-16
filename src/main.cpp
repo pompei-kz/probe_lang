@@ -106,6 +106,7 @@ int main(int /*argc*/, char * /*argv*/[])
             if (app.unit_dlg.open) app.unit_dlg.name_field.on_release();
             if (app.editor.open) app.editor.on_mouse_up();
           }
+          if (ev.button.button == SDL_BUTTON_MIDDLE && app.editor.open) app.editor.on_middle_up();
           break;
 
         case SDL_EVENT_MOUSE_WHEEL:
