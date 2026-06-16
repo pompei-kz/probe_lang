@@ -453,35 +453,40 @@ namespace front {
       return;
     }
 
-    // Build the menu: a deactivate/activate toggle, then the method-type group,
-    // then the access group. "* " marks the current value (not selectable);
-    // "-> " marks a value the item would switch to.
+    // Build the menu: the method-type group, then the access group, then the
+    // deactivate/activate toggle at the bottom. A dot marks the current value
+    // (shown normally, but not selectable); the other values have no marker.
     enum { ACT_TOGGLE, ACT_INNER, ACT_STATIC, ACT_CTOR, ACT_DTOR, ACT_PRIVATE, ACT_PROTECTED, ACT_PUBLIC };
+    enum Mark { MARK_NONE, MARK_CURRENT, MARK_SWITCH };
     struct Item
     {
       std::string label;
-      bool        enabled;
       bool        sep;
-      int         action;
+      int         action; // -1 for separators
+      Mark        mark;
     };
-    auto mark = [](bool current, const char *name) { return std::string(current ? "* " : "-> ") + name; };
+    auto grp = [](bool current, const char *name, int action) {
+      return Item{name, false, action, current ? MARK_CURRENT : MARK_SWITCH};
+    };
 
     std::vector<Item> items;
-    items.push_back({m->disabled ? "Активировать" : "Деактивировать", true, false, ACT_TOGGLE});
-    items.push_back({"", false, true, -1});
-    items.push_back({mark(m->method_type == MethodType::Inner, "Внутренний"), m->method_type != MethodType::Inner, false, ACT_INNER});
-    items.push_back({mark(m->method_type == MethodType::Static, "Статичный"), m->method_type != MethodType::Static, false, ACT_STATIC});
-    items.push_back({mark(m->method_type == MethodType::Constructor, "Конструктор"), m->method_type != MethodType::Constructor, false, ACT_CTOR});
-    items.push_back({mark(m->method_type == MethodType::Destructor, "Деструктор"), m->method_type != MethodType::Destructor, false, ACT_DTOR});
-    items.push_back({"", false, true, -1});
-    items.push_back({mark(m->access == MethodAccess::Private, "Приватный"), m->access != MethodAccess::Private, false, ACT_PRIVATE});
-    items.push_back({mark(m->access == MethodAccess::Protected, "Защищённый"), m->access != MethodAccess::Protected, false, ACT_PROTECTED});
-    items.push_back({mark(m->access == MethodAccess::Public, "Всеобщий"), m->access != MethodAccess::Public, false, ACT_PUBLIC});
+    items.push_back(grp(m->method_type == MethodType::Inner, "Внутренний", ACT_INNER));
+    items.push_back(grp(m->method_type == MethodType::Static, "Статичный", ACT_STATIC));
+    items.push_back(grp(m->method_type == MethodType::Constructor, "Конструктор", ACT_CTOR));
+    items.push_back(grp(m->method_type == MethodType::Destructor, "Деструктор", ACT_DTOR));
+    items.push_back({"", true, -1, MARK_NONE});
+    items.push_back(grp(m->access == MethodAccess::Private, "Приватный", ACT_PRIVATE));
+    items.push_back(grp(m->access == MethodAccess::Protected, "Защищённый", ACT_PROTECTED));
+    items.push_back(grp(m->access == MethodAccess::Public, "Всеобщий", ACT_PUBLIC));
+    items.push_back({"", true, -1, MARK_NONE});
+    items.push_back({m->disabled ? "Активировать" : "Деактивировать", false, ACT_TOGGLE, MARK_NONE});
 
-    constexpr float IH = 24.f, SEP_H = 7.f, PADX = 12.f;
-    float           w = 120.f;
+    // A marker gutter on the left keeps every label aligned, marked or not.
+    constexpr float IH = 24.f, SEP_H = 7.f, PADX = 10.f, GUTTER = 16.f;
+    const float     label_x = PADX + GUTTER;
+    float           w       = 120.f;
     for (const Item &it : items)
-      if (!it.sep) w = std::max(w, text_w(it.label.c_str()) + 2.f * PADX);
+      if (!it.sep) w = std::max(w, label_x + text_w(it.label.c_str()) + PADX);
     float h = 4.f;
     for (const Item &it : items) h += it.sep ? SEP_H : IH;
 
@@ -505,9 +510,14 @@ namespace front {
         iy += SEP_H;
         continue;
       }
-      const bool hov = it.enabled && hit(mx, my, ox, iy, w, IH);
+      const bool selectable = it.mark != MARK_CURRENT; // the current value can't be re-picked
+      const bool hov        = selectable && hit(mx, my, ox, iy, w, IH);
       if (hov) fill(ren, C_HOVER, ox + 1.f, iy, w - 2.f, IH);
-      text_draw(ren, it.label.c_str(), ox + PADX, center_baseline(iy, IH), it.enabled ? C_TEXT : C_DIM);
+
+      if (it.mark == MARK_CURRENT)
+        fill_circle(ren, C_ACCENT, ox + PADX + GUTTER * .5f, iy + IH * .5f, 3.f);
+
+      text_draw(ren, it.label.c_str(), ox + label_x, center_baseline(iy, IH), C_TEXT);
       if (ldown && hov) chosen = it.action;
       iy += IH;
     }
