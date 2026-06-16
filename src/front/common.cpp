@@ -248,8 +248,18 @@ namespace front {
   }
 
   // Render a list of units (leaf rows, no caret) at the given indentation depth.
-  static void render_unit_list(
-      SDL_Renderer *ren, App &app, std::vector<Unit> &units, int ci, int ri, int depth, int &row, float pw, float ph, bool click, bool rclick)
+  static void render_unit_list(SDL_Renderer      *ren,
+                               App               &app,
+                               std::vector<Unit> &units,
+                               int                ci,
+                               int                ri,
+                               int                depth,
+                               int               &row,
+                               float              pw,
+                               float              ph,
+                               bool               click,
+                               bool               rclick,
+                               bool               dblclick)
   {
     static constexpr float STEP   = 14.f;
     const std::string     &conn   = app.conns[ci].conn.name;
@@ -271,6 +281,7 @@ namespace front {
       SDL_RenderFillRect(ren, &sl);
 
       if ((click || rclick) && h_row) app.sel_key = ukey;
+      if (dblclick && h_row) app.editor.open_for(app.conns[ci].conn, schema, unit.id, unit.name);
       if (rclick && h_row) {
         float mx2            = std::min(app.mx, pw - UnitMenu::W - 2.f);
         float my2            = std::min(app.my, ph - UnitMenu::N * UnitMenu::IH - 10.f);
@@ -347,7 +358,7 @@ namespace front {
       row++;
       if (folder.open) {
         render_folder_list(ren, app, folder.children, ci, ri, path, depth + 1, row, pw, ph, click, rclick, dblclick);
-        render_unit_list(ren, app, folder.units, ci, ri, depth + 1, row, pw, ph, click, rclick);
+        render_unit_list(ren, app, folder.units, ci, ri, depth + 1, row, pw, ph, click, rclick, dblclick);
       }
     }
   }
@@ -493,7 +504,7 @@ namespace front {
           row++;
           if (repo.open) {
             render_folder_list(ren, app, repo.folders, i, ri, {node.conn.name, repo.schema_name}, 0, row, pw, ph, click, rclick, dblclick);
-            render_unit_list(ren, app, repo.units, i, ri, 0, row, pw, ph, click, rclick);
+            render_unit_list(ren, app, repo.units, i, ri, 0, row, pw, ph, click, rclick, dblclick);
           }
         }
       }

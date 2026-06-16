@@ -1,6 +1,7 @@
 #pragma once
 #include "ConfirmDlg.h"
 #include "Dlg.h"
+#include "EditorView.h"
 #include "FolderMenu.h"
 #include "FormEditFolder.h"
 #include "FormEditRepository.h"
@@ -29,6 +30,7 @@ namespace front {
     FormEditUnit                       unit_dlg;
     MsgDlg                             msg_dlg;
     ConfirmDlg                         confirm_dlg;
+    EditorView                         editor;
 
     int         pending_delete_idx         = -1; // connection
     int         pending_delete_folder_conn = -1; // folder

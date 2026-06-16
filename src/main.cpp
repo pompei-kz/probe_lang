@@ -47,6 +47,10 @@ int main(int /*argc*/, char * /*argv*/[])
     float l_click_x = 0, l_click_y = 0, r_click_x = 0, r_click_y = 0;
     int   l_clicks = 1;
 
+    auto any_dlg = [&] {
+      return app.dlg.open || app.repo_dlg.open || app.folder_dlg.open || app.unit_dlg.open || app.msg_dlg.open || app.confirm_dlg.open;
+    };
+
     SDL_Event ev;
     while (SDL_PollEvent(&ev)) {
       switch (ev.type) {
@@ -68,6 +72,7 @@ int main(int /*argc*/, char * /*argv*/[])
           }
           if (app.folder_dlg.open && app.lmb_held) app.folder_dlg.name_field.on_move(ev.motion.x);
           if (app.unit_dlg.open && app.lmb_held) app.unit_dlg.name_field.on_move(ev.motion.x);
+          if (app.editor.open) app.editor.on_mouse_move(ev.motion.x, ev.motion.y);
           break;
 
         case SDL_EVENT_MOUSE_BUTTON_DOWN:
@@ -98,11 +103,15 @@ int main(int /*argc*/, char * /*argv*/[])
             }
             if (app.folder_dlg.open) app.folder_dlg.name_field.on_release();
             if (app.unit_dlg.open) app.unit_dlg.name_field.on_release();
+            if (app.editor.open) app.editor.on_mouse_up();
           }
           break;
 
         case SDL_EVENT_MOUSE_WHEEL:
-          if (app.repo_dlg.open && app.repo_dlg.err_view.mouse_over(app.mx, app.my)) app.repo_dlg.err_view.on_scroll(ev.wheel.y);
+          if (app.repo_dlg.open && app.repo_dlg.err_view.mouse_over(app.mx, app.my))
+            app.repo_dlg.err_view.on_scroll(ev.wheel.y);
+          else if (app.editor.open && !any_dlg())
+            app.editor.on_wheel(ev.wheel.y, app.mx, app.my);
           break;
 
         case SDL_EVENT_TEXT_INPUT:
@@ -114,6 +123,8 @@ int main(int /*argc*/, char * /*argv*/[])
             app.folder_dlg.name_field.handle_text(ev.text.text);
           else if (app.unit_dlg.open)
             app.unit_dlg.name_field.handle_text(ev.text.text);
+          else if (app.editor.editing)
+            app.editor.handle_text(ev.text.text);
           break;
 
         case SDL_EVENT_KEY_DOWN:
@@ -179,6 +190,11 @@ int main(int /*argc*/, char * /*argv*/[])
               app.unit_dlg.open = false;
               SDL_StopTextInput(app.win);
             }
+          } else if (app.editor.editing) {
+            SDL_Keymod mod = ev.key.mod;
+            app.editor.handle_key(ev.key.key, mod);
+          } else if (app.editor.open && ev.key.key == SDLK_ESCAPE) {
+            app.editor.close();
           } else {
             // No dialog open: tree/menu keyboard navigation.
             panel_key_down(app, ev.key.key);
@@ -198,6 +214,24 @@ int main(int /*argc*/, char * /*argv*/[])
 
     float pw = app.ww * 0.30f;
     fill(app.ren, C_BG, pw, 0, app.ww - pw, static_cast<float>(app.wh));
+
+    if (app.editor.open) {
+      bool       editor_clicks = !any_dlg();
+      static bool prev_editing = false;
+      app.editor.render(app.ren,
+                        pw,
+                        0,
+                        app.ww - pw,
+                        static_cast<float>(app.wh),
+                        app.mx,
+                        app.my,
+                        editor_clicks && l_click,
+                        editor_clicks && r_click,
+                        l_clicks);
+      if (app.editor.editing && !prev_editing) SDL_StartTextInput(app.win);
+      if (!app.editor.editing && prev_editing) SDL_StopTextInput(app.win);
+      prev_editing = app.editor.editing;
+    }
 
     if (app.dlg.open) {
       DlgMouse dm;
