@@ -88,10 +88,11 @@ namespace back {
       txn.exec("CREATE TABLE " + schemaQuoted +
                ".unit_bl_method "
                "("
-               "  id varchar(32) primary key,"
+               "  id           varchar(32) primary key,"
+               "  type         text CHECK (type IN ('Inner','Static','Constructor','Destructor')) default 'Inner',"
                "  next_unit_id varchar(32),"
-               "  disabled bool default false,"
-               "  name text"
+               "  disabled     bool default false,"
+               "  name         text"
                ")");
 
       ensureCreatedAt(txn, schema, "unit_bl_method");
