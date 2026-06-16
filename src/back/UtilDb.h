@@ -30,4 +30,13 @@ namespace back {
    */
   bool hasTable(pqxx::work &txn, const std::string &schemaName, const std::string &tableName);
 
+  /**
+   * Проверяет существование указанного индекса в указанной схеме
+   * @param txn Транзакция
+   * @param schemaName Имя указанной схемы
+   * @param indexName Имя указанного индекса
+   * @return Признак наличия данного индекса
+   */
+  bool hasIndex(pqxx::work &txn, const std::string &schemaName, const std::string &indexName);
+
 } // namespace back

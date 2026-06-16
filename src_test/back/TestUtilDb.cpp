@@ -398,3 +398,82 @@ TEST_F(UtilDbTest, HasTableFalseForMissingSchema)
   //
   EXPECT_FALSE(result);
 }
+
+// ---------------------------------------------------------------------------
+// hasIndex
+// ---------------------------------------------------------------------------
+
+TEST_F(UtilDbTest, HasIndexTrueForExistingIndex)
+{
+  create_table("t", "id int, val text");
+  {
+    pqxx::work txn(*pg);
+    txn.exec("CREATE INDEX t_val_idx ON " + qual("t") + " (val)");
+    txn.commit();
+  }
+
+  pqxx::work txn(*pg);
+  //
+  //
+  const bool result = hasIndex(txn, schema, "t_val_idx");
+  //
+  //
+  EXPECT_TRUE(result);
+}
+
+TEST_F(UtilDbTest, HasIndexFalseForMissingIndex)
+{
+  create_table("t", "id int, val text");
+
+  pqxx::work txn(*pg);
+  //
+  //
+  const bool result = hasIndex(txn, schema, "no_such_index");
+  //
+  //
+  EXPECT_FALSE(result);
+}
+
+TEST_F(UtilDbTest, HasIndexFalseWhenIndexInDifferentSchema)
+{
+  // The index lives in `schema`, so it must not be found via `public`.
+  create_table("t", "id int, val text");
+  {
+    pqxx::work txn(*pg);
+    txn.exec("CREATE INDEX t_val_idx ON " + qual("t") + " (val)");
+    txn.commit();
+  }
+
+  pqxx::work txn(*pg);
+  //
+  //
+  const bool result = hasIndex(txn, "public", "t_val_idx");
+  //
+  //
+  EXPECT_FALSE(result);
+}
+
+TEST_F(UtilDbTest, HasIndexTrueForPrimaryKeyIndex)
+{
+  // A PRIMARY KEY creates an implicit index named "<table>_pkey".
+  create_table("t", "id int primary key, val text");
+
+  pqxx::work txn(*pg);
+  //
+  //
+  const bool result = hasIndex(txn, schema, "t_pkey");
+  //
+  //
+  EXPECT_TRUE(result);
+}
+
+TEST_F(UtilDbTest, HasIndexFalseForMissingSchema)
+{
+  pqxx::work txn(*pg);
+  //
+  //
+  const bool result = hasIndex(txn, schema + "_does_not_exist", "t_val_idx");
+  //
+  //
+  EXPECT_FALSE(result);
+}

@@ -45,4 +45,13 @@ namespace back {
     return !check.empty();
   }
 
+  bool hasIndex(pqxx::work &txn, const std::string &schemaName, const std::string &indexName)
+  {
+    pqxx::result check = txn.exec_params("SELECT 1 FROM pg_indexes "
+                                         "WHERE schemaname = $1 AND indexname = $2 LIMIT 1",
+                                         schemaName,
+                                         indexName);
+    return !check.empty();
+  }
+
 } // namespace back

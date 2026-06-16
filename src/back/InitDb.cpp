@@ -30,6 +30,8 @@ namespace back {
     txn.exec("CREATE TABLE IF NOT EXISTS " + schemaQuote + ".unit " + UNIT_TABLE_DEF);
     ensureCreatedAt(txn, schema, "unit");
     ensureLastModifiedAt(txn, schema, "unit");
+
+    init_unit_st_tables(txn, pg, schema);
   }
 
   void init_repo_schema(pqxx::work &txn, pqxx::connection &pg, const std::string &schema)
@@ -46,10 +48,10 @@ namespace back {
 
     init_folder_table(txn, pg, schema);
     init_unit_table(txn, pg, schema);
-    init_unit_st_table(txn, pg, schema);
+    init_unit_st_tables(txn, pg, schema);
   }
 
-  void init_unit_st_table(pqxx::work &txn, pqxx::connection &pg, const std::string &schema)
+  void init_unit_st_tables(pqxx::work &txn, pqxx::connection &pg, const std::string &schema)
   {
     const std::string schemaQuoted = pg.quote_name(schema);
 
@@ -62,7 +64,8 @@ namespace back {
                ".unit_st "
                "("
                "  id        VARCHAR(32) primary key,"
-               "  unit_type VARCHAR(150) not null,"
+               "  unit_id   VARCHAR(32) not null,"
+               "  type VARCHAR(150) not null,"
                "  x         FLOAT4 not null,"
                "  y         FLOAT4 not null,"
                "  width     FLOAT4 not null,"
@@ -72,14 +75,16 @@ namespace back {
                "    ST_MakeEnvelope(x, y, x + width, y + height, 0)"
                "  ) STORED"
                ")");
-
-      txn.exec("CREATE INDEX unit_st_geom ON " + schemaQuoted + ".unit_st USING GIST(geom)");
-
-      ensureCreatedAt(txn, schema, "unit_st");
-      ensureLastModifiedAt(txn, schema, "unit_st");
     }
 
-    if (!hasTable(txn, schema, "unit_st")) {
+    if (!hasIndex(txn, schema, "unit_st_geom")) {
+      txn.exec("CREATE INDEX unit_st_geom ON " + schemaQuoted + ".unit_st USING GIST(geom)");
+    }
+
+    ensureCreatedAt(txn, schema, "unit_st");
+    ensureLastModifiedAt(txn, schema, "unit_st");
+
+    if (!hasTable(txn, schema, "unit_st_method")) {
       txn.exec("CREATE TABLE " + schemaQuoted +
                ".unit_st_method "
                "("
@@ -93,7 +98,7 @@ namespace back {
       ensureLastModifiedAt(txn, schema, "unit_st_method");
     }
 
-    if (!hasTable(txn, schema, "unit_st")) {
+    if (!hasTable(txn, schema, "unit_st_field")) {
       txn.exec("CREATE TABLE " + schemaQuoted +
                ".unit_st_field "
                "("
