@@ -26,7 +26,7 @@ namespace back {
     return os.str();
   }
 
-  void save_unit_editor_coord(const std::string &unit_id, const EditorCoordState &st)
+  void save_unit_editor_coord(const std::string &unit_id, const model::EditorCoordState &st)
   {
     const fs::path dir = unit_editor_sys_coord_dir();
     std::error_code ec;
@@ -39,12 +39,12 @@ namespace back {
       << "cam_y=" << fmt(st.cam_y) << '\n';
   }
 
-  std::optional<EditorCoordState> load_unit_editor_coord(const std::string &unit_id)
+  std::optional<model::EditorCoordState> load_unit_editor_coord(const std::string &unit_id)
   {
     std::ifstream f(unit_editor_sys_coord_dir() / unit_id);
     if (!f) return std::nullopt;
 
-    EditorCoordState st;
+    model::EditorCoordState st;
     std::string      line;
     while (std::getline(f, line)) {
       const auto eq = line.find('=');

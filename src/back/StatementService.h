@@ -1,4 +1,5 @@
 #pragma once
+#include "model/BBox.h"
 #include "model/Conn.h"
 #include "model/Statement.h"
 #include <optional>
@@ -8,12 +9,6 @@
 
 namespace back {
 
-  // Axis-aligned bounding box in world coordinates.
-  struct BBox
-  {
-    float min_x, min_y, max_x, max_y;
-  };
-
   // Load the statements of one unit whose geometry intersects the given world
   // rectangle. Uses the GIST index on unit_st.geom (the `&&` bbox operator).
   // Returns an empty list (no error) when the unit_st table is absent.
@@ -21,8 +16,8 @@ namespace back {
       const model::Conn &c, const std::string &schema, const std::string &unit_id, float min_x, float min_y, float max_x, float max_y);
 
   // Bounding box covering all statements of one unit, or nullopt if it has none.
-  // Used to centre the editor camera when it first opens.
-  std::pair<std::optional<BBox>, std::string> statement_bbox_for_unit(const model::Conn &c, const std::string &schema, const std::string &unit_id);
+  // Used to center the editor camera when it first opens.
+  std::pair<std::optional<model::BBox>, std::string> statement_bbox_for_unit(const model::Conn &c, const std::string &schema, const std::string &unit_id);
 
   // Create a statement: a unit_st row plus its unit_st_method / unit_st_field
   // detail row. Returns the new id on success (first element empty on failure).
