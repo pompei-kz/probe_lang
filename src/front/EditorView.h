@@ -99,7 +99,8 @@ namespace front {
     void save_view_state(); // persist the active tab's zoom + offset
     void start_edit_name(const back::model::Block &s, float fbx, float fby, float fbw, float fbh);
     void start_edit_arg(const back::model::Block &m, const back::model::MethodArg &a, float fbx, float fby, float fbw, float fbh);
-    void add_arg(const back::model::Block &m);  // append a new argument, persist, resize
+    void add_arg(const back::model::Block &m);                   // append a new argument, persist, resize
+    void del_arg(const back::model::Block &m, const std::string &arg_id); // delete an argument, persist, resize
     void commit_edit();
   };
 

@@ -154,16 +154,26 @@ namespace front {
     }
   }
 
-  // The "add argument" control: a +-glyph inside an accent circle. On hover the
-  // circle darkens slightly (a dimmed accent, not the near-black panel hover).
-  static void draw_plus(SDL_Renderer *ren, const BoxGeo &g, bool hovered)
+  // A small round +/- control inside an accent circle. `plus` adds the vertical
+  // bar. On hover the circle darkens slightly (a dimmed accent, not the
+  // near-black panel hover).
+  static void draw_round_btn(SDL_Renderer *ren, float cx, float cy, float r, bool plus, bool hovered)
   {
     constexpr Clr C_ACCENT_HOV{0x6f, 0x90, 0xc8}; // ~0.8 * C_ACCENT
-    fill_circle(ren, hovered ? C_ACCENT_HOV : C_ACCENT, g.plus_cx, g.plus_cy, g.plus_r);
-    const float arm   = g.plus_r * .55f;
-    const float thick = std::max(1.5f, g.plus_r * .28f);
-    fill(ren, C_PANEL, g.plus_cx - arm, g.plus_cy - thick * .5f, 2.f * arm, thick);
-    fill(ren, C_PANEL, g.plus_cx - thick * .5f, g.plus_cy - arm, thick, 2.f * arm);
+    fill_circle(ren, hovered ? C_ACCENT_HOV : C_ACCENT, cx, cy, r);
+    const float arm   = r * .55f;
+    const float thick = std::max(1.5f, r * .28f);
+    fill(ren, C_PANEL, cx - arm, cy - thick * .5f, 2.f * arm, thick);
+    if (plus) fill(ren, C_PANEL, cx - thick * .5f, cy - arm, thick, 2.f * arm);
+  }
+
+  // Centre + radius (screen) of the delete (−) control for argument row `i`. It
+  // sits in the same left column as the + control, beside the argument's name.
+  static void arg_minus(const BoxGeo &g, int i, float &cx, float &cy, float &r)
+  {
+    cx = g.plus_cx;
+    cy = arg_row_y(g, i) + ROW_H * g.z * .5f;
+    r  = PLUS_D * .5f * g.z;
   }
 
   static bool hit_circle(float mx, float my, float cx, float cy, float r)
@@ -181,10 +191,23 @@ namespace front {
     return -1;
   }
 
+  // Index of the argument whose − (delete) control is under the cursor, or -1.
+  static int arg_minus_at(const BoxGeo &g, const Block &s, float mx, float my)
+  {
+    if (s.type != BlockType::Method) return -1;
+    for (int i = 0; i < static_cast<int>(s.args.size()); i++) {
+      float cx, cy, r;
+      arg_minus(g, i, cx, cy, r);
+      if (hit_circle(mx, my, cx, cy, r)) return i;
+    }
+    return -1;
+  }
+
   // Draw a canvas block: box, per-element hover highlight, badge, name and (for
-  // methods) the argument rows plus the + control. `skip_arg_id`, when
-  // non-empty, is the argument being edited inline (drawn as the input field
-  // instead). hov_name / hov_arg / hov_plus pick which element is highlighted.
+  // methods) the argument rows (each with a − delete control) plus the + control.
+  // `skip_arg_id`, when non-empty, is the argument being edited inline (drawn as
+  // the input field instead). hov_name / hov_arg / hov_plus / hov_minus pick
+  // which element is highlighted.
   static void draw_block(SDL_Renderer      *ren,
                          const BoxGeo      &g,
                          const Block       &s,
@@ -193,7 +216,8 @@ namespace front {
                          const std::string &skip_arg_id,
                          bool               hov_name,
                          int                hov_arg,
-                         bool               hov_plus)
+                         bool               hov_plus,
+                         int                hov_minus)
   {
     const float z = g.z;
     fill(ren, C_PANEL, g.bx, g.by, g.bw, g.bh);
@@ -218,8 +242,11 @@ namespace front {
     for (int i = 0; i < static_cast<int>(s.args.size()); i++) {
       if (s.args[i].id == skip_arg_id) continue;
       text_draw_scaled(ren, s.args[i].name.c_str(), g.nx, center_baseline_scaled(arg_row_y(g, i), ROW_H * z, z), C_TEXT, z);
+      float cx, cy, r;
+      arg_minus(g, i, cx, cy, r);
+      draw_round_btn(ren, cx, cy, r, false, hov_minus == i);
     }
-    draw_plus(ren, g, hov_plus);
+    draw_round_btn(ren, g.plus_cx, g.plus_cy, g.plus_r, true, hov_plus);
   }
 
   // ── lifecycle ────────────────────────────────────────────────────────────────
@@ -374,6 +401,24 @@ namespace front {
     const float w = std::max(block_fit_width(m), fit_width("новыйАргумент"));
     const float h = method_height_for(static_cast<int>(m.args.size()) + 1);
     update_block_size(t->conn, t->schema, m.id, w, h);
+    reload();
+  }
+
+  void EditorView::del_arg(const Block &m, const std::string &arg_id)
+  {
+    EditorTab *t = cur();
+    if (!t) return;
+    auto [ok, err] = delete_method_arg(t->conn, t->schema, arg_id);
+    if (!ok) return;
+    // Recompute the box size from the remaining arguments and persist.
+    float w         = fit_width(m.name);
+    int   remaining = 0;
+    for (const MethodArg &a : m.args) {
+      if (a.id == arg_id) continue;
+      w = std::max(w, fit_width(a.name));
+      remaining++;
+    }
+    update_block_size(t->conn, t->schema, m.id, w, method_height_for(remaining));
     reload();
   }
 
@@ -678,11 +723,13 @@ namespace front {
 
       // Resolve which sub-element the cursor is over for a precise highlight.
       bool hov_name = false, hov_plus = false;
-      int  hov_arg = -1;
+      int  hov_arg = -1, hov_minus = -1;
       if (hov) {
         if (s.type == BlockType::Method) {
           if (hit_circle(mx, my, g.plus_cx, g.plus_cy, g.plus_r))
             hov_plus = true;
+          else if (int mi = arg_minus_at(g, s, mx, my); mi >= 0)
+            hov_minus = mi;
           else if (int ai = arg_row_at(g, s, mx, my); ai >= 0)
             hov_arg = ai;
           else if (hit(mx, my, g.bx, g.by, g.bw, BOX_H * z))
@@ -692,7 +739,8 @@ namespace front {
         }
       }
 
-      draw_block(ren, g, s, letter, blank_name, editing_this && edit_is_arg ? edit_arg_id : std::string{}, hov_name, hov_arg, hov_plus);
+      draw_block(
+          ren, g, s, letter, blank_name, editing_this && edit_is_arg ? edit_arg_id : std::string{}, hov_name, hov_arg, hov_plus, hov_minus);
 
       if (editing_this) {
         edit_bx = g.nx;
@@ -788,7 +836,10 @@ namespace front {
         }
       }
       if (target) {
-        if (target->type == BlockType::Method && hit_circle(mx, my, tgeo.plus_cx, tgeo.plus_cy, tgeo.plus_r)) {
+        int minus_i = arg_minus_at(tgeo, *target, mx, my);
+        if (minus_i >= 0) {
+          del_arg(*target, target->args[minus_i].id);
+        } else if (target->type == BlockType::Method && hit_circle(mx, my, tgeo.plus_cx, tgeo.plus_cy, tgeo.plus_r)) {
           add_arg(*target);
         } else {
           dragging    = true;

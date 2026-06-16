@@ -344,3 +344,25 @@ TEST_F(BlockServiceTest, UpdateMethodArgNamePersists)
   ASSERT_TRUE(ok) << err;
   EXPECT_EQ(detail_name("unit_bl_method_arg", aid), "renamed");
 }
+
+TEST_F(BlockServiceTest, DeleteMethodArgRemovesRow)
+{
+  make_schema();
+  auto [mid, mmsg] = create_block(conn(), schema, "u1", BlockType::Method, 0, 0, 50, 20, "m");
+  ASSERT_FALSE(mid.empty()) << mmsg;
+  auto [aid, amsg] = create_method_arg(conn(), schema, mid, 0, "doomed");
+  ASSERT_FALSE(aid.empty()) << amsg;
+
+  //
+  //
+  auto [ok, err] = delete_method_arg(conn(), schema, aid);
+  //
+  //
+
+  ASSERT_TRUE(ok) << err;
+  EXPECT_EQ(detail_name("unit_bl_method_arg", aid), "");
+  auto [blocks, lerr] = load_blocks_in_view(conn(), schema, "u1", -1000, -1000, 1000, 1000);
+  ASSERT_TRUE(lerr.empty()) << lerr;
+  ASSERT_EQ(blocks.size(), 1u);
+  EXPECT_TRUE(blocks[0].args.empty());
+}

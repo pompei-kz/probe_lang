@@ -44,6 +44,9 @@ namespace back {
   std::pair<bool, std::string> update_method_arg_name(
       const model::Conn &c, const std::string &schema, const std::string &id, const std::string &name);
 
+  // Delete one method argument (unit_bl_method_arg row) by id.
+  std::pair<bool, std::string> delete_method_arg(const model::Conn &c, const std::string &schema, const std::string &id);
+
   // Update a block's box size (unit_bl.width / height). The geom column is
   // regenerated automatically.
   std::pair<bool, std::string> update_block_size(

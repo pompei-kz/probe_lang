@@ -183,6 +183,21 @@ namespace back {
     }
   }
 
+  std::pair<bool, std::string> delete_method_arg(const Conn &c, const std::string &schema, const std::string &id)
+  {
+    try {
+      pqxx::connection pg(make_cs(c));
+      pqxx::work       txn(pg);
+      txn.exec_params("DELETE FROM " + pg.quote_name(schema) + ".unit_bl_method_arg WHERE id = $1", id);
+      txn.commit();
+      return {true, ""};
+    } catch (const pqxx::sql_error &e) {
+      return {false, sql_err_msg(e)};
+    } catch (const std::exception &e) {
+      return {false, e.what()};
+    }
+  }
+
   std::pair<bool, std::string> update_block_name(
       const Conn &c, const std::string &schema, const std::string &id, BlockType type, const std::string &name)
   {
