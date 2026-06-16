@@ -54,6 +54,11 @@ namespace front {
     float chooser_wx = 0, chooser_wy = 0; // world coords of the remembered click
     float chooser_sx = 0, chooser_sy = 0; // screen coords for the popup
 
+    // Method context menu (right-click on a method's name).
+    bool        method_menu_open = false;
+    std::string method_menu_id; // block id of the method the menu acts on
+    float       method_menu_x = 0, method_menu_y = 0; // screen position
+
     // Inline name editing. When edit_is_arg is set the field edits a method
     // argument (edit_arg_id); edit_id then holds the owning method's block id.
     bool                   editing = false;
@@ -102,6 +107,7 @@ namespace front {
     void add_arg(const back::model::Block &m);                   // append a new argument, persist, resize
     void del_arg(const back::model::Block &m, const std::string &arg_id); // delete an argument, persist, resize
     void commit_edit();
+    void draw_method_menu(SDL_Renderer *ren, float mx, float my, bool ldown, bool rdown); // method context menu
   };
 
 } // namespace front

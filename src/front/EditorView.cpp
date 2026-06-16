@@ -154,13 +154,18 @@ namespace front {
     }
   }
 
-  // A small round +/- control inside an accent circle. `plus` adds the vertical
+  // Darken a colour by factor `f` (keeps alpha). Used for hover states.
+  static Clr scale_clr(Clr c, float f)
+  {
+    return Clr{static_cast<Uint8>(c.r * f), static_cast<Uint8>(c.g * f), static_cast<Uint8>(c.b * f), c.a};
+  }
+
+  // A small round +/- control inside `accent` circle. `plus` adds the vertical
   // bar. On hover the circle darkens slightly (a dimmed accent, not the
   // near-black panel hover).
-  static void draw_round_btn(SDL_Renderer *ren, float cx, float cy, float r, bool plus, bool hovered)
+  static void draw_round_btn(SDL_Renderer *ren, float cx, float cy, float r, bool plus, bool hovered, Clr accent)
   {
-    constexpr Clr C_ACCENT_HOV{0x6f, 0x90, 0xc8}; // ~0.8 * C_ACCENT
-    fill_circle(ren, hovered ? C_ACCENT_HOV : C_ACCENT, cx, cy, r);
+    fill_circle(ren, hovered ? scale_clr(accent, .8f) : accent, cx, cy, r);
     const float arm   = r * .55f;
     const float thick = std::max(1.5f, r * .28f);
     fill(ren, C_PANEL, cx - arm, cy - thick * .5f, 2.f * arm, thick);
@@ -220,6 +225,11 @@ namespace front {
                          int                hov_minus)
   {
     const float z = g.z;
+    // A deactivated method renders dim and monochrome.
+    const bool disabled = s.type == BlockType::Method && s.disabled;
+    const Clr  accent   = disabled ? C_DIM : C_ACCENT;
+    const Clr  txt      = disabled ? C_DIM : C_TEXT;
+
     fill(ren, C_PANEL, g.bx, g.by, g.bw, g.bh);
     rect(ren, C_BORDER, g.bx, g.by, g.bw, g.bh);
 
@@ -228,25 +238,25 @@ namespace front {
     if (hov_arg >= 0) fill(ren, C_HOVER, g.bx + 1.f, arg_row_y(g, hov_arg), g.bw - 2.f, ROW_H * z);
 
     // Badge (drawn on top of any highlight).
-    fill(ren, C_ACCENT, g.badge_x, g.badge_y, g.badge, g.badge);
+    fill(ren, accent, g.badge_x, g.badge_y, g.badge, g.badge);
     const char ls[2] = {letter, '\0'};
     text_draw_scaled(ren, ls, g.badge_x + (g.badge - text_w(ls) * z) * .5f, center_baseline_scaled(g.badge_y, g.badge, z), C_PANEL, z);
 
     // Name, centred in the header band.
     const float header_h = 2.f * (g.badge_y - g.by) + g.badge;
     if (!blank_name && !s.name.empty())
-      text_draw_scaled(ren, s.name.c_str(), g.nx, center_baseline_scaled(g.by, header_h, z), C_TEXT, z);
+      text_draw_scaled(ren, s.name.c_str(), g.nx, center_baseline_scaled(g.by, header_h, z), txt, z);
 
     if (s.type != BlockType::Method) return;
 
     for (int i = 0; i < static_cast<int>(s.args.size()); i++) {
       if (s.args[i].id == skip_arg_id) continue;
-      text_draw_scaled(ren, s.args[i].name.c_str(), g.nx, center_baseline_scaled(arg_row_y(g, i), ROW_H * z, z), C_TEXT, z);
+      text_draw_scaled(ren, s.args[i].name.c_str(), g.nx, center_baseline_scaled(arg_row_y(g, i), ROW_H * z, z), txt, z);
       float cx, cy, r;
       arg_minus(g, i, cx, cy, r);
-      draw_round_btn(ren, cx, cy, r, false, hov_minus == i);
+      draw_round_btn(ren, cx, cy, r, false, hov_minus == i, accent);
     }
-    draw_round_btn(ren, g.plus_cx, g.plus_cy, g.plus_r, true, hov_plus);
+    draw_round_btn(ren, g.plus_cx, g.plus_cy, g.plus_r, true, hov_plus, accent);
   }
 
   // ── lifecycle ────────────────────────────────────────────────────────────────
@@ -271,6 +281,7 @@ namespace front {
     editing      = false;
     chooser_open = false;
     panning      = false;
+    method_menu_open = false;
   }
 
   void EditorView::close()
@@ -279,6 +290,7 @@ namespace front {
     editing      = false;
     chooser_open = false;
     panning      = false;
+    method_menu_open = false;
   }
 
   void EditorView::close_tab(int i)
@@ -288,6 +300,7 @@ namespace front {
     editing      = false;
     chooser_open = false;
     panning      = false;
+    method_menu_open = false;
     if (tabs.empty()) {
       active = -1;
       open   = false;
@@ -419,6 +432,99 @@ namespace front {
       remaining++;
     }
     update_block_size(t->conn, t->schema, m.id, w, method_height_for(remaining));
+    reload();
+  }
+
+  void EditorView::draw_method_menu(SDL_Renderer *ren, float mx, float my, bool ldown, bool rdown)
+  {
+    EditorTab *t = cur();
+    if (!t) {
+      method_menu_open = false;
+      return;
+    }
+    const Block *m = nullptr;
+    for (const Block &b : t->blocks)
+      if (b.id == method_menu_id && b.type == BlockType::Method) {
+        m = &b;
+        break;
+      }
+    if (!m) {
+      method_menu_open = false;
+      return;
+    }
+
+    // Build the menu: a deactivate/activate toggle, then the method-type group,
+    // then the access group. "* " marks the current value (not selectable);
+    // "-> " marks a value the item would switch to.
+    enum { ACT_TOGGLE, ACT_INNER, ACT_STATIC, ACT_CTOR, ACT_DTOR, ACT_PRIVATE, ACT_PROTECTED, ACT_PUBLIC };
+    struct Item
+    {
+      std::string label;
+      bool        enabled;
+      bool        sep;
+      int         action;
+    };
+    auto mark = [](bool current, const char *name) { return std::string(current ? "* " : "-> ") + name; };
+
+    std::vector<Item> items;
+    items.push_back({m->disabled ? "Активировать" : "Деактивировать", true, false, ACT_TOGGLE});
+    items.push_back({"", false, true, -1});
+    items.push_back({mark(m->method_type == MethodType::Inner, "Внутренний"), m->method_type != MethodType::Inner, false, ACT_INNER});
+    items.push_back({mark(m->method_type == MethodType::Static, "Статичный"), m->method_type != MethodType::Static, false, ACT_STATIC});
+    items.push_back({mark(m->method_type == MethodType::Constructor, "Конструктор"), m->method_type != MethodType::Constructor, false, ACT_CTOR});
+    items.push_back({mark(m->method_type == MethodType::Destructor, "Деструктор"), m->method_type != MethodType::Destructor, false, ACT_DTOR});
+    items.push_back({"", false, true, -1});
+    items.push_back({mark(m->access == MethodAccess::Private, "Приватный"), m->access != MethodAccess::Private, false, ACT_PRIVATE});
+    items.push_back({mark(m->access == MethodAccess::Protected, "Защищённый"), m->access != MethodAccess::Protected, false, ACT_PROTECTED});
+    items.push_back({mark(m->access == MethodAccess::Public, "Всеобщий"), m->access != MethodAccess::Public, false, ACT_PUBLIC});
+
+    constexpr float IH = 24.f, SEP_H = 7.f, PADX = 12.f;
+    float           w = 120.f;
+    for (const Item &it : items)
+      if (!it.sep) w = std::max(w, text_w(it.label.c_str()) + 2.f * PADX);
+    float h = 4.f;
+    for (const Item &it : items) h += it.sep ? SEP_H : IH;
+
+    const float ox = std::clamp(method_menu_x, cx, cx + cw - w);
+    const float oy = std::clamp(method_menu_y, cy, cy + ch - h);
+
+    // A click outside the menu dismisses it.
+    if ((ldown || rdown) && !hit(mx, my, ox, oy, w, h)) {
+      method_menu_open = false;
+      return;
+    }
+
+    fill(ren, C_DLGBG, ox, oy, w, h);
+    rect(ren, C_BORDER, ox, oy, w, h);
+
+    int   chosen = -1;
+    float iy     = oy + 2.f;
+    for (const Item &it : items) {
+      if (it.sep) {
+        fill(ren, C_BORDER, ox + 6.f, iy + SEP_H * .5f, w - 12.f, 1.f);
+        iy += SEP_H;
+        continue;
+      }
+      const bool hov = it.enabled && hit(mx, my, ox, iy, w, IH);
+      if (hov) fill(ren, C_HOVER, ox + 1.f, iy, w - 2.f, IH);
+      text_draw(ren, it.label.c_str(), ox + PADX, center_baseline(iy, IH), it.enabled ? C_TEXT : C_DIM);
+      if (ldown && hov) chosen = it.action;
+      iy += IH;
+    }
+
+    if (chosen < 0) return;
+
+    switch (chosen) {
+      case ACT_TOGGLE: update_method_disabled(t->conn, t->schema, m->id, !m->disabled); break;
+      case ACT_INNER: update_method_type(t->conn, t->schema, m->id, MethodType::Inner); break;
+      case ACT_STATIC: update_method_type(t->conn, t->schema, m->id, MethodType::Static); break;
+      case ACT_CTOR: update_method_type(t->conn, t->schema, m->id, MethodType::Constructor); break;
+      case ACT_DTOR: update_method_type(t->conn, t->schema, m->id, MethodType::Destructor); break;
+      case ACT_PRIVATE: update_method_access(t->conn, t->schema, m->id, MethodAccess::Private); break;
+      case ACT_PROTECTED: update_method_access(t->conn, t->schema, m->id, MethodAccess::Protected); break;
+      case ACT_PUBLIC: update_method_access(t->conn, t->schema, m->id, MethodAccess::Public); break;
+    }
+    method_menu_open = false;
     reload();
   }
 
@@ -674,9 +780,10 @@ namespace front {
     if (ldown && hovered_tab >= 0) {
       if (editing) commit_edit();
       if (hovered_tab != active) {
-        active       = hovered_tab;
-        chooser_open = false;
-        panning      = false;
+        active           = hovered_tab;
+        chooser_open     = false;
+        method_menu_open = false;
+        panning          = false;
       }
       tab_clicked = true;
     }
@@ -772,6 +879,27 @@ namespace front {
         else
           commit_edit();
       }
+      SDL_SetRenderClipRect(ren, nullptr);
+      return;
+    }
+
+    // Method context menu: open on right-click over a method's name header.
+    if (!method_menu_open && rdown && !chooser_open && !tab_clicked && hit(mx, my, cx, cy, cw, ch)) {
+      const Block *target = nullptr;
+      for (const Block &s : t->blocks) {
+        BoxGeo g = box_geo(*this, s);
+        if (s.type == BlockType::Method && hit(mx, my, g.bx, g.by, g.bw, BOX_H * static_cast<float>(t->zoom))) target = &s;
+      }
+      if (target) {
+        method_menu_open = true;
+        method_menu_id   = target->id;
+        method_menu_x    = mx;
+        method_menu_y    = my;
+      }
+    }
+
+    if (method_menu_open) {
+      draw_method_menu(ren, mx, my, ldown && !tab_clicked, rdown);
       SDL_SetRenderClipRect(ren, nullptr);
       return;
     }

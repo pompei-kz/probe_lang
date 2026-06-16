@@ -100,6 +100,12 @@ namespace back {
       ensureLastModifiedAt(txn, schema, "unit_bl_method");
     }
 
+    // Migrate older unit_bl_method tables that predate these columns.
+    const std::string qMethod = schemaQuoted + ".unit_bl_method";
+    txn.exec("ALTER TABLE " + qMethod + " ADD COLUMN IF NOT EXISTS type text default 'Inner'");
+    txn.exec("ALTER TABLE " + qMethod + " ADD COLUMN IF NOT EXISTS access text default 'Private'");
+    txn.exec("ALTER TABLE " + qMethod + " ADD COLUMN IF NOT EXISTS disabled bool default false");
+
     if (!hasTable(txn, schema, "unit_bl_method_arg")) {
       txn.exec("CREATE TABLE " + schemaQuoted +
                ".unit_bl_method_arg "

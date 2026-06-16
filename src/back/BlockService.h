@@ -47,6 +47,11 @@ namespace back {
   // Delete one method argument (unit_bl_method_arg row) by id.
   std::pair<bool, std::string> delete_method_arg(const model::Conn &c, const std::string &schema, const std::string &id);
 
+  // Update method-only attributes (unit_bl_method.disabled / type / access).
+  std::pair<bool, std::string> update_method_disabled(const model::Conn &c, const std::string &schema, const std::string &id, bool disabled);
+  std::pair<bool, std::string> update_method_type(const model::Conn &c, const std::string &schema, const std::string &id, model::MethodType type);
+  std::pair<bool, std::string> update_method_access(const model::Conn &c, const std::string &schema, const std::string &id, model::MethodAccess access);
+
   // Update a block's box size (unit_bl.width / height). The geom column is
   // regenerated automatically.
   std::pair<bool, std::string> update_block_size(

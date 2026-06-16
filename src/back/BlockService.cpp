@@ -20,7 +20,10 @@ namespace back {
       const std::string qs = pg.quote_name(schema);
       pqxx::result      rows =
           txn.exec_params("SELECT s.id, s.unit_id, s.type, s.x, s.y, s.width, s.height, "
-                          "       COALESCE(m.name, f.name, '') "
+                          "       COALESCE(m.name, f.name, ''), "
+                          "       COALESCE(m.disabled, false), "
+                          "       COALESCE(m.type, 'Inner'), "
+                          "       COALESCE(m.access, 'Private') "
                           "FROM " + qs + ".unit_bl s "
                           "LEFT JOIN " + qs + ".unit_bl_method m ON m.id = s.id "
                           "LEFT JOIN " + qs + ".unit_bl_field  f ON f.id = s.id "
@@ -35,14 +38,17 @@ namespace back {
       out.reserve(rows.size());
       for (const pqxx::row &row : rows) {
         Block s{};
-        s.id      = row[0].c_str();
-        s.unit_id = row[1].c_str();
-        s.type    = block_type_from_string(row[2].c_str());
-        s.x       = row[3].as<float>();
-        s.y       = row[4].as<float>();
-        s.width   = row[5].as<float>();
-        s.height  = row[6].as<float>();
-        s.name    = row[7].c_str();
+        s.id          = row[0].c_str();
+        s.unit_id     = row[1].c_str();
+        s.type        = block_type_from_string(row[2].c_str());
+        s.x           = row[3].as<float>();
+        s.y           = row[4].as<float>();
+        s.width       = row[5].as<float>();
+        s.height      = row[6].as<float>();
+        s.name        = row[7].c_str();
+        s.disabled    = row[8].as<bool>();
+        s.method_type = method_type_from_string(row[9].c_str());
+        s.access      = method_access_from_string(row[10].c_str());
         out.push_back(std::move(s));
       }
 
@@ -196,6 +202,39 @@ namespace back {
     } catch (const std::exception &e) {
       return {false, e.what()};
     }
+  }
+
+  // Helper: UPDATE one unit_bl_method column for a single method id.
+  static std::pair<bool, std::string> update_method_column(
+      const Conn &c, const std::string &schema, const std::string &id, const std::string &column, const std::string &value)
+  {
+    try {
+      pqxx::connection pg(make_cs(c));
+      pqxx::work       txn(pg);
+      // `column` is a fixed internal literal, never user input.
+      txn.exec_params("UPDATE " + pg.quote_name(schema) + ".unit_bl_method SET " + column + " = $1 WHERE id = $2", value, id);
+      txn.commit();
+      return {true, ""};
+    } catch (const pqxx::sql_error &e) {
+      return {false, sql_err_msg(e)};
+    } catch (const std::exception &e) {
+      return {false, e.what()};
+    }
+  }
+
+  std::pair<bool, std::string> update_method_disabled(const Conn &c, const std::string &schema, const std::string &id, bool disabled)
+  {
+    return update_method_column(c, schema, id, "disabled", disabled ? "true" : "false");
+  }
+
+  std::pair<bool, std::string> update_method_type(const Conn &c, const std::string &schema, const std::string &id, MethodType type)
+  {
+    return update_method_column(c, schema, id, "type", to_string(type));
+  }
+
+  std::pair<bool, std::string> update_method_access(const Conn &c, const std::string &schema, const std::string &id, MethodAccess access)
+  {
+    return update_method_column(c, schema, id, "access", to_string(access));
   }
 
   std::pair<bool, std::string> update_block_name(

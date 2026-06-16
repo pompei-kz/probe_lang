@@ -366,3 +366,51 @@ TEST_F(BlockServiceTest, DeleteMethodArgRemovesRow)
   ASSERT_EQ(blocks.size(), 1u);
   EXPECT_TRUE(blocks[0].args.empty());
 }
+
+// ---------------------------------------------------------------------------
+// method attributes: disabled / type / access
+// ---------------------------------------------------------------------------
+
+TEST_F(BlockServiceTest, NewMethodHasDefaultAttributes)
+{
+  make_schema();
+  ASSERT_FALSE(create_block(conn(), schema, "u1", BlockType::Method, 0, 0, 50, 20, "m").first.empty());
+
+  //
+  //
+  auto [blocks, err] = load_blocks_in_view(conn(), schema, "u1", -1000, -1000, 1000, 1000);
+  //
+  //
+
+  ASSERT_TRUE(err.empty()) << err;
+  ASSERT_EQ(blocks.size(), 1u);
+  EXPECT_FALSE(blocks[0].disabled);
+  EXPECT_EQ(blocks[0].method_type, MethodType::Inner);
+  EXPECT_EQ(blocks[0].access, MethodAccess::Private);
+}
+
+TEST_F(BlockServiceTest, UpdateMethodAttributesPersist)
+{
+  make_schema();
+  auto [mid, mmsg] = create_block(conn(), schema, "u1", BlockType::Method, 0, 0, 50, 20, "m");
+  ASSERT_FALSE(mid.empty()) << mmsg;
+
+  //
+  //
+  auto disabled = update_method_disabled(conn(), schema, mid, true);
+  auto type     = update_method_type(conn(), schema, mid, MethodType::Constructor);
+  auto access   = update_method_access(conn(), schema, mid, MethodAccess::Public);
+  //
+  //
+
+  ASSERT_TRUE(disabled.first) << disabled.second;
+  ASSERT_TRUE(type.first) << type.second;
+  ASSERT_TRUE(access.first) << access.second;
+
+  auto [blocks, err] = load_blocks_in_view(conn(), schema, "u1", -1000, -1000, 1000, 1000);
+  ASSERT_TRUE(err.empty()) << err;
+  ASSERT_EQ(blocks.size(), 1u);
+  EXPECT_TRUE(blocks[0].disabled);
+  EXPECT_EQ(blocks[0].method_type, MethodType::Constructor);
+  EXPECT_EQ(blocks[0].access, MethodAccess::Public);
+}
