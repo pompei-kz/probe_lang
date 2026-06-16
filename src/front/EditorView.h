@@ -2,46 +2,52 @@
 #include "InputField.h"
 #include "back/model/Conn.h"
 #include "back/model/Statement.h"
+#include "back/model/Unit.h"
 #include <SDL3/SDL.h>
 #include <string>
 #include <vector>
 
 namespace front {
 
-  // Graphical canvas shown in the right pane. Opened by double-clicking a unit
-  // in the tree. Displays every statement (unit_st row) whose geometry falls in
-  // the visible world rectangle (spatial query via the GIST index). Supports
-  // pan (drag) and zoom (wheel), adding statements (double-click empty space),
-  // and inline renaming (double-click a statement's name).
-  struct EditorView
+  // One open unit in the editor: its own canvas (statements scoped to this unit)
+  // plus an independent camera (pan/zoom remembered per tab).
+  struct EditorTab
   {
-    bool open = false;
+    back::model::Conn     conn;
+    std::string           schema;
+    std::string           unit_id;
+    std::string           unit_name;
+    back::model::UnitType unit_type = back::model::UnitType::Class;
 
-    back::model::Conn conn;
-    std::string       schema;
-    std::string       unit_id;   // opened unit; used as unit_id for new statements
-    std::string       unit_name; // shown as a hint in the corner
-
-    // Camera: world point at the top-left of the pane, plus zoom (px per world unit).
-    double cam_x = 0, cam_y = 0;
-    double zoom  = 1.0;
+    double cam_x = 0, cam_y = 0, zoom = 1.0;
+    bool   cam_init = false;
+    float  last_cw = -1, last_ch = -1;
 
     std::vector<back::model::Statement> stmts;
+  };
 
-    // Pane rectangle as set on the most recent render (for world<->screen math).
+  // Tabbed graphical canvas in the right pane. A tab is opened by double-clicking
+  // a unit in the tree; tabs are selected with the left button and closed with
+  // the middle button. The canvas shows the active unit's statements within the
+  // visible world rectangle (spatial query), with pan (drag) and zoom (wheel).
+  struct EditorView
+  {
+    bool                   open = false;
+    std::vector<EditorTab> tabs;
+    int                    active = -1;
+
+    // Pane and canvas (pane minus the tab strip) geometry from the last render.
     float px = 0, py = 0, pw = 0, ph = 0;
-    bool  cam_init = false;
-    float last_pw = -1, last_ph = -1;
+    float cx = 0, cy = 0, cw = 0, ch = 0;
 
     // Pan drag.
-    bool  panning = false;
-    bool  panned  = false;
+    bool  panning = false, panned = false;
     float pan_last_x = 0, pan_last_y = 0;
 
-    // Type-chooser popup (after double-clicking empty space).
+    // Type-chooser popup (double-click on empty canvas).
     bool  chooser_open = false;
     float chooser_wx = 0, chooser_wy = 0; // world coords of the remembered click
-    float chooser_sx = 0, chooser_sy = 0; // screen coords where the popup is drawn
+    float chooser_sx = 0, chooser_sy = 0; // screen coords for the popup
 
     // Inline name editing.
     bool                       editing = false;
@@ -50,25 +56,33 @@ namespace front {
     InputField                 edit_field;
     float                      edit_bx = 0, edit_by = 0, edit_bw = 0, edit_bh = 0;
 
-    void open_for(const back::model::Conn &c, const std::string &schema_, const std::string &uid, const std::string &uname);
-    void close();
+    // Open a unit (focus its tab if already open, else add a new one).
+    void open_for(const back::model::Conn &c, const std::string &schema, const std::string &uid, const std::string &uname, back::model::UnitType utype);
+    void close();          // close the whole editor
+    void close_tab(int i); // close one tab
 
-    // World <-> screen using the pane geometry from the last render.
-    double to_world_x(float sx) const { return cam_x + (sx - px) / zoom; }
-    double to_world_y(float sy) const { return cam_y + (sy - py) / zoom; }
-    float  to_screen_x(double wx) const { return px + static_cast<float>((wx - cam_x) * zoom); }
-    float  to_screen_y(double wy) const { return py + static_cast<float>((wy - cam_y) * zoom); }
+    EditorTab       *cur() { return active >= 0 && active < static_cast<int>(tabs.size()) ? &tabs[active] : nullptr; }
+    const EditorTab *cur() const { return active >= 0 && active < static_cast<int>(tabs.size()) ? &tabs[active] : nullptr; }
 
-    void reload(); // spatial query for the current viewport
+    // World <-> screen using the active tab's camera and the canvas rect.
+    double to_world_x(float sx) const { auto t = cur(); return t ? t->cam_x + (sx - cx) / t->zoom : 0; }
+    double to_world_y(float sy) const { auto t = cur(); return t ? t->cam_y + (sy - cy) / t->zoom : 0; }
+    float  to_screen_x(double wx) const { auto t = cur(); return t ? cx + static_cast<float>((wx - t->cam_x) * t->zoom) : cx; }
+    float  to_screen_y(double wy) const { auto t = cur(); return t ? cy + static_cast<float>((wy - t->cam_y) * t->zoom) : cy; }
 
-    // Draw the canvas and handle click/double-click/right-click interaction.
+    // Index of the tab under the cursor, or -1.
+    int tab_at(float mx, float my) const;
+
+    void reload(); // spatial query for the active tab's current viewport
+
     void render(SDL_Renderer *ren, float pane_x, float pane_y, float pane_w, float pane_h, float mx, float my, bool ldown, bool rdown, int clicks);
 
     // Event hooks driven from the main loop.
-    void on_wheel(float dy, float mx, float my); // zoom around the cursor
-    void on_mouse_move(float mx, float my);       // pan / text-selection drag
+    void on_wheel(float dy, float mx, float my);
+    void on_mouse_move(float mx, float my);
     void on_mouse_up();
-    bool handle_key(SDL_Keycode key, SDL_Keymod mod); // returns true if consumed
+    void on_middle_down(float mx, float my); // close the tab under the cursor
+    bool handle_key(SDL_Keycode key, SDL_Keymod mod);
     void handle_text(const char *t);
 
   private:

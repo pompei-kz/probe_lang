@@ -14,11 +14,11 @@ namespace back {
     float min_x, min_y, max_x, max_y;
   };
 
-  // Load every statement whose geometry intersects the given world rectangle.
-  // Uses the GIST index on unit_st.geom (the `&&` bounding-box operator).
+  // Load the statements of one unit whose geometry intersects the given world
+  // rectangle. Uses the GIST index on unit_st.geom (the `&&` bbox operator).
   // Returns an empty list (no error) when the unit_st table is absent.
   std::pair<std::vector<model::Statement>, std::string> load_statements_in_view(
-      const model::Conn &c, const std::string &schema, float min_x, float min_y, float max_x, float max_y);
+      const model::Conn &c, const std::string &schema, const std::string &unit_id, float min_x, float min_y, float max_x, float max_y);
 
   // Bounding box covering all statements of one unit, or nullopt if it has none.
   // Used to centre the editor camera when it first opens.

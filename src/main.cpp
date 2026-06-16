@@ -88,6 +88,7 @@ int main(int /*argc*/, char * /*argv*/[])
             r_click_x = ev.button.x;
             r_click_y = ev.button.y;
           }
+          if (ev.button.button == SDL_BUTTON_MIDDLE && app.editor.open && !any_dlg()) app.editor.on_middle_down(ev.button.x, ev.button.y);
           break;
 
         case SDL_EVENT_MOUSE_BUTTON_UP:

@@ -12,27 +12,58 @@ namespace front {
   using namespace back;
   using namespace back::model;
 
-  // Defaults for a freshly-created statement box (world units).
   static constexpr float DEF_W = 150.f;
   static constexpr float DEF_H = 44.f;
   static constexpr float ZOOM_MIN = 0.15f, ZOOM_MAX = 8.f;
-  static constexpr float GRID = 50.f;
+  static constexpr float GRID  = 50.f;
+  static constexpr float TAB_H = 30.f;
 
-  // Screen-space geometry of a statement box, derived from its world rect.
+  // ── unit-type glyph (mirrors the tree's draw_unit_icon) ──────────────────────
+  static void draw_unit_icon(SDL_Renderer *r, float x, float yc, UnitType t, Clr c)
+  {
+    sc(r, c);
+    switch (t) {
+      case UnitType::Class: {
+        SDL_FRect b{x, yc - 4.f, 9.f, 9.f};
+        SDL_RenderFillRect(r, &b);
+        break;
+      }
+      case UnitType::Interface: {
+        SDL_FRect b{x, yc - 4.f, 9.f, 9.f};
+        SDL_RenderRect(r, &b);
+        break;
+      }
+      case UnitType::Enum: {
+        for (int i = 0; i < 3; i++) {
+          SDL_FRect bar{x, yc - 4.f + i * 3.5f, 9.f, 1.6f};
+          SDL_RenderFillRect(r, &bar);
+        }
+        break;
+      }
+    }
+  }
+
+  static float tab_width(const EditorTab &t)
+  {
+    return std::clamp(10.f + 14.f + text_w(t.unit_name.c_str()) + 10.f, 90.f, 240.f);
+  }
+
+  // ── statement box geometry / drawing ─────────────────────────────────────────
   struct BoxGeo
   {
-    float bx, by, bw, bh;       // outer box
-    float badge_x, badge_y, badge; // square badge on the left
-    float nx, ny, nw, nh;       // name / edit-field area
+    float bx, by, bw, bh;
+    float badge_x, badge_y, badge;
+    float nx, ny, nw, nh;
   };
 
   static BoxGeo box_geo(const EditorView &e, const Statement &s)
   {
-    BoxGeo g{};
+    const double z = e.cur() ? e.cur()->zoom : 1.0;
+    BoxGeo       g{};
     g.bx = e.to_screen_x(s.x);
     g.by = e.to_screen_y(s.y);
-    g.bw = static_cast<float>(s.width * e.zoom);
-    g.bh = static_cast<float>(s.height * e.zoom);
+    g.bw = static_cast<float>(s.width * z);
+    g.bh = static_cast<float>(s.height * z);
 
     g.badge   = std::clamp(g.bh - 6.f, 8.f, 22.f);
     g.badge_x = g.bx + 5.f;
@@ -45,7 +76,6 @@ namespace front {
     return g;
   }
 
-  // Filled box with a left badge ("M"/"F") and a centred name.
   static void draw_box(SDL_Renderer *ren, const BoxGeo &g, char letter, const char *name, bool hovered)
   {
     fill(ren, hovered ? C_HOVER : C_PANEL, g.bx, g.by, g.bw, g.bh);
@@ -58,20 +88,28 @@ namespace front {
     if (name && *name) text_draw(ren, name, g.nx, center_baseline(g.by, g.bh), C_TEXT);
   }
 
-  void EditorView::open_for(const Conn &c, const std::string &schema_, const std::string &uid, const std::string &uname)
+  // ── lifecycle ────────────────────────────────────────────────────────────────
+  void EditorView::open_for(const Conn &c, const std::string &schema_, const std::string &uid, const std::string &uname, UnitType utype)
   {
+    for (int i = 0; i < static_cast<int>(tabs.size()); i++) {
+      if (tabs[i].unit_id == uid && tabs[i].schema == schema_ && tabs[i].conn.name == c.name) {
+        active = i;
+        open   = true;
+        return;
+      }
+    }
+    EditorTab t{};
+    t.conn      = c;
+    t.schema    = schema_;
+    t.unit_id   = uid;
+    t.unit_name = uname;
+    t.unit_type = utype;
+    tabs.push_back(std::move(t));
+    active       = static_cast<int>(tabs.size()) - 1;
     open         = true;
-    conn         = c;
-    schema       = schema_;
-    unit_id      = uid;
-    unit_name    = uname;
-    zoom         = 1.0;
-    cam_init     = false;
-    last_pw      = last_ph = -1;
-    panning      = panned = false;
-    chooser_open = false;
     editing      = false;
-    stmts.clear();
+    chooser_open = false;
+    panning      = false;
   }
 
   void EditorView::close()
@@ -82,34 +120,67 @@ namespace front {
     panning      = false;
   }
 
+  void EditorView::close_tab(int i)
+  {
+    if (i < 0 || i >= static_cast<int>(tabs.size())) return;
+    tabs.erase(tabs.begin() + i);
+    editing      = false;
+    chooser_open = false;
+    panning      = false;
+    if (tabs.empty()) {
+      active = -1;
+      open   = false;
+      return;
+    }
+    if (active > i)
+      active--;
+    else if (active >= static_cast<int>(tabs.size()))
+      active = static_cast<int>(tabs.size()) - 1;
+  }
+
+  int EditorView::tab_at(float mx, float my) const
+  {
+    if (my < py || my >= py + TAB_H) return -1;
+    float x = px;
+    for (int i = 0; i < static_cast<int>(tabs.size()); i++) {
+      float w = tab_width(tabs[i]);
+      if (mx >= x && mx < x + w) return i;
+      x += w;
+    }
+    return -1;
+  }
+
   void EditorView::init_camera()
   {
-    zoom = 1.0;
-    auto [box, err] = statement_bbox_for_unit(conn, schema, unit_id);
+    EditorTab *t = cur();
+    if (!t) return;
+    t->zoom         = 1.0;
+    auto [box, err] = statement_bbox_for_unit(t->conn, t->schema, t->unit_id);
     if (box) {
-      const double cx = (box->min_x + box->max_x) * .5;
-      const double cy = (box->min_y + box->max_y) * .5;
-      cam_x           = cx - (pw * .5) / zoom;
-      cam_y           = cy - (ph * .5) / zoom;
+      const double mx = (box->min_x + box->max_x) * .5;
+      const double my = (box->min_y + box->max_y) * .5;
+      t->cam_x        = mx - (cw * .5) / t->zoom;
+      t->cam_y        = my - (ch * .5) / t->zoom;
     } else {
-      // No statements yet: centre the world origin in the pane.
-      cam_x = -(pw * .5) / zoom;
-      cam_y = -(ph * .5) / zoom;
+      t->cam_x = -(cw * .5) / t->zoom;
+      t->cam_y = -(ch * .5) / t->zoom;
     }
-    cam_init = true;
-    last_pw  = pw;
-    last_ph  = ph;
+    t->cam_init = true;
+    t->last_cw  = cw;
+    t->last_ch  = ch;
     reload();
   }
 
   void EditorView::reload()
   {
-    const float minx = static_cast<float>(cam_x);
-    const float miny = static_cast<float>(cam_y);
-    const float maxx = static_cast<float>(cam_x + pw / zoom);
-    const float maxy = static_cast<float>(cam_y + ph / zoom);
-    auto [rows, err] = load_statements_in_view(conn, schema, minx, miny, maxx, maxy);
-    stmts            = std::move(rows);
+    EditorTab *t = cur();
+    if (!t) return;
+    const float minx = static_cast<float>(t->cam_x);
+    const float miny = static_cast<float>(t->cam_y);
+    const float maxx = static_cast<float>(t->cam_x + cw / t->zoom);
+    const float maxy = static_cast<float>(t->cam_y + ch / t->zoom);
+    auto [rows, err] = load_statements_in_view(t->conn, t->schema, t->unit_id, minx, miny, maxx, maxy);
+    t->stmts         = std::move(rows);
   }
 
   void EditorView::start_edit(const Statement &s, float fbx, float fby, float fbw, float fbh)
@@ -129,23 +200,25 @@ namespace front {
   void EditorView::commit_edit()
   {
     if (!editing) return;
-    update_statement_name(conn, schema, edit_id, edit_type, edit_field.ed.buf);
+    EditorTab *t = cur();
+    if (t) update_statement_name(t->conn, t->schema, edit_id, edit_type, edit_field.ed.buf);
     editing = false;
     reload();
   }
 
+  // ── event hooks ──────────────────────────────────────────────────────────────
   void EditorView::on_wheel(float dy, float mx, float my)
   {
     if (!open || editing || chooser_open) return;
-    if (!hit(mx, my, px, py, pw, ph)) return;
+    EditorTab *t = cur();
+    if (!t || !hit(mx, my, cx, cy, cw, ch)) return;
 
     const double wx     = to_world_x(mx);
     const double wy     = to_world_y(my);
     const double factor = dy > 0 ? 1.15 : 1.0 / 1.15;
-    zoom                = std::clamp(zoom * factor, static_cast<double>(ZOOM_MIN), static_cast<double>(ZOOM_MAX));
-    // Keep the world point under the cursor fixed.
-    cam_x = wx - (mx - px) / zoom;
-    cam_y = wy - (my - py) / zoom;
+    t->zoom             = std::clamp(t->zoom * factor, static_cast<double>(ZOOM_MIN), static_cast<double>(ZOOM_MAX));
+    t->cam_x            = wx - (mx - cx) / t->zoom;
+    t->cam_y            = wy - (my - cy) / t->zoom;
     reload();
   }
 
@@ -153,12 +226,13 @@ namespace front {
   {
     if (!open) return;
     if (editing) edit_field.on_move(mx);
-    if (panning) {
+    EditorTab *t = cur();
+    if (panning && t) {
       const float dx = mx - pan_last_x;
       const float dy = my - pan_last_y;
       if (dx != 0 || dy != 0) {
-        cam_x -= dx / zoom;
-        cam_y -= dy / zoom;
+        t->cam_x -= dx / t->zoom;
+        t->cam_y -= dy / t->zoom;
         panned = true;
       }
       pan_last_x = mx;
@@ -175,6 +249,13 @@ namespace front {
       if (panned) reload();
       panned = false;
     }
+  }
+
+  void EditorView::on_middle_down(float mx, float my)
+  {
+    if (!open) return;
+    int i = tab_at(mx, my);
+    if (i >= 0) close_tab(i);
   }
 
   bool EditorView::handle_key(SDL_Keycode key, SDL_Keymod mod)
@@ -196,28 +277,28 @@ namespace front {
     if (open && editing) edit_field.handle_text(t);
   }
 
-  // ── chooser popup ──────────────────────────────────────────────────────────
-  // Returns true if it consumed the click (selection made or dismissed).
-  static bool draw_chooser(EditorView &e, SDL_Renderer *ren, float mx, float my, bool ldown)
+  // ── chooser popup ────────────────────────────────────────────────────────────
+  static void draw_chooser(EditorView &e, SDL_Renderer *ren, float mx, float my, bool ldown)
   {
+    EditorTab *t = e.cur();
+    if (!t) return;
+
     constexpr float PAD = 8.f, SW = 180.f, SH = 40.f, GAP = 8.f;
     const float     panel_w = SW + 2 * PAD;
     const float     panel_h = 2 * SH + GAP + 2 * PAD;
 
-    float ox = std::min(e.chooser_sx, e.px + e.pw - panel_w);
-    float oy = std::min(e.chooser_sy, e.py + e.ph - panel_h);
-    ox       = std::max(ox, e.px);
-    oy       = std::max(oy, e.py);
+    float ox = std::clamp(e.chooser_sx, e.cx, e.cx + e.cw - panel_w);
+    float oy = std::clamp(e.chooser_sy, e.cy, e.cy + e.ch - panel_h);
 
     fill(ren, C_DLGBG, ox, oy, panel_w, panel_h);
     rect(ren, C_BORDER, ox, oy, panel_w, panel_h);
 
     auto sample = [&](float sy, char letter, const char *name) -> bool {
       BoxGeo g{};
-      g.bx = ox + PAD;
-      g.by = sy;
-      g.bw = SW;
-      g.bh = SH;
+      g.bx      = ox + PAD;
+      g.by      = sy;
+      g.bw      = SW;
+      g.bh      = SH;
       g.badge   = std::clamp(g.bh - 6.f, 8.f, 22.f);
       g.badge_x = g.bx + 5.f;
       g.badge_y = g.by + (g.bh - g.badge) * .5f;
@@ -232,64 +313,104 @@ namespace front {
 
     if (ldown) {
       if (hm) {
-        create_statement(e.conn, e.schema, e.unit_id, StatementType::Method, e.chooser_wx, e.chooser_wy, DEF_W, DEF_H, "newMethod");
+        create_statement(t->conn, t->schema, t->unit_id, StatementType::Method, e.chooser_wx, e.chooser_wy, DEF_W, DEF_H, "newMethod");
         e.chooser_open = false;
         e.reload();
       } else if (hf) {
-        create_statement(e.conn, e.schema, e.unit_id, StatementType::Field, e.chooser_wx, e.chooser_wy, DEF_W, DEF_H, "newField");
+        create_statement(t->conn, t->schema, t->unit_id, StatementType::Field, e.chooser_wx, e.chooser_wy, DEF_W, DEF_H, "newField");
         e.chooser_open = false;
         e.reload();
       } else {
-        e.chooser_open = false; // click outside dismisses
+        e.chooser_open = false;
       }
-      return true;
     }
-    return false;
   }
 
+  // ── tab strip ────────────────────────────────────────────────────────────────
   void EditorView::render(SDL_Renderer *ren, float pane_x, float pane_y, float pane_w, float pane_h, float mx, float my, bool ldown, bool rdown, int clicks)
   {
     if (!open) return;
+    if (active < 0 || tabs.empty()) {
+      open = false;
+      return;
+    }
     px = pane_x;
     py = pane_y;
     pw = pane_w;
     ph = pane_h;
+    cx = px;
+    cy = py + TAB_H;
+    cw = pw;
+    ch = ph - TAB_H;
 
-    if (!cam_init)
+    const bool dbl         = ldown && clicks >= 2;
+    const int  hovered_tab = tab_at(mx, my);
+
+    // Tab strip.
+    fill(ren, C_BG, px, py, pw, TAB_H);
+    float tx = px;
+    for (int i = 0; i < static_cast<int>(tabs.size()); i++) {
+      const float tw  = tab_width(tabs[i]);
+      const bool  act = i == active;
+      fill(ren, act ? C_PANEL : (hovered_tab == i ? C_HOVER : C_BG), tx, py, tw, TAB_H);
+      fill(ren, C_BORDER, tx + tw - 1, py, 1, TAB_H);
+      draw_unit_icon(ren, tx + 10, py + TAB_H * .5f, tabs[i].unit_type, act ? C_ACCENT : C_DIM);
+      text_draw(ren, tabs[i].unit_name.c_str(), tx + 24, center_baseline(py, TAB_H), act ? C_TEXT : C_DIM);
+      if (act) fill(ren, C_ACCENT, tx, py + TAB_H - 2, tw, 2);
+      tx += tw;
+    }
+    fill(ren, C_BORDER, px, py + TAB_H - 1, pw, 1);
+
+    // Left-click selects a tab.
+    bool tab_clicked = false;
+    if (ldown && hovered_tab >= 0) {
+      if (editing) commit_edit();
+      if (hovered_tab != active) {
+        active       = hovered_tab;
+        chooser_open = false;
+        panning      = false;
+      }
+      tab_clicked = true;
+    }
+
+    EditorTab *t = cur();
+    if (!t) return;
+
+    if (!t->cam_init)
       init_camera();
-    else if (pw != last_pw || ph != last_ph) {
-      last_pw = pw;
-      last_ph = ph;
+    else if (cw != t->last_cw || ch != t->last_ch) {
+      t->last_cw = cw;
+      t->last_ch = ch;
       reload();
     }
 
-    SDL_Rect clip{static_cast<int>(px), static_cast<int>(py), static_cast<int>(pw), static_cast<int>(ph)};
+    // Canvas.
+    SDL_Rect clip{static_cast<int>(cx), static_cast<int>(cy), static_cast<int>(cw), static_cast<int>(ch)};
     SDL_SetRenderClipRect(ren, &clip);
 
-    // ── grid ────────────────────────────────────────────────────────────────
-    const float step = static_cast<float>(GRID * zoom);
+    // Grid.
+    const float step = static_cast<float>(GRID * t->zoom);
     if (step >= 6.f) {
       sc(ren, C_PANEL);
-      double first_x = std::floor(cam_x / GRID) * GRID;
-      for (double wx = first_x; to_screen_x(wx) < px + pw; wx += GRID) {
+      double first_x = std::floor(t->cam_x / GRID) * GRID;
+      for (double wx = first_x; to_screen_x(wx) < cx + cw; wx += GRID) {
         float sx = to_screen_x(wx);
-        if (sx >= px) SDL_RenderLine(ren, sx, py, sx, py + ph);
+        if (sx >= cx) SDL_RenderLine(ren, sx, cy, sx, cy + ch);
       }
-      double first_y = std::floor(cam_y / GRID) * GRID;
-      for (double wy = first_y; to_screen_y(wy) < py + ph; wy += GRID) {
+      double first_y = std::floor(t->cam_y / GRID) * GRID;
+      for (double wy = first_y; to_screen_y(wy) < cy + ch; wy += GRID) {
         float sy = to_screen_y(wy);
-        if (sy >= py) SDL_RenderLine(ren, px, sy, px + pw, sy);
+        if (sy >= cy) SDL_RenderLine(ren, cx, sy, cx + cw, sy);
       }
     }
 
-    // ── statement boxes ───────────────────────────────────────────────────────
-    for (const Statement &s : stmts) {
-      BoxGeo     g   = box_geo(*this, s);
-      const bool hov = !editing && !chooser_open && hit(mx, my, g.bx, g.by, g.bw, g.bh);
+    // Statement boxes.
+    for (const Statement &s : t->stmts) {
+      BoxGeo     g      = box_geo(*this, s);
+      const bool hov    = !editing && !chooser_open && !tab_clicked && hit(mx, my, g.bx, g.by, g.bw, g.bh);
       const char letter = s.type == StatementType::Field ? 'F' : 'M';
 
       if (editing && s.id == edit_id) {
-        // Draw the box frame + badge, then an editable field over the name area.
         draw_box(ren, g, letter, "", false);
         edit_bx = g.nx;
         edit_bw = g.nw;
@@ -301,15 +422,10 @@ namespace front {
       }
     }
 
-    // ── unit name hint ────────────────────────────────────────────────────────
-    if (!unit_name.empty()) text_draw(ren, unit_name.c_str(), px + 8.f, py + 8.f + FS, C_DIM);
-
-    const bool dbl = ldown && clicks >= 2;
-
-    // ── inline editing mode consumes all interaction ──────────────────────────
+    // Inline editing consumes all canvas interaction.
     if (editing) {
       const float text_ox = edit_bx + 6.f;
-      if (ldown) {
+      if (ldown && !tab_clicked) {
         if (hit(mx, my, edit_bx, edit_by, edit_bw, edit_bh))
           edit_field.on_ldown(text_ox, mx, my, edit_bx, edit_by, edit_bw, edit_bh, clicks);
         else
@@ -319,20 +435,22 @@ namespace front {
       return;
     }
 
-    // ── chooser popup ─────────────────────────────────────────────────────────
     if (chooser_open) {
-      draw_chooser(*this, ren, mx, my, ldown);
+      draw_chooser(*this, ren, mx, my, ldown && !tab_clicked);
       SDL_SetRenderClipRect(ren, nullptr);
       return;
     }
 
-    // ── double-click: edit a box's name, or open the chooser on empty space ────
-    // Guard to the pane: the double-click that opened the editor lands in the
-    // tree (left pane) and must not be treated as an empty-canvas double-click.
-    if (dbl && hit(mx, my, px, py, pw, ph)) {
+    if (tab_clicked) {
+      SDL_SetRenderClipRect(ren, nullptr);
+      return;
+    }
+
+    // Double-click: edit a box's name, or open the chooser on empty canvas.
+    if (dbl && hit(mx, my, cx, cy, cw, ch)) {
       const Statement *target = nullptr;
       BoxGeo           tgeo{};
-      for (const Statement &s : stmts) { // last hit wins (topmost)
+      for (const Statement &s : t->stmts) {
         BoxGeo g = box_geo(*this, s);
         if (hit(mx, my, g.bx, g.by, g.bw, g.bh)) {
           target = &s;
@@ -354,8 +472,8 @@ namespace front {
       return;
     }
 
-    // ── single click begins a pan ─────────────────────────────────────────────
-    if (ldown && hit(mx, my, px, py, pw, ph)) {
+    // Single click on the canvas begins a pan.
+    if (ldown && hit(mx, my, cx, cy, cw, ch)) {
       panning    = true;
       panned     = false;
       pan_last_x = mx;

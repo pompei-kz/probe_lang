@@ -9,7 +9,7 @@ namespace back {
   using namespace model;
 
   std::pair<std::vector<Statement>, std::string> load_statements_in_view(
-      const Conn &c, const std::string &schema, float min_x, float min_y, float max_x, float max_y)
+      const Conn &c, const std::string &schema, const std::string &unit_id, float min_x, float min_y, float max_x, float max_y)
   {
     try {
       pqxx::connection pg(make_cs(c));
@@ -24,7 +24,8 @@ namespace back {
                           "FROM " + qs + ".unit_st s "
                           "LEFT JOIN " + qs + ".unit_st_method m ON m.id = s.id "
                           "LEFT JOIN " + qs + ".unit_st_field  f ON f.id = s.id "
-                          "WHERE s.geom && ST_MakeEnvelope($1, $2, $3, $4, 0)",
+                          "WHERE s.unit_id = $1 AND s.geom && ST_MakeEnvelope($2, $3, $4, $5, 0)",
+                          unit_id,
                           min_x,
                           min_y,
                           max_x,

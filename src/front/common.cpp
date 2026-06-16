@@ -281,7 +281,7 @@ namespace front {
       SDL_RenderFillRect(ren, &sl);
 
       if ((click || rclick) && h_row) app.sel_key = ukey;
-      if (dblclick && h_row) app.editor.open_for(app.conns[ci].conn, schema, unit.id, unit.name);
+      if (dblclick && h_row) app.editor.open_for(app.conns[ci].conn, schema, unit.id, unit.name, unit.type);
       if (rclick && h_row) {
         float mx2            = std::min(app.mx, pw - UnitMenu::W - 2.f);
         float my2            = std::min(app.my, ph - UnitMenu::N * UnitMenu::IH - 10.f);

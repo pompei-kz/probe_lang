@@ -90,7 +90,7 @@ TEST_F(StatementServiceTest, LoadReturnsStatementIntersectingView)
 
   //
   //
-  auto [stmts, err] = load_statements_in_view(conn(), schema, 0, 0, 100, 100);
+  auto [stmts, err] = load_statements_in_view(conn(), schema, "u1", 0, 0, 100, 100);
   //
   //
 
@@ -114,12 +114,29 @@ TEST_F(StatementServiceTest, LoadExcludesStatementOutsideView)
 
   //
   //
-  auto [stmts, err] = load_statements_in_view(conn(), schema, 500, 500, 600, 600);
+  auto [stmts, err] = load_statements_in_view(conn(), schema, "u1", 500, 500, 600, 600);
   //
   //
 
   ASSERT_TRUE(err.empty()) << err;
   EXPECT_TRUE(stmts.empty());
+}
+
+TEST_F(StatementServiceTest, LoadExcludesStatementsOfOtherUnits)
+{
+  make_schema();
+  ASSERT_FALSE(create_statement(conn(), schema, "u1", StatementType::Method, 0, 0, 50, 20, "mine").first.empty());
+  ASSERT_FALSE(create_statement(conn(), schema, "u2", StatementType::Method, 0, 30, 50, 20, "other").first.empty());
+
+  //
+  //
+  auto [stmts, err] = load_statements_in_view(conn(), schema, "u1", -1000, -1000, 1000, 1000);
+  //
+  //
+
+  ASSERT_TRUE(err.empty()) << err;
+  ASSERT_EQ(stmts.size(), 1u);
+  EXPECT_EQ(stmts[0].name, "mine");
 }
 
 TEST_F(StatementServiceTest, LoadReturnsBothMethodAndFieldNames)
@@ -130,7 +147,7 @@ TEST_F(StatementServiceTest, LoadReturnsBothMethodAndFieldNames)
 
   //
   //
-  auto [stmts, err] = load_statements_in_view(conn(), schema, -1000, -1000, 1000, 1000);
+  auto [stmts, err] = load_statements_in_view(conn(), schema, "u1", -1000, -1000, 1000, 1000);
   //
   //
 
@@ -151,7 +168,7 @@ TEST_F(StatementServiceTest, LoadEmptyWhenTableMissing)
 
   //
   //
-  auto [stmts, err] = load_statements_in_view(conn(), schema, 0, 0, 100, 100);
+  auto [stmts, err] = load_statements_in_view(conn(), schema, "u1", 0, 0, 100, 100);
   //
   //
 
