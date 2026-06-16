@@ -18,4 +18,6 @@ namespace back {
   // feature was introduced).
   void init_unit_table(pqxx::work &txn, pqxx::connection &pg, const std::string &schema);
 
+  void init_unit_st_table(pqxx::work &txn, pqxx::connection &pg, const std::string &schema);
+
 } // namespace back

@@ -2,27 +2,26 @@
 #include "CustomId.h"
 #include "InitDb.h"
 #include "RepoService.h" // make_cs, sql_err_msg
-#include <tuple>
 
 namespace back {
 
   using namespace model;
 
-  std::vector<Unit> load_units_for_schema(pqxx::work &txn, pqxx::connection &pg, const std::string &sch)
+  std::vector<Unit> load_units_for_schema(pqxx::work &txn, const pqxx::connection &pg, const std::string &sch)
   {
     // Check the unit table exists first.
-    auto check = txn.exec_params("SELECT 1 FROM information_schema.tables "
-                                 "WHERE table_schema = $1 AND table_name = 'unit' LIMIT 1",
-                                 sch);
+    pqxx::result check = txn.exec_params("SELECT 1 FROM information_schema.tables "
+                                         "WHERE table_schema = $1 AND table_name = 'unit' LIMIT 1",
+                                         sch);
     if (check.empty()) return {};
 
-    auto rows = txn.exec("SELECT id, COALESCE(parent_folder_id, ''), name, type "
-                         "FROM " +
-                         pg.quote_name(sch) + ".unit ORDER BY name");
+    pqxx::result rows = txn.exec("SELECT id, COALESCE(parent_folder_id, ''), name, type "
+                                 "FROM " +
+                                 pg.quote_name(sch) + ".unit ORDER BY name");
 
     std::vector<Unit> units;
-    for (const auto &row : rows) {
-      Unit u;
+    for (const pqxx::row &row : rows) {
+      Unit u{};
       u.id               = row[0].c_str();
       u.parent_folder_id = row[1].c_str();
       u.name             = row[2].c_str();
@@ -38,7 +37,7 @@ namespace back {
     try {
       pqxx::connection pg(make_cs(c));
       pqxx::work       txn(pg);
-      std::string      qsch = pg.quote_name(schema);
+      std::string      schemaQuote = pg.quote_name(schema);
 
       // Create table in case repo predates the unit feature.
       init_unit_table(txn, pg, schema);
@@ -46,9 +45,9 @@ namespace back {
       std::string       id       = new_id();
       const std::string type_str = to_string(type);
       if (parent_folder_id.empty()) {
-        txn.exec_params("INSERT INTO " + qsch + ".unit (id, name, type) VALUES ($1, $2, $3)", id, name, type_str);
+        txn.exec_params("INSERT INTO " + schemaQuote + ".unit (id, name, type) VALUES ($1, $2, $3)", id, name, type_str);
       } else {
-        txn.exec_params("INSERT INTO " + qsch + ".unit (id, parent_folder_id, name, type) VALUES ($1, $2, $3, $4)",
+        txn.exec_params("INSERT INTO " + schemaQuote + ".unit (id, parent_folder_id, name, type) VALUES ($1, $2, $3, $4)",
                         id,
                         parent_folder_id,
                         name,
@@ -100,12 +99,14 @@ namespace back {
       pqxx::connection pg(make_cs(c));
       pqxx::work       txn(pg);
 
-      auto schema_rows = txn.exec("SELECT table_schema FROM information_schema.tables "
-                                  "WHERE table_name = 'lang_setting' "
-                                  "  AND table_schema NOT IN ('pg_catalog','information_schema') "
-                                  "ORDER BY table_schema");
-      for (const auto &row : schema_rows)
+      pqxx::result schema_rows = txn.exec("SELECT table_schema FROM information_schema.tables "
+                                          "WHERE table_name = 'lang_setting' "
+                                          "  AND table_schema NOT IN ('pg_catalog','information_schema') "
+                                          "ORDER BY table_schema");
+
+      for (const auto &row : schema_rows) {
         init_unit_table(txn, pg, row[0].c_str());
+      }
 
       txn.commit();
       return {true, ""};

@@ -16,31 +16,32 @@ pkg_check_modules(PQXX REQUIRED libpqxx)
 include(cmake/EmbedResources.cmake)
 
 add_executable(probe_lang
-    src/main.cpp
-    src/front/common.cpp
-    src/front/PanelMenu.cpp
-    src/front/FontAtlas.cpp
-    src/front/TextEditor.cpp
-    src/front/ContextMenu.cpp
-    src/front/InputField.cpp
-    src/front/Dlg.cpp
-    src/front/MsgDlg.cpp
-    src/front/ConfirmDlg.cpp
-    src/front/SchemaMenu.cpp
-    src/front/FolderMenu.cpp
-    src/front/SelectableText.cpp
-    src/front/FormEditRepository.cpp
-    src/front/FormEditFolder.cpp
-    src/front/FormEditUnit.cpp
-    src/front/UnitMenu.cpp
-    src/back/ConnService.cpp
-    src/back/RepoService.cpp
-    src/back/FolderService.cpp
-    src/back/InitDb.cpp
-    src/back/UtilDb.cpp
-    src/back/ProjectTreeService.cpp
-    src/back/UnitService.cpp
-    src/back/CustomId.cpp
+        src/main.cpp
+        src/front/common.cpp
+        src/front/PanelMenu.cpp
+        src/front/FontAtlas.cpp
+        src/front/TextEditor.cpp
+        src/front/ContextMenu.cpp
+        src/front/InputField.cpp
+        src/front/Dlg.cpp
+        src/front/MsgDlg.cpp
+        src/front/ConfirmDlg.cpp
+        src/front/SchemaMenu.cpp
+        src/front/FolderMenu.cpp
+        src/front/SelectableText.cpp
+        src/front/FormEditRepository.cpp
+        src/front/FormEditFolder.cpp
+        src/front/FormEditUnit.cpp
+        src/front/UnitMenu.cpp
+        src/back/ConnService.cpp
+        src/back/RepoService.cpp
+        src/back/FolderService.cpp
+        src/back/InitDb.cpp
+        src/back/UtilDb.cpp
+        src/back/ProjectTreeService.cpp
+        src/back/UnitService.cpp
+        src/back/CustomId.cpp
+        src/back/model/RowChange.h
 )
 target_include_directories(probe_lang PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_include_directories(probe_lang PRIVATE ${stb_SOURCE_DIR})
@@ -58,22 +59,23 @@ enable_testing()
 find_package(GTest REQUIRED)
 
 add_executable(probe_lang_tests
-    src_test/back/TestCustomId.cpp
-    src_test/back/TestConnService.cpp
-    src_test/back/TestUtilDb.cpp
-    src_test/back/TestInitDb.cpp
-    src_test/back/TestRepoService.cpp
-    src_test/back/TestFolderService.cpp
-    src_test/back/TestProjectTreeService.cpp
-    src_test/back/TestUnitService.cpp
-    src/back/CustomId.cpp
-    src/back/ConnService.cpp
-    src/back/UtilDb.cpp
-    src/back/InitDb.cpp
-    src/back/RepoService.cpp
-    src/back/FolderService.cpp
-    src/back/ProjectTreeService.cpp
-    src/back/UnitService.cpp
+        src_test/back/TestCustomId.cpp
+        src_test/back/TestConnService.cpp
+        src_test/back/TestUtilDb.cpp
+        src_test/back/TestInitDb.cpp
+        src_test/back/TestRepoService.cpp
+        src_test/back/TestFolderService.cpp
+        src_test/back/TestProjectTreeService.cpp
+        src_test/back/TestUnitService.cpp
+        src/back/CustomId.cpp
+        src/back/ConnService.cpp
+        src/back/UtilDb.cpp
+        src/back/InitDb.cpp
+        src/back/RepoService.cpp
+        src/back/FolderService.cpp
+        src/back/ProjectTreeService.cpp
+        src/back/UnitService.cpp
+        src/back/model/RowChange.h
 )
 target_include_directories(probe_lang_tests PRIVATE src)
 target_include_directories(probe_lang_tests PRIVATE src_test)

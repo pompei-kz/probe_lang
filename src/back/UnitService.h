@@ -9,7 +9,7 @@
 namespace back {
 
   // Load all units of a schema as a flat list (empty if the table is absent).
-  std::vector<model::Unit> load_units_for_schema(pqxx::work &txn, pqxx::connection &pg, const std::string &sch);
+  std::vector<model::Unit> load_units_for_schema(pqxx::work &txn, const pqxx::connection &pg, const std::string &sch);
 
   // Create a new unit. parent_folder_id empty = directly under the repository.
   std::pair<bool, std::string> create_unit(

@@ -28,4 +28,13 @@ namespace back {
              ".set_last_modified_at()");
   }
 
+  bool hasSchema(pqxx::work &txn, const std::string &schemaName)
+  {
+    // TODO нужно реализовать
+  }
+  bool hasTable(pqxx::work &txn, const std::string &schemaName, const std::string &tableName)
+  {
+    // TODO нужно реализовать
+  }
+
 } // namespace back

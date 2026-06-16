@@ -2,6 +2,6 @@
 
 cd "$(dirname "$0")" || exit 113
 
-bash remove.bash
+bash docker-remove.bash
 
 bash docker-restart.bash

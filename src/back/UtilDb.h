@@ -13,4 +13,21 @@ namespace back {
   // now() automatically on every row update (via a BEFORE UPDATE trigger).
   void ensureLastModifiedAt(pqxx::work &txn, const std::string &schemaName, const std::string &tableName);
 
+  /**
+   * Проверяет наличие указанной схемы
+   * @param txn Транзакция
+   * @param schemaName Имя указанной схемы
+   * @return Признак наличия указанной схемы
+   */
+  bool hasSchema(pqxx::work &txn, const std::string &schemaName);
+
+  /**
+   * Проверяет существование указанной таблице в указанной схеме
+   * @param txn Транзакция
+   * @param schemaName Имя указанной схемы
+   * @param tableName Имя указанной таблицы
+   * @return Признак наличия данной таблицы
+   */
+  bool hasTable(pqxx::work &txn, const std::string &schemaName, const std::string &tableName);
+
 } // namespace back
