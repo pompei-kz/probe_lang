@@ -98,6 +98,19 @@ namespace back {
       ensureLastModifiedAt(txn, schema, "unit_st_method");
     }
 
+    if (!hasTable(txn, schema, "unit_st_method_arg")) {
+      txn.exec("CREATE TABLE " + schemaQuoted +
+               ".unit_st_method_arg "
+               "("
+               "  id varchar(32) primary key,"
+               "  owner_method_id varchar(32) not null,"
+               "  name text"
+               ")");
+
+      ensureCreatedAt(txn, schema, "unit_st_method_arg");
+      ensureLastModifiedAt(txn, schema, "unit_st_method_arg");
+    }
+
     if (!hasTable(txn, schema, "unit_st_field")) {
       txn.exec("CREATE TABLE " + schemaQuoted +
                ".unit_st_field "
@@ -111,6 +124,8 @@ namespace back {
       ensureCreatedAt(txn, schema, "unit_st_field");
       ensureLastModifiedAt(txn, schema, "unit_st_field");
     }
+
+
   }
 
 } // namespace back

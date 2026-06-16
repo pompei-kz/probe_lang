@@ -31,4 +31,8 @@ namespace back {
                                                const std::string &new_schema,
                                                const std::string &new_repo_name);
 
+  // Ensure a repository schema and all of its tables exist (idempotent). Called
+  // when a repository branch is opened, so repos predating newer tables get them.
+  std::pair<bool, std::string> ensure_repo_schema(const model::Conn &c, const std::string &schema);
+
 } // namespace back

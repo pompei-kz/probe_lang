@@ -166,4 +166,19 @@ namespace back {
     }
   }
 
+  std::pair<bool, std::string> ensure_repo_schema(const Conn &c, const std::string &schema)
+  {
+    try {
+      pqxx::connection pg(make_cs(c));
+      pqxx::work       txn(pg);
+      init_repo_schema(txn, pg, schema);
+      txn.commit();
+      return {true, ""};
+    } catch (const pqxx::sql_error &e) {
+      return {false, sql_err_msg(e)};
+    } catch (const std::exception &e) {
+      return {false, e.what()};
+    }
+  }
+
 } // namespace back

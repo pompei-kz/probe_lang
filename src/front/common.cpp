@@ -488,6 +488,8 @@ namespace front {
           if (has_kids && ((click && h_caret1) || (dblclick && h_row1))) {
             repo.open = !repo.open;
             if (repo.open) {
+              // Ensure the schema and all of its tables exist (idempotent).
+              if (auto [ok, err] = ensure_repo_schema(node.conn, repo.schema_name); !ok) app.msg_dlg = {true, "Ошибка", std::move(err)};
               open_tree_node({node.conn.name, repo.schema_name});
               restore_repo_folders_open(node.conn.name, repo); // reopen persisted folders from disk
             } else {

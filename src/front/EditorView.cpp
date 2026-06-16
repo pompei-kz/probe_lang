@@ -13,10 +13,13 @@ namespace front {
   using namespace back;
   using namespace back::model;
 
-  static constexpr float DEF_W = 150.f;
-  static constexpr float DEF_H = 44.f;
   static constexpr float ZOOM_MIN = 0.15f, ZOOM_MAX = 8.f;
   static constexpr float GRID  = 50.f;
+  static constexpr float PAD   = 5.f;  // inner padding (left == top == bottom)
+  static constexpr float GAP   = 6.f;  // gap between the badge and the name
+  static constexpr float BADGE = 22.f; // M/F badge size (unchanged)
+  // Compact box height: the badge plus equal top/bottom padding (== PAD == left).
+  static constexpr float BOX_H = BADGE + 2.f * PAD;
   static constexpr float TAB_H = 30.f;
 
   // ── unit-type glyph (mirrors the tree's draw_unit_icon) ──────────────────────
@@ -66,27 +69,24 @@ namespace front {
     g.bx = e.to_screen_x(s.x);
     g.by = e.to_screen_y(s.y);
     g.bw = s.width * z;
-    g.bh = s.height * z;
+    g.bh = BOX_H * z; // compact: height hugs the badge with PAD top/bottom
 
-    const float badge0 = std::clamp(s.height - 6.f, 8.f, 22.f); // unscaled badge
-    g.badge            = badge0 * z;
-    g.badge_x          = g.bx + 5.f * z;
-    g.badge_y          = g.by + (g.bh - g.badge) * .5f;
+    g.badge   = BADGE * z;
+    g.badge_x = g.bx + PAD * z;
+    g.badge_y = g.by + PAD * z; // top padding == PAD == left
 
-    g.nx = g.bx + (5.f + badge0 + 6.f) * z;
+    g.nx = g.bx + (PAD + BADGE + GAP) * z;
     g.nh = std::min(g.bh - 6.f, FS + 8.f);
     g.ny = g.by + (g.bh - g.nh) * .5f;
-    g.nw = std::max(g.bx + g.bw - g.nx - 6.f * z, 10.f);
+    g.nw = std::max(g.bx + g.bw - g.nx - GAP * z, 10.f);
     return g;
   }
 
-  // `scale` scales the text (name + badge letter) with the box; 1 == unzoomed.
   // Unscaled (world-unit) box width needed to fit `name`: matches box_geo's
   // horizontal layout (left pad + badge + gap + text + right pad).
-  static float fit_width(float height, const std::string &name)
+  static float fit_width(const std::string &name)
   {
-    const float badge0 = std::clamp(height - 6.f, 8.f, 22.f);
-    const float w      = 5.f + badge0 + 6.f + text_w(name.c_str()) + 6.f;
+    const float w = PAD + BADGE + GAP + text_w(name.c_str()) + GAP;
     return std::max(w, 60.f);
   }
 
@@ -213,16 +213,16 @@ namespace front {
 
   void EditorView::start_edit(const Statement &s, float fbx, float fby, float fbw, float fbh)
   {
-    editing             = true;
-    edit_id             = s.id;
-    edit_type           = s.type;
-    edit_field.ed       = TextEditor{};
+    editing       = true;
+    edit_id       = s.id;
+    edit_type     = s.type;
+    edit_field.ed = TextEditor{};
     edit_field.ed.set(s.name);
     edit_field.ctx.open = false;
-    edit_bx = fbx;
-    edit_by = fby;
-    edit_bw = fbw;
-    edit_bh = fbh;
+    edit_bx             = fbx;
+    edit_by             = fby;
+    edit_bw             = fbw;
+    edit_bh             = fbh;
   }
 
   void EditorView::commit_edit()
@@ -232,15 +232,8 @@ namespace front {
     if (t) {
       const std::string &name = edit_field.ed.buf;
       update_statement_name(t->conn, t->schema, edit_id, edit_type, name);
-
-      // Recompute the box width to fit the new name (height unchanged) and persist it.
-      float height = DEF_H;
-      for (const Statement &s : t->stmts)
-        if (s.id == edit_id) {
-          height = s.height;
-          break;
-        }
-      update_statement_size(t->conn, t->schema, edit_id, fit_width(height, name), height);
+      // Resize the box to fit the new name; height is the compact BOX_H.
+      update_statement_size(t->conn, t->schema, edit_id, fit_width(name), BOX_H);
     }
     editing = false;
     reload();
@@ -389,10 +382,10 @@ namespace front {
       g.by      = sy;
       g.bw      = SW;
       g.bh      = SH;
-      g.badge   = std::clamp(g.bh - 6.f, 8.f, 22.f);
-      g.badge_x = g.bx + 5.f;
+      g.badge   = BADGE;
+      g.badge_x = g.bx + PAD;
       g.badge_y = g.by + (g.bh - g.badge) * .5f;
-      g.nx      = g.badge_x + g.badge + 6.f;
+      g.nx      = g.badge_x + g.badge + GAP;
       bool hov  = hit(mx, my, g.bx, g.by, g.bw, g.bh);
       draw_box(ren, g, letter, name, hov, 1.f);
       return hov;
@@ -403,11 +396,19 @@ namespace front {
 
     if (ldown) {
       if (hm) {
-        create_statement(t->conn, t->schema, t->unit_id, StatementType::Method, e.chooser_wx, e.chooser_wy, DEF_W, DEF_H, "newMethod");
+        create_statement(t->conn,
+                         t->schema,
+                         t->unit_id,
+                         StatementType::Method,
+                         e.chooser_wx,
+                         e.chooser_wy,
+                         fit_width("newMethod"),
+                         BOX_H,
+                         "newMethod");
         e.chooser_open = false;
         e.reload();
       } else if (hf) {
-        create_statement(t->conn, t->schema, t->unit_id, StatementType::Field, e.chooser_wx, e.chooser_wy, DEF_W, DEF_H, "newField");
+        create_statement(t->conn, t->schema, t->unit_id, StatementType::Field, e.chooser_wx, e.chooser_wy, fit_width("newField"), BOX_H, "newField");
         e.chooser_open = false;
         e.reload();
       } else {
@@ -417,7 +418,8 @@ namespace front {
   }
 
   // ── tab strip ────────────────────────────────────────────────────────────────
-  void EditorView::render(SDL_Renderer *ren, float pane_x, float pane_y, float pane_w, float pane_h, float mx, float my, bool ldown, bool rdown, int clicks)
+  void EditorView::render(
+      SDL_Renderer *ren, float pane_x, float pane_y, float pane_w, float pane_h, float mx, float my, bool ldown, bool rdown, int clicks)
   {
     if (!open) return;
     if (active < 0 || tabs.empty()) {
