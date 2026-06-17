@@ -394,6 +394,32 @@ TEST_F(BlockServiceTest, AppendMethodArgGoesToEndAfterDelete)
   EXPECT_EQ(blocks[0].args[1].name, "a2");
 }
 
+TEST_F(BlockServiceTest, ReorderMethodArgsRewritesOrder)
+{
+  make_schema();
+  auto [mid, mmsg] = create_block(conn(), schema, "u1", BlockType::Method, 0, 0, 50, 20, "m");
+  ASSERT_FALSE(mid.empty()) << mmsg;
+  auto [a0, m0] = append_method_arg(conn(), schema, mid, "a0");
+  auto [a1, m1] = append_method_arg(conn(), schema, mid, "a1");
+  auto [a2, m2] = append_method_arg(conn(), schema, mid, "a2");
+  ASSERT_FALSE(a0.empty() || a1.empty() || a2.empty());
+
+  //
+  //
+  auto [ok, err] = reorder_method_args(conn(), schema, mid, {a2, a0, a1});
+  //
+  //
+
+  ASSERT_TRUE(ok) << err;
+  auto [blocks, lerr] = load_blocks_in_view(conn(), schema, "u1", -1000, -1000, 1000, 1000);
+  ASSERT_TRUE(lerr.empty()) << lerr;
+  ASSERT_EQ(blocks.size(), 1u);
+  ASSERT_EQ(blocks[0].args.size(), 3u);
+  EXPECT_EQ(blocks[0].args[0].name, "a2");
+  EXPECT_EQ(blocks[0].args[1].name, "a0");
+  EXPECT_EQ(blocks[0].args[2].name, "a1");
+}
+
 // ---------------------------------------------------------------------------
 // method attributes: disabled / type / access
 // ---------------------------------------------------------------------------

@@ -234,6 +234,26 @@ namespace back {
     }
   }
 
+  std::pair<bool, std::string> reorder_method_args(
+      const Conn &c, const std::string &schema, const std::string &owner_method_id, const std::vector<std::string> &ordered_ids)
+  {
+    try {
+      pqxx::connection pg(make_cs(c));
+      pqxx::work       txn(pg);
+      // Rewrite order_index to match the given sequence (0..n-1), all in one
+      // transaction. The owner_method_id guard keeps it scoped to this method.
+      const std::string q =
+          "UPDATE " + pg.quote_name(schema) + ".unit_bl_method_arg SET order_index = $1 WHERE id = $2 AND owner_method_id = $3";
+      for (int i = 0; i < static_cast<int>(ordered_ids.size()); i++) txn.exec_params(q, i, ordered_ids[i], owner_method_id);
+      txn.commit();
+      return {true, ""};
+    } catch (const pqxx::sql_error &e) {
+      return {false, sql_err_msg(e)};
+    } catch (const std::exception &e) {
+      return {false, e.what()};
+    }
+  }
+
   // Helper: UPDATE one unit_bl_method column for a single method id.
   static std::pair<bool, std::string> update_method_column(
       const Conn &c, const std::string &schema, const std::string &id, const std::string &column, const std::string &value)

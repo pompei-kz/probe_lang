@@ -53,6 +53,11 @@ namespace back {
   // Delete one method argument (unit_bl_method_arg row) by id.
   std::pair<bool, std::string> delete_method_arg(const model::Conn &c, const std::string &schema, const std::string &id);
 
+  // Rewrite the order of a method's arguments: order_index becomes each id's
+  // position in `ordered_ids` (0..n-1). Used by drag-to-reorder.
+  std::pair<bool, std::string> reorder_method_args(
+      const model::Conn &c, const std::string &schema, const std::string &owner_method_id, const std::vector<std::string> &ordered_ids);
+
   // Update method-only attributes (unit_bl_method.disabled / type / access).
   std::pair<bool, std::string> update_method_disabled(const model::Conn &c, const std::string &schema, const std::string &id, bool disabled);
   std::pair<bool, std::string> update_method_type(const model::Conn &c, const std::string &schema, const std::string &id, model::MethodType type);

@@ -154,6 +154,22 @@ namespace front {
     }
   }
 
+  // Circle outline (SDL has no circle primitive): a closed polyline. Works over
+  // any background, unlike a two-fill ring.
+  static void stroke_circle(SDL_Renderer *r, Clr c, float cx, float cy, float rad)
+  {
+    sc(r, c);
+    const int   segs = std::max(16, static_cast<int>(rad * 2.f));
+    float       px = cx + rad, py = cy;
+    for (int i = 1; i <= segs; i++) {
+      const float a = static_cast<float>(i) / static_cast<float>(segs) * 6.2831853f;
+      const float x = cx + rad * std::cos(a), y = cy + rad * std::sin(a);
+      SDL_RenderLine(r, px, py, x, y);
+      px = x;
+      py = y;
+    }
+  }
+
   // Darken a colour by factor `f` (keeps alpha). Used for hover states.
   static Clr scale_clr(Clr c, float f)
   {
@@ -257,22 +273,6 @@ namespace front {
     if (hov_name) fill(ren, C_HOVER, g.bx + 1.f, g.by + 1.f, g.bw - 2.f, BOX_H * z - 2.f);
     if (hov_arg >= 0) fill(ren, C_HOVER, g.bx + 1.f, arg_row_y(g, hov_arg), g.bw - 2.f, ROW_H * z);
 
-    // Access marker along the left wall: a thick bar a small distance from the
-    // left edge, stopping short of the top and bottom. Private is solid,
-    // Protected is dashed, Public draws nothing.
-    if (s.access != MethodAccess::Public) {
-      const float lx = g.bx + 3.f * z;            // small gap from the left wall
-      const float lw = std::max(1.25f * z, 1.f);  // bar thickness
-      const float y0 = g.by + 4.f * z;            // stop short of the top
-      const float y1 = g.by + g.bh - 4.f * z;     // stop short of the bottom
-      if (s.access == MethodAccess::Private) {
-        fill(ren, accent, lx, y0, lw, y1 - y0);
-      } else { // Protected: dashed
-        const float dash = 5.f * z, gap = 3.f * z;
-        for (float y = y0; y < y1; y += dash + gap) fill(ren, accent, lx, y, lw, std::min(dash, y1 - y));
-      }
-    }
-
     // Badge (drawn on top of any highlight). The method type tweaks its look:
     // constructor shows a K, an inner method sits in a circle (not a square),
     // a destructor's letter is crossed out diagonally.
@@ -287,6 +287,19 @@ namespace front {
       }
     }
     draw_badge(ren, g, badge_letter, accent, z, circle, crossed);
+
+    // Access level as protective "walls" enclosing the badge (following its
+    // shape): Public — none, Protected — one wall, Private — two walls. More
+    // walls reads as more enclosed, hence more protected.
+    const int walls = s.access == MethodAccess::Private ? 2 : (s.access == MethodAccess::Protected ? 1 : 0);
+    const float cx = g.badge_x + g.badge * .5f, cy = g.badge_y + g.badge * .5f;
+    for (int w = 0; w < walls; w++) {
+      const float d = (2.f + 2.f * static_cast<float>(w)) * z; // gap of the w-th wall from the badge
+      if (circle)
+        stroke_circle(ren, accent, cx, cy, g.badge * .5f + d);
+      else
+        rect(ren, accent, g.badge_x - d, g.badge_y - d, g.badge + 2.f * d, g.badge + 2.f * d);
+    }
 
     // Name, centred in the header band.
     const float header_h = 2.f * (g.badge_y - g.by) + g.badge;
@@ -676,6 +689,36 @@ namespace front {
       drag_last_y = my;
     }
 
+    if (dragging_arg) {
+      Block *owner = nullptr;
+      for (Block &s : t->blocks)
+        if (s.id == drag_arg_owner) {
+          owner = &s;
+          break;
+        }
+      if (owner) {
+        const BoxGeo g   = box_geo(*this, *owner);
+        const int    n   = static_cast<int>(owner->args.size());
+        int          cur = -1;
+        for (int i = 0; i < n; i++)
+          if (owner->args[i].id == drag_arg_id) {
+            cur = i;
+            break;
+          }
+        if (cur >= 0) {
+          // Row under the cursor (rows start below the header, ROW_H apart).
+          int tgt = static_cast<int>(std::floor((my - (g.by + BOX_H * g.z)) / (ROW_H * g.z)));
+          tgt     = std::clamp(tgt, 0, n - 1);
+          if (tgt != cur) {
+            const MethodArg a = owner->args[cur];
+            owner->args.erase(owner->args.begin() + cur);
+            owner->args.insert(owner->args.begin() + tgt, a);
+            arg_drag_moved = true;
+          }
+        }
+      }
+    }
+
     if (panning) {
       const float dx = mx - pan_last_x;
       const float dy = my - pan_last_y;
@@ -705,6 +748,21 @@ namespace front {
       }
       dragging   = false;
       drag_moved = false;
+    }
+    if (dragging_arg) {
+      EditorTab *t = cur();
+      if (t && arg_drag_moved) {
+        for (const Block &s : t->blocks)
+          if (s.id == drag_arg_owner) {
+            std::vector<std::string> ids;
+            for (const MethodArg &a : s.args) ids.push_back(a.id);
+            reorder_method_args(t->conn, t->schema, s.id, ids);
+            break;
+          }
+        reload();
+      }
+      dragging_arg   = false;
+      arg_drag_moved = false;
     }
   }
 
@@ -1041,10 +1099,17 @@ namespace front {
       }
       if (target) {
         int minus_i = arg_minus_at(tgeo, *target, mx, my);
+        int arg_i   = target->type == BlockType::Method ? arg_row_at(tgeo, *target, mx, my) : -1;
         if (minus_i >= 0) {
           del_arg(*target, target->args[minus_i].id);
         } else if (target->type == BlockType::Method && hit_circle(mx, my, tgeo.plus_cx, tgeo.plus_cy, tgeo.plus_r)) {
           add_arg(*target);
+        } else if (arg_i >= 0) {
+          // Grab an argument row to reorder it within the method.
+          dragging_arg   = true;
+          arg_drag_moved = false;
+          drag_arg_owner = target->id;
+          drag_arg_id    = target->args[arg_i].id;
         } else {
           dragging    = true;
           drag_moved  = false;

@@ -49,6 +49,13 @@ namespace front {
     std::string drag_id;
     float       drag_last_x = 0, drag_last_y = 0;
 
+    // Argument reorder drag (left button on a method's argument row). The dragged
+    // argument is moved within its method's args vector live as the cursor crosses
+    // rows; the new order is persisted on release.
+    bool        dragging_arg = false, arg_drag_moved = false;
+    std::string drag_arg_owner; // owning method block id
+    std::string drag_arg_id;    // the argument being dragged
+
     // Type-chooser popup (double-click on empty canvas).
     bool  chooser_open = false;
     float chooser_wx = 0, chooser_wy = 0; // world coords of the remembered click
