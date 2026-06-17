@@ -21,9 +21,9 @@ namespace back {
       pqxx::result      rows =
           txn.exec_params("SELECT s.id, s.unit_id, s.type, s.x, s.y, s.width, s.height, "
                           "       COALESCE(m.name, f.name, ''), "
-                          "       COALESCE(m.disabled, false), "
+                          "       COALESCE(m.disabled, f.disabled, false), "
                           "       COALESCE(m.type, 'Inner'), "
-                          "       COALESCE(m.access, 'Private') "
+                          "       COALESCE(m.access, f.access, 'Private') "
                           "FROM " + qs + ".unit_bl s "
                           "LEFT JOIN " + qs + ".unit_bl_method m ON m.id = s.id "
                           "LEFT JOIN " + qs + ".unit_bl_field  f ON f.id = s.id "
@@ -235,6 +235,34 @@ namespace back {
   std::pair<bool, std::string> update_method_access(const Conn &c, const std::string &schema, const std::string &id, MethodAccess access)
   {
     return update_method_column(c, schema, id, "access", to_string(access));
+  }
+
+  // Helper: UPDATE one unit_bl_field column for a single field id.
+  static std::pair<bool, std::string> update_field_column(
+      const Conn &c, const std::string &schema, const std::string &id, const std::string &column, const std::string &value)
+  {
+    try {
+      pqxx::connection pg(make_cs(c));
+      pqxx::work       txn(pg);
+      // `column` is a fixed internal literal, never user input.
+      txn.exec_params("UPDATE " + pg.quote_name(schema) + ".unit_bl_field SET " + column + " = $1 WHERE id = $2", value, id);
+      txn.commit();
+      return {true, ""};
+    } catch (const pqxx::sql_error &e) {
+      return {false, sql_err_msg(e)};
+    } catch (const std::exception &e) {
+      return {false, e.what()};
+    }
+  }
+
+  std::pair<bool, std::string> update_field_disabled(const Conn &c, const std::string &schema, const std::string &id, bool disabled)
+  {
+    return update_field_column(c, schema, id, "disabled", disabled ? "true" : "false");
+  }
+
+  std::pair<bool, std::string> update_field_access(const Conn &c, const std::string &schema, const std::string &id, MethodAccess access)
+  {
+    return update_field_column(c, schema, id, "access", to_string(access));
   }
 
   std::pair<bool, std::string> update_block_name(

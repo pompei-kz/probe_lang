@@ -245,8 +245,8 @@ namespace front {
                          int                hov_minus)
   {
     const float z = g.z;
-    // A deactivated method renders dim and monochrome.
-    const bool disabled = s.type == BlockType::Method && s.disabled;
+    // A deactivated block renders dim and monochrome.
+    const bool disabled = s.disabled;
     const Clr  accent   = disabled ? C_DIM : C_ACCENT;
     const Clr  txt      = disabled ? C_DIM : C_TEXT;
 
@@ -474,7 +474,7 @@ namespace front {
     }
     const Block *m = nullptr;
     for (const Block &b : t->blocks)
-      if (b.id == method_menu_id && b.type == BlockType::Method) {
+      if (b.id == method_menu_id) {
         m = &b;
         break;
       }
@@ -482,10 +482,12 @@ namespace front {
       method_menu_open = false;
       return;
     }
+    const bool is_method = m->type == BlockType::Method;
 
-    // Build the menu: the method-type group, then the access group, then the
-    // deactivate/activate toggle at the bottom. A dot marks the current value
-    // (shown normally, but not selectable); the other values have no marker.
+    // Build the menu: for methods the method-type group first, then (both kinds)
+    // the access group and the deactivate/activate toggle at the bottom. A dot
+    // marks the current value (shown normally, but not selectable); the other
+    // values have no marker.
     enum { ACT_TOGGLE, ACT_INNER, ACT_STATIC, ACT_CTOR, ACT_DTOR, ACT_PRIVATE, ACT_PROTECTED, ACT_PUBLIC };
     enum Mark { MARK_NONE, MARK_CURRENT, MARK_SWITCH };
     struct Item
@@ -500,11 +502,13 @@ namespace front {
     };
 
     std::vector<Item> items;
-    items.push_back(grp(m->method_type == MethodType::Inner, "Внутренний", ACT_INNER));
-    items.push_back(grp(m->method_type == MethodType::Static, "Статичный", ACT_STATIC));
-    items.push_back(grp(m->method_type == MethodType::Constructor, "Конструктор", ACT_CTOR));
-    items.push_back(grp(m->method_type == MethodType::Destructor, "Деструктор", ACT_DTOR));
-    items.push_back({"", true, -1, MARK_NONE});
+    if (is_method) {
+      items.push_back(grp(m->method_type == MethodType::Inner, "Внутренний", ACT_INNER));
+      items.push_back(grp(m->method_type == MethodType::Static, "Статичный", ACT_STATIC));
+      items.push_back(grp(m->method_type == MethodType::Constructor, "Конструктор", ACT_CTOR));
+      items.push_back(grp(m->method_type == MethodType::Destructor, "Деструктор", ACT_DTOR));
+      items.push_back({"", true, -1, MARK_NONE});
+    }
     items.push_back(grp(m->access == MethodAccess::Private, "Приватный", ACT_PRIVATE));
     items.push_back(grp(m->access == MethodAccess::Protected, "Защищённый", ACT_PROTECTED));
     items.push_back(grp(m->access == MethodAccess::Public, "Всеобщий", ACT_PUBLIC));
@@ -554,15 +558,28 @@ namespace front {
 
     if (chosen < 0) return;
 
+    // Access and the disabled toggle exist on both kinds; the method-type group
+    // is method-only.
+    auto set_access = [&](MethodAccess a) {
+      if (is_method)
+        update_method_access(t->conn, t->schema, m->id, a);
+      else
+        update_field_access(t->conn, t->schema, m->id, a);
+    };
     switch (chosen) {
-      case ACT_TOGGLE: update_method_disabled(t->conn, t->schema, m->id, !m->disabled); break;
+      case ACT_TOGGLE:
+        if (is_method)
+          update_method_disabled(t->conn, t->schema, m->id, !m->disabled);
+        else
+          update_field_disabled(t->conn, t->schema, m->id, !m->disabled);
+        break;
       case ACT_INNER: update_method_type(t->conn, t->schema, m->id, MethodType::Inner); break;
       case ACT_STATIC: update_method_type(t->conn, t->schema, m->id, MethodType::Static); break;
       case ACT_CTOR: update_method_type(t->conn, t->schema, m->id, MethodType::Constructor); break;
       case ACT_DTOR: update_method_type(t->conn, t->schema, m->id, MethodType::Destructor); break;
-      case ACT_PRIVATE: update_method_access(t->conn, t->schema, m->id, MethodAccess::Private); break;
-      case ACT_PROTECTED: update_method_access(t->conn, t->schema, m->id, MethodAccess::Protected); break;
-      case ACT_PUBLIC: update_method_access(t->conn, t->schema, m->id, MethodAccess::Public); break;
+      case ACT_PRIVATE: set_access(MethodAccess::Private); break;
+      case ACT_PROTECTED: set_access(MethodAccess::Protected); break;
+      case ACT_PUBLIC: set_access(MethodAccess::Public); break;
     }
     method_menu_open = false;
     reload();
@@ -923,12 +940,13 @@ namespace front {
       return;
     }
 
-    // Method context menu: open on right-click over a method's name header.
+    // Block context menu: open on right-click over a block's name header
+    // (methods and fields both have one).
     if (!method_menu_open && rdown && !chooser_open && !tab_clicked && hit(mx, my, cx, cy, cw, ch)) {
       const Block *target = nullptr;
       for (const Block &s : t->blocks) {
         BoxGeo g = box_geo(*this, s);
-        if (s.type == BlockType::Method && hit(mx, my, g.bx, g.by, g.bw, BOX_H * static_cast<float>(t->zoom))) target = &s;
+        if (hit(mx, my, g.bx, g.by, g.bw, BOX_H * static_cast<float>(t->zoom))) target = &s;
       }
       if (target) {
         method_menu_open = true;

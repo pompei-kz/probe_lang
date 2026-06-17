@@ -135,5 +135,11 @@ namespace back {
       ensureCreatedAt(txn, schema, "unit_bl_field");
       ensureLastModifiedAt(txn, schema, "unit_bl_field");
     }
+
+    // Migrate older unit_bl_field tables that predate these columns.
+    const std::string qField = schemaQuoted + ".unit_bl_field";
+    txn.exec("ALTER TABLE " + qField + " ADD COLUMN IF NOT EXISTS access text default 'Private'");
+    txn.exec("ALTER TABLE " + qField + " ADD COLUMN IF NOT EXISTS commented bool default false");
+    txn.exec("ALTER TABLE " + qField + " ADD COLUMN IF NOT EXISTS disabled bool default false");
   }
 } // namespace back

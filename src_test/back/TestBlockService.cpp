@@ -414,3 +414,39 @@ TEST_F(BlockServiceTest, UpdateMethodAttributesPersist)
   EXPECT_EQ(blocks[0].method_type, MethodType::Constructor);
   EXPECT_EQ(blocks[0].access, MethodAccess::Public);
 }
+
+TEST_F(BlockServiceTest, NewFieldHasDefaultAttributes)
+{
+  make_schema();
+  ASSERT_FALSE(create_block(conn(), schema, "u1", BlockType::Field, 0, 0, 50, 20, "f").first.empty());
+
+  auto [blocks, err] = load_blocks_in_view(conn(), schema, "u1", -1000, -1000, 1000, 1000);
+  ASSERT_TRUE(err.empty()) << err;
+  ASSERT_EQ(blocks.size(), 1u);
+  EXPECT_EQ(blocks[0].type, BlockType::Field);
+  EXPECT_FALSE(blocks[0].disabled);
+  EXPECT_EQ(blocks[0].access, MethodAccess::Private);
+}
+
+TEST_F(BlockServiceTest, UpdateFieldAttributesPersist)
+{
+  make_schema();
+  auto [fid, fmsg] = create_block(conn(), schema, "u1", BlockType::Field, 0, 0, 50, 20, "f");
+  ASSERT_FALSE(fid.empty()) << fmsg;
+
+  //
+  //
+  auto disabled = update_field_disabled(conn(), schema, fid, true);
+  auto access   = update_field_access(conn(), schema, fid, MethodAccess::Protected);
+  //
+  //
+
+  ASSERT_TRUE(disabled.first) << disabled.second;
+  ASSERT_TRUE(access.first) << access.second;
+
+  auto [blocks, err] = load_blocks_in_view(conn(), schema, "u1", -1000, -1000, 1000, 1000);
+  ASSERT_TRUE(err.empty()) << err;
+  ASSERT_EQ(blocks.size(), 1u);
+  EXPECT_TRUE(blocks[0].disabled);
+  EXPECT_EQ(blocks[0].access, MethodAccess::Protected);
+}

@@ -31,9 +31,9 @@ namespace back::model {
     float                  width = 0, height = 0;
     std::string            name;             // from unit_bl_method / unit_bl_field
     std::vector<MethodArg> args;             // method arguments, ordered (methods only)
-    // Method-only (from unit_bl_method); ignored for fields.
+    // disabled/access come from unit_bl_method or unit_bl_field per `type`.
     bool                   disabled = false;
-    MethodType             method_type = MethodType::Inner;
+    MethodType             method_type = MethodType::Inner; // method-only; ignored for fields
     MethodAccess           access = MethodAccess::Private;
   };
 

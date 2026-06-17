@@ -52,6 +52,10 @@ namespace back {
   std::pair<bool, std::string> update_method_type(const model::Conn &c, const std::string &schema, const std::string &id, model::MethodType type);
   std::pair<bool, std::string> update_method_access(const model::Conn &c, const std::string &schema, const std::string &id, model::MethodAccess access);
 
+  // Update field attributes (unit_bl_field.disabled / access).
+  std::pair<bool, std::string> update_field_disabled(const model::Conn &c, const std::string &schema, const std::string &id, bool disabled);
+  std::pair<bool, std::string> update_field_access(const model::Conn &c, const std::string &schema, const std::string &id, model::MethodAccess access);
+
   // Update a block's box size (unit_bl.width / height). The geom column is
   // regenerated automatically.
   std::pair<bool, std::string> update_block_size(
