@@ -466,10 +466,10 @@ namespace front {
   {
     EditorTab *t = cur();
     if (!t) return;
-    auto [id, err] = append_method_arg(t->conn, t->schema, m.id, "новыйАргумент");
+    auto [id, err] = append_method_arg(t->conn, t->schema, m.id, "Новый Аргумент");
     if (id.empty()) return;
     // Resize the box for the extra row and persist before reloading.
-    const float w = std::max(block_fit_width(m), fit_width("новыйАргумент"));
+    const float w = std::max(block_fit_width(m), fit_width("Новый Аргумент"));
     const float h = method_height_for(static_cast<int>(m.args.size()) + 1);
     update_block_size(t->conn, t->schema, m.id, w, h);
     reload();
@@ -846,8 +846,8 @@ namespace front {
       return hov;
     };
 
-    bool hm = sample(oy + PAD, 'M', "newMethod");
-    bool hf = sample(oy + PAD + SH + GAP, 'F', "newField");
+    bool hm = sample(oy + PAD, 'M', "Новый Метод");
+    bool hf = sample(oy + PAD + SH + GAP, 'F', "Новое Поле");
 
     if (ldown) {
       if (hm) {
@@ -857,13 +857,13 @@ namespace front {
                          BlockType::Method,
                          e.chooser_wx,
                          e.chooser_wy,
-                         fit_width("newMethod"),
+                         fit_width("Новый Метод"),
                          method_height_for(0),
-                         "newMethod");
+                         "Новый Метод");
         e.chooser_open = false;
         e.reload();
       } else if (hf) {
-        create_block(t->conn, t->schema, t->unit_id, BlockType::Field, e.chooser_wx, e.chooser_wy, fit_width("newField"), BOX_H, "newField");
+        create_block(t->conn, t->schema, t->unit_id, BlockType::Field, e.chooser_wx, e.chooser_wy, fit_width("Новое Поле"), BOX_H, "Новое Поле");
         e.chooser_open = false;
         e.reload();
       } else {
