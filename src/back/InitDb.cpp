@@ -31,7 +31,7 @@ namespace back {
     ensureCreatedAt(txn, schema, "unit");
     ensureLastModifiedAt(txn, schema, "unit");
 
-    init_unit_bl_tables(txn, pg, schema);
+    init_unit_b_tables(txn, pg, schema);
   }
 
   void init_repo_schema(pqxx::work &txn, pqxx::connection &pg, const std::string &schema)
@@ -48,10 +48,10 @@ namespace back {
 
     init_folder_table(txn, pg, schema);
     init_unit_table(txn, pg, schema);
-    init_unit_bl_tables(txn, pg, schema);
+    init_unit_b_tables(txn, pg, schema);
   }
 
-  void init_unit_bl_tables(pqxx::work &txn, pqxx::connection &pg, const std::string &schema)
+  void init_unit_b_tables(pqxx::work &txn, pqxx::connection &pg, const std::string &schema)
   {
     const std::string schemaQuoted = pg.quote_name(schema);
 
@@ -59,9 +59,9 @@ namespace back {
       txn.exec("CREATE SCHEMA " + schemaQuoted);
     }
 
-    if (!hasTable(txn, schema, "unit_bl")) {
+    if (!hasTable(txn, schema, "unit_b")) {
       txn.exec("CREATE TABLE " + schemaQuoted +
-               ".unit_bl "
+               ".unit_b "
                "("
                "  id        VARCHAR(32) primary key,"
                "  unit_id   VARCHAR(32) not null,"
@@ -77,16 +77,16 @@ namespace back {
                ")");
     }
 
-    if (!hasIndex(txn, schema, "unit_bl_geom")) {
-      txn.exec("CREATE INDEX unit_bl_geom ON " + schemaQuoted + ".unit_bl USING GIST(geom)");
+    if (!hasIndex(txn, schema, "unit_b_geom")) {
+      txn.exec("CREATE INDEX unit_b_geom ON " + schemaQuoted + ".unit_b USING GIST(geom)");
     }
 
-    ensureCreatedAt(txn, schema, "unit_bl");
-    ensureLastModifiedAt(txn, schema, "unit_bl");
+    ensureCreatedAt(txn, schema, "unit_b");
+    ensureLastModifiedAt(txn, schema, "unit_b");
 
-    if (!hasTable(txn, schema, "unit_bl_method")) {
+    if (!hasTable(txn, schema, "unit_b_method")) {
       txn.exec("CREATE TABLE " + schemaQuoted +
-               ".unit_bl_method "
+               ".unit_b_method "
                "("
                "  id           varchar(32) primary key,"
                "  type         text CHECK (type IN ('Inner','Static','Constructor','Destructor')) default 'Inner',"
@@ -96,19 +96,19 @@ namespace back {
                "  name         text"
                ")");
 
-      ensureCreatedAt(txn, schema, "unit_bl_method");
-      ensureLastModifiedAt(txn, schema, "unit_bl_method");
+      ensureCreatedAt(txn, schema, "unit_b_method");
+      ensureLastModifiedAt(txn, schema, "unit_b_method");
     }
 
-    // Migrate older unit_bl_method tables that predate these columns.
-    const std::string qMethod = schemaQuoted + ".unit_bl_method";
+    // Migrate older unit_b_method tables that predate these columns.
+    const std::string qMethod = schemaQuoted + ".unit_b_method";
     txn.exec("ALTER TABLE " + qMethod + " ADD COLUMN IF NOT EXISTS type text default 'Inner'");
     txn.exec("ALTER TABLE " + qMethod + " ADD COLUMN IF NOT EXISTS access text default 'Private'");
     txn.exec("ALTER TABLE " + qMethod + " ADD COLUMN IF NOT EXISTS disabled bool default false");
 
-    if (!hasTable(txn, schema, "unit_bl_method_arg")) {
+    if (!hasTable(txn, schema, "unit_b_method_arg")) {
       txn.exec("CREATE TABLE " + schemaQuoted +
-               ".unit_bl_method_arg "
+               ".unit_b_method_arg "
                "("
                "  id              varchar(32) primary key,"
                "  owner_method_id varchar(32) not null,"
@@ -116,13 +116,13 @@ namespace back {
                "  name            text"
                ")");
 
-      ensureCreatedAt(txn, schema, "unit_bl_method_arg");
-      ensureLastModifiedAt(txn, schema, "unit_bl_method_arg");
+      ensureCreatedAt(txn, schema, "unit_b_method_arg");
+      ensureLastModifiedAt(txn, schema, "unit_b_method_arg");
     }
 
-    if (!hasTable(txn, schema, "unit_bl_field")) {
+    if (!hasTable(txn, schema, "unit_b_field")) {
       txn.exec("CREATE TABLE " + schemaQuoted +
-               ".unit_bl_field "
+               ".unit_b_field "
                "("
                "  id varchar(32) primary key,"
                "  next_unit_id varchar(32),"
@@ -132,12 +132,12 @@ namespace back {
                "  name text"
                ")");
 
-      ensureCreatedAt(txn, schema, "unit_bl_field");
-      ensureLastModifiedAt(txn, schema, "unit_bl_field");
+      ensureCreatedAt(txn, schema, "unit_b_field");
+      ensureLastModifiedAt(txn, schema, "unit_b_field");
     }
 
-    // Migrate older unit_bl_field tables that predate these columns.
-    const std::string qField = schemaQuoted + ".unit_bl_field";
+    // Migrate older unit_b_field tables that predate these columns.
+    const std::string qField = schemaQuoted + ".unit_b_field";
     txn.exec("ALTER TABLE " + qField + " ADD COLUMN IF NOT EXISTS access text default 'Private'");
     txn.exec("ALTER TABLE " + qField + " ADD COLUMN IF NOT EXISTS commented bool default false");
     txn.exec("ALTER TABLE " + qField + " ADD COLUMN IF NOT EXISTS disabled bool default false");

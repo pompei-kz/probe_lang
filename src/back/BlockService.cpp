@@ -15,7 +15,7 @@ namespace back {
       pqxx::connection pg(make_cs(c));
       pqxx::work       txn(pg);
 
-      if (!hasTable(txn, schema, "unit_bl")) return {{}, ""};
+      if (!hasTable(txn, schema, "unit_b")) return {{}, ""};
 
       const std::string qs = pg.quote_name(schema);
       pqxx::result      rows =
@@ -24,9 +24,9 @@ namespace back {
                           "       COALESCE(m.disabled, f.disabled, false), "
                           "       COALESCE(m.type, 'Inner'), "
                           "       COALESCE(m.access, f.access, 'Private') "
-                          "FROM " + qs + ".unit_bl s "
-                          "LEFT JOIN " + qs + ".unit_bl_method m ON m.id = s.id "
-                          "LEFT JOIN " + qs + ".unit_bl_field  f ON f.id = s.id "
+                          "FROM " + qs + ".unit_b s "
+                          "LEFT JOIN " + qs + ".unit_b_method m ON m.id = s.id "
+                          "LEFT JOIN " + qs + ".unit_b_field  f ON f.id = s.id "
                           "WHERE s.unit_id = $1 AND s.geom && ST_MakeEnvelope($2, $3, $4, $5, 0)",
                           unit_id,
                           min_x,
@@ -53,12 +53,12 @@ namespace back {
       }
 
       // Attach method arguments. One query for the whole unit (joined through
-      // unit_bl), then distributed to the in-view method blocks by owner id.
-      if (hasTable(txn, schema, "unit_bl_method_arg")) {
+      // unit_b), then distributed to the in-view method blocks by owner id.
+      if (hasTable(txn, schema, "unit_b_method_arg")) {
         pqxx::result args = txn.exec_params(
             "SELECT a.id, a.owner_method_id, a.name "
-            "FROM " + qs + ".unit_bl_method_arg a "
-            "JOIN " + qs + ".unit_bl s ON s.id = a.owner_method_id "
+            "FROM " + qs + ".unit_b_method_arg a "
+            "JOIN " + qs + ".unit_b s ON s.id = a.owner_method_id "
             "WHERE s.unit_id = $1 "
             "ORDER BY a.owner_method_id, a.order_index, a.id",
             unit_id);
@@ -88,10 +88,10 @@ namespace back {
       pqxx::connection pg(make_cs(c));
       pqxx::work       txn(pg);
 
-      if (!hasTable(txn, schema, "unit_bl")) return {std::nullopt, ""};
+      if (!hasTable(txn, schema, "unit_b")) return {std::nullopt, ""};
 
       pqxx::result r = txn.exec_params("SELECT min(x), min(y), max(x + width), max(y + height) "
-                                       "FROM " + pg.quote_name(schema) + ".unit_bl WHERE unit_id = $1",
+                                       "FROM " + pg.quote_name(schema) + ".unit_b WHERE unit_id = $1",
                                        unit_id);
       if (r.empty() || r[0][0].is_null()) return {std::nullopt, ""};
 
@@ -118,14 +118,14 @@ namespace back {
       pqxx::connection pg(make_cs(c));
       pqxx::work       txn(pg);
 
-      // Create the unit_bl tables in case the repo predates this feature.
-      init_unit_bl_tables(txn, pg, schema);
+      // Create the unit_b tables in case the repo predates this feature.
+      init_unit_b_tables(txn, pg, schema);
 
       const std::string qs       = pg.quote_name(schema);
       const std::string id       = new_id();
       const std::string type_str = to_string(type);
 
-      txn.exec_params("INSERT INTO " + qs + ".unit_bl (id, unit_id, type, x, y, width, height) "
+      txn.exec_params("INSERT INTO " + qs + ".unit_b (id, unit_id, type, x, y, width, height) "
                       "VALUES ($1, $2, $3, $4, $5, $6, $7)",
                       id,
                       unit_id,
@@ -135,7 +135,7 @@ namespace back {
                       width,
                       height);
 
-      const std::string detail = type == BlockType::Field ? ".unit_bl_field" : ".unit_bl_method";
+      const std::string detail = type == BlockType::Field ? ".unit_b_field" : ".unit_b_method";
       txn.exec_params("INSERT INTO " + qs + detail + " (id, name) VALUES ($1, $2)", id, name);
 
       txn.commit();
@@ -154,12 +154,12 @@ namespace back {
       pqxx::connection pg(make_cs(c));
       pqxx::work       txn(pg);
 
-      // Create the unit_bl tables in case the repo predates this feature.
-      init_unit_bl_tables(txn, pg, schema);
+      // Create the unit_b tables in case the repo predates this feature.
+      init_unit_b_tables(txn, pg, schema);
 
       const std::string id = new_id();
       txn.exec_params("INSERT INTO " + pg.quote_name(schema) +
-                          ".unit_bl_method_arg (id, owner_method_id, order_index, name) VALUES ($1, $2, $3, $4)",
+                          ".unit_b_method_arg (id, owner_method_id, order_index, name) VALUES ($1, $2, $3, $4)",
                       id,
                       owner_method_id,
                       order_index,
@@ -180,17 +180,17 @@ namespace back {
       pqxx::connection pg(make_cs(c));
       pqxx::work       txn(pg);
 
-      // Create the unit_bl tables in case the repo predates this feature.
-      init_unit_bl_tables(txn, pg, schema);
+      // Create the unit_b tables in case the repo predates this feature.
+      init_unit_b_tables(txn, pg, schema);
 
       // Always append at the end: order_index = max(order_index in this method) + 1.
       // Computed in the same transaction so a prior delete can't shift it.
       const std::string id = new_id();
       txn.exec_params("INSERT INTO " + pg.quote_name(schema) +
-                          ".unit_bl_method_arg (id, owner_method_id, order_index, name) "
+                          ".unit_b_method_arg (id, owner_method_id, order_index, name) "
                           "SELECT $1, $2::text, COALESCE(MAX(order_index), -1) + 1, $3 "
                           "FROM " +
-                          pg.quote_name(schema) + ".unit_bl_method_arg WHERE owner_method_id = $2::text",
+                          pg.quote_name(schema) + ".unit_b_method_arg WHERE owner_method_id = $2::text",
                       id,
                       owner_method_id,
                       name);
@@ -209,7 +209,7 @@ namespace back {
     try {
       pqxx::connection pg(make_cs(c));
       pqxx::work       txn(pg);
-      txn.exec_params("UPDATE " + pg.quote_name(schema) + ".unit_bl_method_arg SET name = $1 WHERE id = $2", name, id);
+      txn.exec_params("UPDATE " + pg.quote_name(schema) + ".unit_b_method_arg SET name = $1 WHERE id = $2", name, id);
       txn.commit();
       return {true, ""};
     } catch (const pqxx::sql_error &e) {
@@ -224,7 +224,7 @@ namespace back {
     try {
       pqxx::connection pg(make_cs(c));
       pqxx::work       txn(pg);
-      txn.exec_params("DELETE FROM " + pg.quote_name(schema) + ".unit_bl_method_arg WHERE id = $1", id);
+      txn.exec_params("DELETE FROM " + pg.quote_name(schema) + ".unit_b_method_arg WHERE id = $1", id);
       txn.commit();
       return {true, ""};
     } catch (const pqxx::sql_error &e) {
@@ -243,7 +243,7 @@ namespace back {
       // Rewrite order_index to match the given sequence (0..n-1), all in one
       // transaction. The owner_method_id guard keeps it scoped to this method.
       const std::string q =
-          "UPDATE " + pg.quote_name(schema) + ".unit_bl_method_arg SET order_index = $1 WHERE id = $2 AND owner_method_id = $3";
+          "UPDATE " + pg.quote_name(schema) + ".unit_b_method_arg SET order_index = $1 WHERE id = $2 AND owner_method_id = $3";
       for (int i = 0; i < static_cast<int>(ordered_ids.size()); i++) txn.exec_params(q, i, ordered_ids[i], owner_method_id);
       txn.commit();
       return {true, ""};
@@ -254,7 +254,7 @@ namespace back {
     }
   }
 
-  // Helper: UPDATE one unit_bl_method column for a single method id.
+  // Helper: UPDATE one unit_b_method column for a single method id.
   static std::pair<bool, std::string> update_method_column(
       const Conn &c, const std::string &schema, const std::string &id, const std::string &column, const std::string &value)
   {
@@ -262,7 +262,7 @@ namespace back {
       pqxx::connection pg(make_cs(c));
       pqxx::work       txn(pg);
       // `column` is a fixed internal literal, never user input.
-      txn.exec_params("UPDATE " + pg.quote_name(schema) + ".unit_bl_method SET " + column + " = $1 WHERE id = $2", value, id);
+      txn.exec_params("UPDATE " + pg.quote_name(schema) + ".unit_b_method SET " + column + " = $1 WHERE id = $2", value, id);
       txn.commit();
       return {true, ""};
     } catch (const pqxx::sql_error &e) {
@@ -287,7 +287,7 @@ namespace back {
     return update_method_column(c, schema, id, "access", to_string(access));
   }
 
-  // Helper: UPDATE one unit_bl_field column for a single field id.
+  // Helper: UPDATE one unit_b_field column for a single field id.
   static std::pair<bool, std::string> update_field_column(
       const Conn &c, const std::string &schema, const std::string &id, const std::string &column, const std::string &value)
   {
@@ -295,7 +295,7 @@ namespace back {
       pqxx::connection pg(make_cs(c));
       pqxx::work       txn(pg);
       // `column` is a fixed internal literal, never user input.
-      txn.exec_params("UPDATE " + pg.quote_name(schema) + ".unit_bl_field SET " + column + " = $1 WHERE id = $2", value, id);
+      txn.exec_params("UPDATE " + pg.quote_name(schema) + ".unit_b_field SET " + column + " = $1 WHERE id = $2", value, id);
       txn.commit();
       return {true, ""};
     } catch (const pqxx::sql_error &e) {
@@ -321,7 +321,7 @@ namespace back {
     try {
       pqxx::connection  pg(make_cs(c));
       pqxx::work        txn(pg);
-      const std::string detail = type == BlockType::Field ? ".unit_bl_field" : ".unit_bl_method";
+      const std::string detail = type == BlockType::Field ? ".unit_b_field" : ".unit_b_method";
       txn.exec_params("UPDATE " + pg.quote_name(schema) + detail + " SET name = $1 WHERE id = $2", name, id);
       txn.commit();
       return {true, ""};
@@ -338,11 +338,11 @@ namespace back {
       pqxx::connection  pg(make_cs(c));
       pqxx::work        txn(pg);
       const std::string qs     = pg.quote_name(schema);
-      const std::string detail = type == BlockType::Field ? ".unit_bl_field" : ".unit_bl_method";
+      const std::string detail = type == BlockType::Field ? ".unit_b_field" : ".unit_b_method";
       if (type == BlockType::Method)
-        txn.exec_params("DELETE FROM " + qs + ".unit_bl_method_arg WHERE owner_method_id = $1", id);
+        txn.exec_params("DELETE FROM " + qs + ".unit_b_method_arg WHERE owner_method_id = $1", id);
       txn.exec_params("DELETE FROM " + qs + detail + " WHERE id = $1", id);
-      txn.exec_params("DELETE FROM " + qs + ".unit_bl WHERE id = $1", id);
+      txn.exec_params("DELETE FROM " + qs + ".unit_b WHERE id = $1", id);
       txn.commit();
       return {true, ""};
     } catch (const pqxx::sql_error &e) {
@@ -358,7 +358,7 @@ namespace back {
     try {
       pqxx::connection pg(make_cs(c));
       pqxx::work       txn(pg);
-      txn.exec_params("UPDATE " + pg.quote_name(schema) + ".unit_bl SET width = $1, height = $2 WHERE id = $3", width, height, id);
+      txn.exec_params("UPDATE " + pg.quote_name(schema) + ".unit_b SET width = $1, height = $2 WHERE id = $3", width, height, id);
       txn.commit();
       return {true, ""};
     } catch (const pqxx::sql_error &e) {
@@ -374,7 +374,7 @@ namespace back {
     try {
       pqxx::connection pg(make_cs(c));
       pqxx::work       txn(pg);
-      txn.exec_params("UPDATE " + pg.quote_name(schema) + ".unit_bl SET x = $1, y = $2 WHERE id = $3", x, y, id);
+      txn.exec_params("UPDATE " + pg.quote_name(schema) + ".unit_b SET x = $1, y = $2 WHERE id = $3", x, y, id);
       txn.commit();
       return {true, ""};
     } catch (const pqxx::sql_error &e) {

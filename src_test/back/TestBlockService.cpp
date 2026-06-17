@@ -11,7 +11,7 @@ using namespace back::model;
 class BlockServiceTest : public DbTest
 {
 protected:
-  // Name stored in the detail table for a given unit_bl id ("" if absent).
+  // Name stored in the detail table for a given unit_b id ("" if absent).
   std::string detail_name(const std::string &table, const std::string &id)
   {
     pqxx::work txn(*pg);
@@ -19,10 +19,10 @@ protected:
     return r.empty() ? "" : r[0][0].c_str();
   }
 
-  long unit_bl_count()
+  long unit_b_count()
   {
     pqxx::work txn(*pg);
-    return txn.exec("SELECT count(*) FROM " + qual("unit_bl"))[0][0].as<long>();
+    return txn.exec("SELECT count(*) FROM " + qual("unit_b"))[0][0].as<long>();
   }
 };
 
@@ -33,7 +33,7 @@ protected:
 TEST_F(BlockServiceTest, CreateBlockCreatesTablesIfMissing)
 {
   make_schema();
-  ASSERT_FALSE(table_exists("unit_bl"));
+  ASSERT_FALSE(table_exists("unit_b"));
 
   //
   //
@@ -42,9 +42,9 @@ TEST_F(BlockServiceTest, CreateBlockCreatesTablesIfMissing)
   //
 
   ASSERT_FALSE(id.empty()) << msg;
-  EXPECT_TRUE(table_exists("unit_bl"));
-  EXPECT_TRUE(table_exists("unit_bl_method"));
-  EXPECT_TRUE(table_exists("unit_bl_field"));
+  EXPECT_TRUE(table_exists("unit_b"));
+  EXPECT_TRUE(table_exists("unit_b_method"));
+  EXPECT_TRUE(table_exists("unit_b_field"));
 }
 
 TEST_F(BlockServiceTest, CreateMethodInsertsUnitBlAndMethodRow)
@@ -58,9 +58,9 @@ TEST_F(BlockServiceTest, CreateMethodInsertsUnitBlAndMethodRow)
   //
 
   ASSERT_FALSE(id.empty()) << msg;
-  EXPECT_EQ(unit_bl_count(), 1);
-  EXPECT_EQ(detail_name("unit_bl_method", id), "doWork");
-  EXPECT_EQ(detail_name("unit_bl_field", id), ""); // not in the field table
+  EXPECT_EQ(unit_b_count(), 1);
+  EXPECT_EQ(detail_name("unit_b_method", id), "doWork");
+  EXPECT_EQ(detail_name("unit_b_field", id), ""); // not in the field table
 }
 
 TEST_F(BlockServiceTest, CreateFieldInsertsIntoFieldTable)
@@ -74,8 +74,8 @@ TEST_F(BlockServiceTest, CreateFieldInsertsIntoFieldTable)
   //
 
   ASSERT_FALSE(id.empty()) << msg;
-  EXPECT_EQ(detail_name("unit_bl_field", id), "count");
-  EXPECT_EQ(detail_name("unit_bl_method", id), "");
+  EXPECT_EQ(detail_name("unit_b_field", id), "count");
+  EXPECT_EQ(detail_name("unit_b_method", id), "");
 }
 
 // ---------------------------------------------------------------------------
@@ -164,7 +164,7 @@ TEST_F(BlockServiceTest, LoadReturnsBothMethodAndFieldNames)
 
 TEST_F(BlockServiceTest, LoadEmptyWhenTableMissing)
 {
-  make_schema(); // schema exists, but no unit_bl table
+  make_schema(); // schema exists, but no unit_b table
 
   //
   //
@@ -234,7 +234,7 @@ TEST_F(BlockServiceTest, UpdateBlockNamePersists)
   //
 
   ASSERT_TRUE(ok) << err;
-  EXPECT_EQ(detail_name("unit_bl_method", id), "renamed");
+  EXPECT_EQ(detail_name("unit_b_method", id), "renamed");
 }
 
 // ---------------------------------------------------------------------------
@@ -302,7 +302,7 @@ TEST_F(BlockServiceTest, CreateMethodArgInsertsRow)
   //
 
   ASSERT_FALSE(aid.empty()) << amsg;
-  EXPECT_EQ(detail_name("unit_bl_method_arg", aid), "arg0");
+  EXPECT_EQ(detail_name("unit_b_method_arg", aid), "arg0");
 }
 
 TEST_F(BlockServiceTest, LoadAttachesArgsToMethodsInOrder)
@@ -342,7 +342,7 @@ TEST_F(BlockServiceTest, UpdateMethodArgNamePersists)
   //
 
   ASSERT_TRUE(ok) << err;
-  EXPECT_EQ(detail_name("unit_bl_method_arg", aid), "renamed");
+  EXPECT_EQ(detail_name("unit_b_method_arg", aid), "renamed");
 }
 
 TEST_F(BlockServiceTest, DeleteMethodArgRemovesRow)
@@ -360,7 +360,7 @@ TEST_F(BlockServiceTest, DeleteMethodArgRemovesRow)
   //
 
   ASSERT_TRUE(ok) << err;
-  EXPECT_EQ(detail_name("unit_bl_method_arg", aid), "");
+  EXPECT_EQ(detail_name("unit_b_method_arg", aid), "");
   auto [blocks, lerr] = load_blocks_in_view(conn(), schema, "u1", -1000, -1000, 1000, 1000);
   ASSERT_TRUE(lerr.empty()) << lerr;
   ASSERT_EQ(blocks.size(), 1u);

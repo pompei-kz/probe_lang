@@ -148,9 +148,9 @@ window icon (`resources/application_icon.png`) is decoded with stb_image in `fro
 ## DB schema shape (per repository schema)
 
 `lang_setting`, `folder` (self-referential tree via `parent_id`), `unit` (Class/Interface/Enum,
-optional `parent_folder_id`), `unit_bl` (a block: `x/y/width/height` + generated PostGIS `geom`,
-GIST-indexed), and the detail tables `unit_bl_method` / `unit_bl_field` (1:1 with `unit_bl`, chosen by
-`BlockType`) plus `unit_bl_method_arg` (ordered method arguments). Block geometry edits update
+optional `parent_folder_id`), `unit_b` (a block: `x/y/width/height` + generated PostGIS `geom`,
+GIST-indexed), and the detail tables `unit_b_method` / `unit_b_field` (1:1 with `unit_b`, chosen by
+`BlockType`) plus `unit_b_method_arg` (ordered method arguments). Block geometry edits update
 `x/y/width/height`; `geom` regenerates automatically.
 
 ## Conventions

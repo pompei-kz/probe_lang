@@ -4,16 +4,16 @@
 
 namespace back::model {
 
-  // A Block is one row of unit_bl, displayed as a box on the editor canvas.
-  // It is either a Method (extra fields in unit_bl_method) or a Field
-  // (extra fields in unit_bl_field), discriminated by `type`.
+  // A Block is one row of unit_b, displayed as a box on the editor canvas.
+  // It is either a Method (extra fields in unit_b_method) or a Field
+  // (extra fields in unit_b_field), discriminated by `type`.
   enum class BlockType { Method, Field };
 
-  // Method-only attributes stored in unit_bl_method.
+  // Method-only attributes stored in unit_b_method.
   enum class MethodType { Inner, Static, Constructor, Destructor };
   enum class MethodAccess { Private, Protected, Public };
 
-  // One argument of a method block (a row of unit_bl_method_arg). Drawn as a
+  // One argument of a method block (a row of unit_b_method_arg). Drawn as a
   // row below the method's badge; absent for field blocks.
   struct MethodArg
   {
@@ -29,9 +29,9 @@ namespace back::model {
     BlockType              type = BlockType::Method;
     float                  x = 0, y = 0;     // top-left, world coordinates
     float                  width = 0, height = 0;
-    std::string            name;             // from unit_bl_method / unit_bl_field
+    std::string            name;             // from unit_b_method / unit_b_field
     std::vector<MethodArg> args;             // method arguments, ordered (methods only)
-    // disabled/access come from unit_bl_method or unit_bl_field per `type`.
+    // disabled/access come from unit_b_method or unit_b_field per `type`.
     bool                   disabled = false;
     MethodType             method_type = MethodType::Inner; // method-only; ignored for fields
     MethodAccess           access = MethodAccess::Private;
