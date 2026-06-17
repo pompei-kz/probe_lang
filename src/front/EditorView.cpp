@@ -257,6 +257,22 @@ namespace front {
     if (hov_name) fill(ren, C_HOVER, g.bx + 1.f, g.by + 1.f, g.bw - 2.f, BOX_H * z - 2.f);
     if (hov_arg >= 0) fill(ren, C_HOVER, g.bx + 1.f, arg_row_y(g, hov_arg), g.bw - 2.f, ROW_H * z);
 
+    // Access marker along the left wall: a thick bar a small distance from the
+    // left edge, stopping short of the top and bottom. Private is solid,
+    // Protected is dashed, Public draws nothing.
+    if (s.access != MethodAccess::Public) {
+      const float lx = g.bx + 3.f * z;            // small gap from the left wall
+      const float lw = std::max(1.25f * z, 1.f);  // bar thickness
+      const float y0 = g.by + 4.f * z;            // stop short of the top
+      const float y1 = g.by + g.bh - 4.f * z;     // stop short of the bottom
+      if (s.access == MethodAccess::Private) {
+        fill(ren, accent, lx, y0, lw, y1 - y0);
+      } else { // Protected: dashed
+        const float dash = 5.f * z, gap = 3.f * z;
+        for (float y = y0; y < y1; y += dash + gap) fill(ren, accent, lx, y, lw, std::min(dash, y1 - y));
+      }
+    }
+
     // Badge (drawn on top of any highlight). The method type tweaks its look:
     // constructor shows a K, an inner method sits in a circle (not a square),
     // a destructor's letter is crossed out diagonally.
