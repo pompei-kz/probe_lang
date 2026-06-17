@@ -367,6 +367,33 @@ TEST_F(BlockServiceTest, DeleteMethodArgRemovesRow)
   EXPECT_TRUE(blocks[0].args.empty());
 }
 
+TEST_F(BlockServiceTest, AppendMethodArgGoesToEndAfterDelete)
+{
+  make_schema();
+  auto [mid, mmsg] = create_block(conn(), schema, "u1", BlockType::Method, 0, 0, 50, 20, "m");
+  ASSERT_FALSE(mid.empty()) << mmsg;
+  auto [a0, m0] = append_method_arg(conn(), schema, mid, "a0");
+  ASSERT_FALSE(a0.empty()) << m0;
+  auto [a1, m1] = append_method_arg(conn(), schema, mid, "a1");
+  ASSERT_FALSE(a1.empty()) << m1;
+  // Delete the first arg, then append a new one: it must land at the end.
+  ASSERT_TRUE(delete_method_arg(conn(), schema, a0).first);
+
+  //
+  //
+  auto [a2, m2] = append_method_arg(conn(), schema, mid, "a2");
+  //
+  //
+
+  ASSERT_FALSE(a2.empty()) << m2;
+  auto [blocks, err] = load_blocks_in_view(conn(), schema, "u1", -1000, -1000, 1000, 1000);
+  ASSERT_TRUE(err.empty()) << err;
+  ASSERT_EQ(blocks.size(), 1u);
+  ASSERT_EQ(blocks[0].args.size(), 2u);
+  EXPECT_EQ(blocks[0].args[0].name, "a1");
+  EXPECT_EQ(blocks[0].args[1].name, "a2");
+}
+
 // ---------------------------------------------------------------------------
 // method attributes: disabled / type / access
 // ---------------------------------------------------------------------------

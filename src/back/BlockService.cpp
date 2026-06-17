@@ -173,6 +173,36 @@ namespace back {
     }
   }
 
+  std::pair<std::string, std::string> append_method_arg(const Conn &c, const std::string &schema, const std::string &owner_method_id,
+                                                        const std::string &name)
+  {
+    try {
+      pqxx::connection pg(make_cs(c));
+      pqxx::work       txn(pg);
+
+      // Create the unit_bl tables in case the repo predates this feature.
+      init_unit_bl_tables(txn, pg, schema);
+
+      // Always append at the end: order_index = max(order_index in this method) + 1.
+      // Computed in the same transaction so a prior delete can't shift it.
+      const std::string id = new_id();
+      txn.exec_params("INSERT INTO " + pg.quote_name(schema) +
+                          ".unit_bl_method_arg (id, owner_method_id, order_index, name) "
+                          "SELECT $1, $2::text, COALESCE(MAX(order_index), -1) + 1, $3 "
+                          "FROM " +
+                          pg.quote_name(schema) + ".unit_bl_method_arg WHERE owner_method_id = $2::text",
+                      id,
+                      owner_method_id,
+                      name);
+      txn.commit();
+      return {id, ""};
+    } catch (const pqxx::sql_error &e) {
+      return {"", sql_err_msg(e)};
+    } catch (const std::exception &e) {
+      return {"", e.what()};
+    }
+  }
+
   std::pair<bool, std::string> update_method_arg_name(
       const Conn &c, const std::string &schema, const std::string &id, const std::string &name)
   {

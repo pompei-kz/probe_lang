@@ -453,8 +453,7 @@ namespace front {
   {
     EditorTab *t = cur();
     if (!t) return;
-    const double order_index = static_cast<double>(m.args.size());
-    auto [id, err]           = create_method_arg(t->conn, t->schema, m.id, order_index, "новыйАргумент");
+    auto [id, err] = append_method_arg(t->conn, t->schema, m.id, "новыйАргумент");
     if (id.empty()) return;
     // Resize the box for the extra row and persist before reloading.
     const float w = std::max(block_fit_width(m), fit_width("новыйАргумент"));

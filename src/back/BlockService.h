@@ -40,6 +40,12 @@ namespace back {
   std::pair<std::string, std::string> create_method_arg(
       const model::Conn &c, const std::string &schema, const std::string &owner_method_id, double order_index, const std::string &name);
 
+  // Create one argument and append it at the end of the method: its order_index
+  // is max(order_index in this method) + 1, computed atomically so a prior
+  // delete can't make it land in the middle. Returns the new id (empty on error).
+  std::pair<std::string, std::string> append_method_arg(
+      const model::Conn &c, const std::string &schema, const std::string &owner_method_id, const std::string &name);
+
   // Update a method argument's name (unit_bl_method_arg.name).
   std::pair<bool, std::string> update_method_arg_name(
       const model::Conn &c, const std::string &schema, const std::string &id, const std::string &name);
