@@ -2,6 +2,7 @@
 #include <SDL3/SDL_main.h>
 
 #include "front/App.h"
+#include "front/AppIcon.h"
 #include "front/DlgMouse.h"
 #include "front/FontAtlas.h"
 #include "front/common.h"
@@ -34,6 +35,12 @@ int main(int /*argc*/, char * /*argv*/[])
   if (!app.ren) {
     SDL_Log("CreateRenderer: %s", SDL_GetError());
     return 1;
+  }
+
+  // Window / taskbar icon: a procedurally drawn hedgehog (ёжик).
+  if (SDL_Surface *icon = make_hedgehog_icon()) {
+    SDL_SetWindowIcon(app.win, icon);
+    SDL_DestroySurface(icon);
   }
 
   SDL_SetRenderDrawBlendMode(app.ren, SDL_BLENDMODE_NONE);

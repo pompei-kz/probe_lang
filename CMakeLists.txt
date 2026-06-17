@@ -17,6 +17,7 @@ include(cmake/EmbedResources.cmake)
 
 add_executable(probe_lang
         src/main.cpp
+        src/front/AppIcon.cpp
         src/front/common.cpp
         src/front/PanelMenu.cpp
         src/front/FontAtlas.cpp

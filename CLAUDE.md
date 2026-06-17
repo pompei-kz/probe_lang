@@ -118,10 +118,32 @@ Two namespaces, cleanly separated — `back` (logic + persistence) never include
 
 ### Resources
 
-`cmake/EmbedResources.cmake` compiles everything under `resources/` into the binary at build time.
+`cmake/EmbedResources.cmake` compiles everything under `resources/` into the binary at build time
+(via `.incbin` in a generated `.S` per file — no codegen step, no filesystem reads at runtime).
 Access embedded data via `#include "resources.hpp"`: text files become `std::string_view`
 (`resources::SomeTextFile_txt`), binaries become `std::span<const uint8_t>`
-(`resources::fonts::Roboto_Regular_ttf`). Fonts are rasterized with stb into a `FontAtlas`.
+(`resources::fonts::Roboto_Regular_ttf`). Fonts are rasterized with stb into a `FontAtlas`; the
+window icon (`resources/application_icon.png`) is decoded with stb_image in `front/AppIcon.cpp`.
+
+### Adding a resource
+
+1. **Drop the file under `resources/`** (subdirectories are kept as nested namespaces — e.g.
+   `resources/fonts/Foo.ttf` → `resources::fonts::Foo_ttf`). The accessor symbol is the file name
+   with every non-alphanumeric character replaced by `_` (so `application_icon.png` →
+   `resources::application_icon_png`, extension included).
+2. **Text vs binary is decided purely by extension**, from the `_EMBED_TEXT_EXTENSIONS` list at the
+   top of `cmake/EmbedResources.cmake` (`.txt .json .sql .md .glsl …`):
+   - **Text** → `std::string_view` with a trailing `\0` appended (the `\0` is excluded from
+     `.size()`), so it is safe to pass to C string APIs.
+   - **Binary** (anything *not* in that list — `.png .ttf .ico …`) → `std::span<const uint8_t>`.
+   To embed a new **text** kind, add its extension to `_EMBED_TEXT_EXTENSIONS`; for a **binary**
+   resource do nothing — any unlisted extension is binary by default.
+3. **Reconfigure** so the new file is picked up: `make build` re-runs CMake (the glob is
+   `CONFIGURE_DEPENDS`), regenerating the `.S`/`.hpp` and `resources.hpp`. New top-level source
+   files (`.cpp`) must also be added to the `add_executable`/test lists in `CMakeLists.txt` — sources
+   are listed explicitly, not globbed.
+4. **Use it**: `#include "resources.hpp"`, then read the span/string_view. Decode binaries in code
+   (e.g. stb_image for images — see `front/AppIcon.cpp` for the PNG → `SDL_Surface` pattern).
 
 ## DB schema shape (per repository schema)
 
