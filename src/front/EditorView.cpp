@@ -78,6 +78,11 @@ namespace front {
     return s.type == BlockType::Method ? method_height_for(static_cast<int>(s.args.size())) : BOX_H;
   }
 
+  // Extra (unscaled) left indent of the name from the badge — one "Н" wide — so
+  // the name never touches the access "walls" drawn around a private/protected
+  // block's badge.
+  static float name_indent() { return text_w("Н"); }
+
   // Layout is computed at scale 1 (world/unzoomed) and multiplied by the zoom,
   // so the box and everything inside it scale together.
   static BoxGeo box_geo(const EditorView &e, const Block &s)
@@ -94,7 +99,7 @@ namespace front {
     g.badge_x = g.bx + PAD * z;
     g.badge_y = g.by + PAD * z; // top padding == PAD == left
 
-    g.nx = g.bx + (PAD + BADGE + GAP) * z;
+    g.nx = g.bx + (PAD + BADGE + GAP) * z + name_indent() * z;
     g.nh = std::min(BOX_H * z - 6.f, FS + 8.f);
     g.ny = g.by + (BOX_H * z - g.nh) * .5f;
     g.nw = std::max(g.bx + g.bw - g.nx - GAP * z, 10.f);
@@ -115,7 +120,7 @@ namespace front {
   // horizontal layout (left pad + badge + gap + text + right pad).
   static float fit_width(const std::string &name)
   {
-    const float w = PAD + BADGE + GAP + text_w(name.c_str()) + GAP;
+    const float w = PAD + BADGE + GAP + name_indent() + text_w(name.c_str()) + GAP;
     return std::max(w, 60.f);
   }
 
