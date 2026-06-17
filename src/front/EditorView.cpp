@@ -208,6 +208,26 @@ namespace front {
     return -1;
   }
 
+  // Draw the type badge of a block: `letter` centred in a square (or a circle
+  // when `circle`) filled with `accent`. When `crossed`, two diagonals of the
+  // badge square are drawn over the letter (used to strike out a destructor).
+  static void draw_badge(SDL_Renderer *ren, const BoxGeo &g, char letter, Clr accent, float z, bool circle, bool crossed)
+  {
+    if (circle)
+      fill_circle(ren, accent, g.badge_x + g.badge * .5f, g.badge_y + g.badge * .5f, g.badge * .5f);
+    else
+      fill(ren, accent, g.badge_x, g.badge_y, g.badge, g.badge);
+
+    const char ls[2] = {letter, '\0'};
+    text_draw_scaled(ren, ls, g.badge_x + (g.badge - text_w(ls) * z) * .5f, center_baseline_scaled(g.badge_y, g.badge, z), C_PANEL, z);
+
+    if (crossed) {
+      sc(ren, C_PANEL);
+      SDL_RenderLine(ren, g.badge_x, g.badge_y, g.badge_x + g.badge, g.badge_y + g.badge);
+      SDL_RenderLine(ren, g.badge_x + g.badge, g.badge_y, g.badge_x, g.badge_y + g.badge);
+    }
+  }
+
   // Draw a canvas block: box, per-element hover highlight, badge, name and (for
   // methods) the argument rows (each with a − delete control) plus the + control.
   // `skip_arg_id`, when non-empty, is the argument being edited inline (drawn as
@@ -237,10 +257,20 @@ namespace front {
     if (hov_name) fill(ren, C_HOVER, g.bx + 1.f, g.by + 1.f, g.bw - 2.f, BOX_H * z - 2.f);
     if (hov_arg >= 0) fill(ren, C_HOVER, g.bx + 1.f, arg_row_y(g, hov_arg), g.bw - 2.f, ROW_H * z);
 
-    // Badge (drawn on top of any highlight).
-    fill(ren, accent, g.badge_x, g.badge_y, g.badge, g.badge);
-    const char ls[2] = {letter, '\0'};
-    text_draw_scaled(ren, ls, g.badge_x + (g.badge - text_w(ls) * z) * .5f, center_baseline_scaled(g.badge_y, g.badge, z), C_PANEL, z);
+    // Badge (drawn on top of any highlight). The method type tweaks its look:
+    // constructor shows a K, an inner method sits in a circle (not a square),
+    // a destructor's letter is crossed out diagonally.
+    char badge_letter = letter;
+    bool circle = false, crossed = false;
+    if (s.type == BlockType::Method) {
+      switch (s.method_type) {
+        case MethodType::Constructor: badge_letter = 'K'; break;
+        case MethodType::Inner: circle = true; break;
+        case MethodType::Destructor: crossed = true; break;
+        default: break; // Static: plain square M
+      }
+    }
+    draw_badge(ren, g, badge_letter, accent, z, circle, crossed);
 
     // Name, centred in the header band.
     const float header_h = 2.f * (g.badge_y - g.by) + g.badge;
