@@ -110,10 +110,10 @@ namespace back {
       txn.exec("CREATE TABLE " + schemaQuoted +
                ".unit_bl_method_arg "
                "("
-               "  id varchar(32) primary key,"
+               "  id              varchar(32) primary key,"
                "  owner_method_id varchar(32) not null,"
-               "  order_index float8 not null,"
-               "  name text"
+               "  order_index     float8 not null,"
+               "  name            text"
                ")");
 
       ensureCreatedAt(txn, schema, "unit_bl_method_arg");
@@ -126,15 +126,14 @@ namespace back {
                "("
                "  id varchar(32) primary key,"
                "  next_unit_id varchar(32),"
-               "  commented bool default false,"
+               "  access       text CHECK (access IN ('Public','Protected','Private')) default 'Private',"
+               "  commented    bool default false,"
+               "  disabled     bool default false,"
                "  name text"
                ")");
 
       ensureCreatedAt(txn, schema, "unit_bl_field");
       ensureLastModifiedAt(txn, schema, "unit_bl_field");
     }
-
-
   }
-
 } // namespace back
