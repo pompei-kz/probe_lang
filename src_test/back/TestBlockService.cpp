@@ -420,7 +420,12 @@ TEST_F(BlockServiceTest, NewFieldHasDefaultAttributes)
   make_schema();
   ASSERT_FALSE(create_block(conn(), schema, "u1", BlockType::Field, 0, 0, 50, 20, "f").first.empty());
 
+  //
+  //
   auto [blocks, err] = load_blocks_in_view(conn(), schema, "u1", -1000, -1000, 1000, 1000);
+  //
+  //
+
   ASSERT_TRUE(err.empty()) << err;
   ASSERT_EQ(blocks.size(), 1u);
   EXPECT_EQ(blocks[0].type, BlockType::Field);
@@ -449,4 +454,46 @@ TEST_F(BlockServiceTest, UpdateFieldAttributesPersist)
   ASSERT_EQ(blocks.size(), 1u);
   EXPECT_TRUE(blocks[0].disabled);
   EXPECT_EQ(blocks[0].access, MethodAccess::Protected);
+}
+
+TEST_F(BlockServiceTest, DeleteBlockRemovesMethodAndItsArgs)
+{
+  make_schema();
+  auto [mid, mmsg] = create_block(conn(), schema, "u1", BlockType::Method, 0, 0, 50, 20, "m");
+  ASSERT_FALSE(mid.empty()) << mmsg;
+  ASSERT_FALSE(create_method_arg(conn(), schema, mid, 0, "a").first.empty());
+  // A second block must survive the delete.
+  ASSERT_FALSE(create_block(conn(), schema, "u1", BlockType::Field, 0, 30, 50, 20, "f").first.empty());
+
+  //
+  //
+  auto del = delete_block(conn(), schema, mid, BlockType::Method);
+  //
+  //
+
+  ASSERT_TRUE(del.first) << del.second;
+
+  auto [blocks, err] = load_blocks_in_view(conn(), schema, "u1", -1000, -1000, 1000, 1000);
+  ASSERT_TRUE(err.empty()) << err;
+  ASSERT_EQ(blocks.size(), 1u);
+  EXPECT_EQ(blocks[0].type, BlockType::Field);
+}
+
+TEST_F(BlockServiceTest, DeleteBlockRemovesField)
+{
+  make_schema();
+  auto [fid, fmsg] = create_block(conn(), schema, "u1", BlockType::Field, 0, 0, 50, 20, "f");
+  ASSERT_FALSE(fid.empty()) << fmsg;
+
+  //
+  //
+  auto del = delete_block(conn(), schema, fid, BlockType::Field);
+  //
+  //
+
+  ASSERT_TRUE(del.first) << del.second;
+
+  auto [blocks, err] = load_blocks_in_view(conn(), schema, "u1", -1000, -1000, 1000, 1000);
+  ASSERT_TRUE(err.empty()) << err;
+  EXPECT_TRUE(blocks.empty());
 }

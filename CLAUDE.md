@@ -51,6 +51,32 @@ bash docker/docker-restart.bash    # starts pg (app, :18401) and pg-test (:18402
   `<TestName>_<microsecond-timestamp>`, and schemas are **deliberately not dropped** so failures can
   be inspected. If the DB is unreachable the test calls `GTEST_SKIP()` rather than failing.
 
+### Test layout convention (follow it in every new test)
+
+Each test is arrange / act / assert, with the **act** — the single call under test — fenced by two
+`//` comment lines above and below, blanks around the fence, and **no assertions inside the fence**.
+Setup goes above the fence; all `ASSERT_*`/`EXPECT_*` go below it:
+
+```cpp
+TEST_F(BlockServiceTest, DeleteBlockRemovesField)
+{
+  make_schema();
+  auto [fid, fmsg] = create_block(conn(), schema, "u1", BlockType::Field, 0, 0, 50, 20, "f");
+  ASSERT_FALSE(fid.empty()) << fmsg;
+
+  //
+  //
+  auto del = delete_block(conn(), schema, fid, BlockType::Field);
+  //
+  //
+
+  ASSERT_TRUE(del.first) << del.second;
+  auto [blocks, err] = load_blocks_in_view(conn(), schema, "u1", -1000, -1000, 1000, 1000);
+  ASSERT_TRUE(err.empty()) << err;
+  EXPECT_TRUE(blocks.empty());
+}
+```
+
 ## Architecture
 
 Two namespaces, cleanly separated — `back` (logic + persistence) never includes `front`.

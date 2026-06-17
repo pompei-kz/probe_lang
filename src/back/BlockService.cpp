@@ -282,6 +282,26 @@ namespace back {
     }
   }
 
+  std::pair<bool, std::string> delete_block(const Conn &c, const std::string &schema, const std::string &id, BlockType type)
+  {
+    try {
+      pqxx::connection  pg(make_cs(c));
+      pqxx::work        txn(pg);
+      const std::string qs     = pg.quote_name(schema);
+      const std::string detail = type == BlockType::Field ? ".unit_bl_field" : ".unit_bl_method";
+      if (type == BlockType::Method)
+        txn.exec_params("DELETE FROM " + qs + ".unit_bl_method_arg WHERE owner_method_id = $1", id);
+      txn.exec_params("DELETE FROM " + qs + detail + " WHERE id = $1", id);
+      txn.exec_params("DELETE FROM " + qs + ".unit_bl WHERE id = $1", id);
+      txn.commit();
+      return {true, ""};
+    } catch (const pqxx::sql_error &e) {
+      return {false, sql_err_msg(e)};
+    } catch (const std::exception &e) {
+      return {false, e.what()};
+    }
+  }
+
   std::pair<bool, std::string> update_block_size(
       const Conn &c, const std::string &schema, const std::string &id, float width, float height)
   {

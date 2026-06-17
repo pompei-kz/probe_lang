@@ -488,7 +488,7 @@ namespace front {
     // the access group and the deactivate/activate toggle at the bottom. A dot
     // marks the current value (shown normally, but not selectable); the other
     // values have no marker.
-    enum { ACT_TOGGLE, ACT_INNER, ACT_STATIC, ACT_CTOR, ACT_DTOR, ACT_PRIVATE, ACT_PROTECTED, ACT_PUBLIC };
+    enum { ACT_TOGGLE, ACT_DELETE, ACT_INNER, ACT_STATIC, ACT_CTOR, ACT_DTOR, ACT_PRIVATE, ACT_PROTECTED, ACT_PUBLIC };
     enum Mark { MARK_NONE, MARK_CURRENT, MARK_SWITCH };
     struct Item
     {
@@ -514,6 +514,8 @@ namespace front {
     items.push_back(grp(m->access == MethodAccess::Public, "Всеобщий", ACT_PUBLIC));
     items.push_back({"", true, -1, MARK_NONE});
     items.push_back({m->disabled ? "Активировать" : "Деактивировать", false, ACT_TOGGLE, MARK_NONE});
+    items.push_back({"", true, -1, MARK_NONE});
+    items.push_back({"Удалить", false, ACT_DELETE, MARK_NONE});
 
     // A marker gutter on the left keeps every label aligned, marked or not.
     constexpr float IH = 24.f, SEP_H = 7.f, PADX = 10.f, GUTTER = 16.f;
@@ -573,6 +575,7 @@ namespace front {
         else
           update_field_disabled(t->conn, t->schema, m->id, !m->disabled);
         break;
+      case ACT_DELETE: delete_block(t->conn, t->schema, m->id, m->type); break;
       case ACT_INNER: update_method_type(t->conn, t->schema, m->id, MethodType::Inner); break;
       case ACT_STATIC: update_method_type(t->conn, t->schema, m->id, MethodType::Static); break;
       case ACT_CTOR: update_method_type(t->conn, t->schema, m->id, MethodType::Constructor); break;

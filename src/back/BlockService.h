@@ -56,6 +56,10 @@ namespace back {
   std::pair<bool, std::string> update_field_disabled(const model::Conn &c, const std::string &schema, const std::string &id, bool disabled);
   std::pair<bool, std::string> update_field_access(const model::Conn &c, const std::string &schema, const std::string &id, model::MethodAccess access);
 
+  // Delete a block: its unit_bl row, its detail row (unit_bl_method /
+  // unit_bl_field per `type`) and, for methods, all of its arguments.
+  std::pair<bool, std::string> delete_block(const model::Conn &c, const std::string &schema, const std::string &id, model::BlockType type);
+
   // Update a block's box size (unit_bl.width / height). The geom column is
   // regenerated automatically.
   std::pair<bool, std::string> update_block_size(
