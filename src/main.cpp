@@ -55,7 +55,8 @@ int main(int /*argc*/, char * /*argv*/[])
     int   l_clicks = 1;
 
     auto any_dlg = [&] {
-      return app.dlg.open || app.repo_dlg.open || app.folder_dlg.open || app.unit_dlg.open || app.msg_dlg.open || app.confirm_dlg.open;
+      return app.dlg.open || app.repo_dlg.open || app.folder_dlg.open || app.unit_dlg.open || app.msg_dlg.open || app.confirm_dlg.open ||
+             app.sel_unit_form.open;
     };
 
     SDL_Event ev;
@@ -79,6 +80,7 @@ int main(int /*argc*/, char * /*argv*/[])
           }
           if (app.folder_dlg.open && app.lmb_held) app.folder_dlg.name_field.on_move(ev.motion.x);
           if (app.unit_dlg.open && app.lmb_held) app.unit_dlg.name_field.on_move(ev.motion.x);
+          if (app.sel_unit_form.open && app.lmb_held) app.sel_unit_form.filter_field.on_move(ev.motion.x);
           if (app.editor.open) app.editor.on_mouse_move(ev.motion.x, ev.motion.y);
           break;
 
@@ -111,13 +113,16 @@ int main(int /*argc*/, char * /*argv*/[])
             }
             if (app.folder_dlg.open) app.folder_dlg.name_field.on_release();
             if (app.unit_dlg.open) app.unit_dlg.name_field.on_release();
+            if (app.sel_unit_form.open) app.sel_unit_form.filter_field.on_release();
             if (app.editor.open) app.editor.on_mouse_up();
           }
           if (ev.button.button == SDL_BUTTON_MIDDLE && app.editor.open) app.editor.on_middle_up();
           break;
 
         case SDL_EVENT_MOUSE_WHEEL:
-          if (app.repo_dlg.open && app.repo_dlg.err_view.mouse_over(app.mx, app.my))
+          if (app.sel_unit_form.open && app.sel_unit_form.mouse_over_list(app.mx, app.my))
+            app.sel_unit_form.on_scroll(ev.wheel.y);
+          else if (app.repo_dlg.open && app.repo_dlg.err_view.mouse_over(app.mx, app.my))
             app.repo_dlg.err_view.on_scroll(ev.wheel.y);
           else if (app.editor.open && !any_dlg())
             app.editor.on_wheel(ev.wheel.y, app.mx, app.my);
@@ -132,6 +137,8 @@ int main(int /*argc*/, char * /*argv*/[])
             app.folder_dlg.name_field.handle_text(ev.text.text);
           else if (app.unit_dlg.open)
             app.unit_dlg.name_field.handle_text(ev.text.text);
+          else if (app.sel_unit_form.open)
+            app.sel_unit_form.filter_field.handle_text(ev.text.text);
           else if (app.editor.editing)
             app.editor.handle_text(ev.text.text);
           break;
@@ -199,6 +206,14 @@ int main(int /*argc*/, char * /*argv*/[])
               app.unit_dlg.open = false;
               SDL_StopTextInput(app.win);
             }
+          } else if (app.sel_unit_form.open) {
+            SDL_Keymod mod = ev.key.mod;
+            // ReSharper disable once CppTooWideScopeInitStatement
+            bool consumed  = app.sel_unit_form.filter_field.handle_key(ev.key.key, mod);
+            if (!consumed && ev.key.key == SDLK_ESCAPE) {
+              app.sel_unit_form.close();
+              SDL_StopTextInput(app.win);
+            }
           } else if (app.editor.editing) {
             SDL_Keymod mod = ev.key.mod;
             app.editor.handle_key(ev.key.key, mod);
@@ -240,6 +255,15 @@ int main(int /*argc*/, char * /*argv*/[])
       if (app.editor.editing && !prev_editing) SDL_StartTextInput(app.win);
       if (!app.editor.editing && prev_editing) SDL_StopTextInput(app.win);
       prev_editing = app.editor.editing;
+
+      // ContextMenuSelExpr picked "Юнит": open the unit-selection form.
+      if (app.editor.want_sel_unit) {
+        app.editor.want_sel_unit = false;
+        if (auto *t = app.editor.cur()) {
+          app.sel_unit_form.open_for(t->conn, t->schema, app.editor.want_sel_unit_field_id);
+          SDL_StartTextInput(app.win);
+        }
+      }
     }
 
     if (app.dlg.open) {
@@ -354,6 +378,16 @@ int main(int /*argc*/, char * /*argv*/[])
         app.unit_dlg.open = false;
         SDL_StopTextInput(app.win);
       }
+    }
+
+    if (app.sel_unit_form.open) {
+      float             mx2 = l_click ? l_click_x : app.mx;
+      float             my2 = l_click ? l_click_y : app.my;
+      const std::string fid = app.sel_unit_form.field_id;
+      // ReSharper disable once CppTooWideScopeInitStatement
+      int res = app.sel_unit_form.render(app.ren, mx2, my2, l_click, r_click, l_clicks);
+      if (res != 0) SDL_StopTextInput(app.win);                 // form closes itself on confirm/cancel
+      if (res == 1 && app.editor.open) app.editor.refit_field(fid); // show the chosen unit; resize the box
     }
 
     if (app.msg_dlg.open) {

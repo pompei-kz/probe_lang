@@ -78,6 +78,41 @@ namespace back {
           }
         }
       }
+
+      // Attach expression render data to fields. Soft references throughout: a
+      // field's expr_id may be NULL or dangling (→ no row, expr absent), and a
+      // Unit expression's unit_id may be NULL or dangling (→ unit unresolved).
+      if (hasTable(txn, schema, "unit_e") && hasTable(txn, schema, "unit_e_unit")) {
+        // The `unit` table may be absent (older repo); a Unit expression then
+        // simply has an unresolved reference — not an error (soft coupling).
+        const bool   has_unit = hasTable(txn, schema, "unit");
+        pqxx::result exprs    = txn.exec_params(
+            "SELECT s.id, e.type, eu.unit_id "
+            "FROM " + qs + ".unit_b s "
+            "JOIN " + qs + ".unit_b_field f ON f.id = s.id "
+            "JOIN " + qs + ".unit_e e ON e.id = f.expr_id "
+            "LEFT JOIN " + qs + ".unit_e_unit eu ON eu.id = e.id "
+            "WHERE s.unit_id = $1",
+            unit_id);
+        for (const pqxx::row &row : exprs) {
+          const std::string bid = row[0].c_str();
+          for (Block &b : out) {
+            if (b.id != bid) continue;
+            b.expr_present = true;
+            b.expr_type    = expr_type_from_string(row[1].c_str());
+            // Resolve the unit name through the soft reference unit_e_unit.unit_id -> unit.id.
+            if (b.expr_type == ExprType::Unit && has_unit && !row[2].is_null()) {
+              const std::string uid = row[2].c_str();
+              pqxx::result      ur  = txn.exec_params("SELECT name FROM " + qs + ".unit WHERE id = $1", uid);
+              if (!ur.empty()) {
+                b.expr_unit_present = true;
+                b.expr_unit_name    = ur[0][0].c_str();
+              }
+            }
+            break;
+          }
+        }
+      }
       return {std::move(out), ""};
     } catch (const pqxx::sql_error &e) {
       return {{}, sql_err_msg(e)};

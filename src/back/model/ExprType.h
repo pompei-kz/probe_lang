@@ -3,6 +3,7 @@
 //
 
 #pragma once
+#include <string>
 
 namespace back::model {
 
@@ -46,5 +47,25 @@ namespace back::model {
     Unit = 4,
 
   };
+
+  // The stored text is the enum variable's name (see unit_e.type).
+  inline const char *to_string(ExprType t)
+  {
+    switch (t) {
+      case ExprType::ThisObject: return "ThisObject";
+      case ExprType::ThisUnit: return "ThisUnit";
+      case ExprType::ThisMethod: return "ThisMethod";
+      case ExprType::Unit: return "Unit";
+    }
+    return "ThisObject";
+  }
+
+  inline ExprType expr_type_from_string(const std::string &s)
+  {
+    if (s == "ThisUnit") return ExprType::ThisUnit;
+    if (s == "ThisMethod") return ExprType::ThisMethod;
+    if (s == "Unit") return ExprType::Unit;
+    return ExprType::ThisObject;
+  }
 
 } // namespace back::model

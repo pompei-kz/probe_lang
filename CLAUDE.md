@@ -108,6 +108,28 @@ Two namespaces, cleanly separated — `back` (logic + persistence) never include
 - `EditorView` owns `EditorTab`s (one open unit each, with independent pan/zoom camera). It calls
   `BlockService::load_blocks_in_view` on the active tab's viewport.
 
+#### Expressions on the canvas
+
+When `unit_b_field.expr_id_used` is TRUE, the field block draws its **expression** to the right of
+the name (instead of the "Размер: N байт" message):
+- no expression (soft ref `expr_id` absent) → an empty square sized like the field's "F" glyph, with
+  a little cube (≈⅓ of the square) drawn inside — this is the affordance that opens **ContextMenuSelExpr**;
+- `ExprType::ThisObject` / `ThisUnit` / `ThisMethod` → the literal text "Этот Объект" / "Этот Юнит" /
+  "Этот Метод";
+- `ExprType::Unit` → a diamond emblem, then the referenced `unit.name`; if the soft ref
+  `unit_e_unit.unit_id -> unit.id` is absent, "ОШИБКА: Юнит не существует" in red instead.
+
+**ContextMenuSelExpr** (`Контекстное меню выбора выражения`) is a **multi-level** context menu opened
+on the cube square, used to choose what an expression is. It will keep growing; current items:
+- `[1] "Этот"` → submenu: `[2] "Объект"` / `[2] "Юнит"` / `[2] "Метод"` set `unit_e.type` to
+  `ThisObject` / `ThisUnit` / `ThisMethod`;
+- `[1] "Юнит"` → opens the **unit-selection form** (a filtered, lazily-paginated, scrollable list of
+  units; picking one sets `unit_e.type = 'Unit'` and `unit_e_unit.unit_id = <picked unit id>`). The
+  list appends pages as the scrollbar nears the end and shows a dim "(Всё, данных больше нет)" once
+  exhausted; the filter matches units whose name contains the filter's words in order.
+
+(`[N]` marks the menu level an item appears on.)
+
 ### Persistence outside the DB
 
 - **Connections** are stored as files under a workspace dir (`back::ws_dir()`), not in Postgres.
@@ -152,6 +174,28 @@ optional `parent_folder_id`), `unit_b` (a block: `x/y/width/height` + generated 
 GIST-indexed), and the detail tables `unit_b_method` / `unit_b_field` (1:1 with `unit_b`, chosen by
 `BlockType`) plus `unit_b_method_arg` (ordered method arguments). Block geometry edits update
 `x/y/width/height`; `geom` regenerates automatically.
+
+**Expressions** live in `unit_e` (base: `type` per `model::ExprType` — `ThisObject` / `ThisUnit` /
+`ThisMethod` / `Unit` — plus `x/y/width/height` + generated `geom`) and per-type detail tables
+`unit_e_{some}` (e.g. `unit_e_unit` for an `ExprType::Unit`, holding `unit_id`). Every
+`unit_e_{some}.id` is a **soft reference** to `unit_e.id` (see below). A field's type can be given by
+an expression: `unit_b_field.expr_id` is a soft reference to `unit_e.id`, used only when
+`unit_b_field.expr_id_used` is TRUE.
+
+## Soft references (мягкая связанность)
+
+A **soft reference** is a nullable id column `DSA.asd_id` pointing at `ASD.id` that is **not** a DB
+foreign key and is resolved leniently:
+
+- `DSA.asd_id IS NULL` → the reference is absent. This is a **normal** state, not an error.
+- `DSA.asd_id` holds an id that does **not** exist in `ASD.id` → still **not** an error; treat it
+  exactly as if it were NULL (reference absent). This is a **normal** state.
+- The reference `DSA.asd_id -> ASD.id` is considered present/working **only** when the id actually
+  exists in `ASD.id`.
+
+So code that follows a soft reference must `LEFT JOIN` (never assume the row exists) and behave
+identically for "NULL" and "dangling id". All `unit_e_{some}.id -> unit_e.id` links follow this rule,
+as does `unit_b_field.expr_id -> unit_e.id` and `unit_e_unit.unit_id -> unit.id`.
 
 ## Conventions
 

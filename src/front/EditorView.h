@@ -1,4 +1,5 @@
 #pragma once
+#include "ContextMenuSelExpr.h"
 #include "InputField.h"
 #include "back/model/Conn.h"
 #include "back/model/Block.h"
@@ -66,6 +67,14 @@ namespace front {
     std::string method_menu_id; // block id of the method/field the menu acts on
     float       method_menu_x = 0, method_menu_y = 0; // screen position
 
+    // Expression-selection menu (opened on a field's empty-expression cube square).
+    ContextMenuSelExpr expr_menu;
+
+    // Set when the user picks "Юнит" in expr_menu: the main loop opens the
+    // unit-selection form for this field, then calls set_field_expr_unit + reload.
+    bool        want_sel_unit = false;
+    std::string want_sel_unit_field_id;
+
     // Inline name editing. When edit_is_arg is set the field edits a method
     // argument (edit_arg_id); edit_id then holds the owning method's block id.
     bool                   editing = false;
@@ -99,6 +108,10 @@ namespace front {
     int tab_at(float mx, float my) const;
 
     void reload(); // spatial query for the active tab's current viewport
+
+    // Recompute and persist a field's box size (its expression/size content may
+    // have changed width), then reload.
+    void refit_field(const std::string &id);
 
     void render(SDL_Renderer *ren, float pane_x, float pane_y, float pane_w, float pane_h, float mx, float my, bool ldown, bool rdown, int clicks);
 

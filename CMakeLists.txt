@@ -33,7 +33,9 @@ add_executable(probe_lang
         src/front/FormEditRepository.cpp
         src/front/FormEditFolder.cpp
         src/front/FormEditUnit.cpp
+        src/front/FormSelectUnit.cpp
         src/front/UnitMenu.cpp
+        src/front/ContextMenuSelExpr.cpp
         src/front/EditorView.cpp
         src/back/ConnService.cpp
         src/back/RepoService.cpp
@@ -43,6 +45,7 @@ add_executable(probe_lang
         src/back/ProjectTreeService.cpp
         src/back/UnitService.cpp
         src/back/BlockService.cpp
+        src/back/ExprService.cpp
         src/back/UnitEditorState.cpp
         src/back/CustomId.cpp
         src/back/model/RowChange.h
@@ -73,6 +76,7 @@ add_executable(probe_lang_tests
         src_test/back/TestProjectTreeService.cpp
         src_test/back/TestUnitService.cpp
         src_test/back/TestBlockService.cpp
+        src_test/back/TestExprService.cpp
         src_test/back/TestUnitEditorState.cpp
         src/back/CustomId.cpp
         src/back/ConnService.cpp
@@ -83,6 +87,7 @@ add_executable(probe_lang_tests
         src/back/ProjectTreeService.cpp
         src/back/UnitService.cpp
         src/back/BlockService.cpp
+        src/back/ExprService.cpp
         src/back/UnitEditorState.cpp
         src/back/model/RowChange.h
         src/back/model/ExprType.h

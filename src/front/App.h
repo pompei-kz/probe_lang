@@ -6,6 +6,7 @@
 #include "FormEditFolder.h"
 #include "FormEditRepository.h"
 #include "FormEditUnit.h"
+#include "FormSelectUnit.h"
 #include "MsgDlg.h"
 #include "PanelMenu.h"
 #include "SchemaMenu.h"
@@ -31,6 +32,7 @@ namespace front {
     MsgDlg                             msg_dlg;
     ConfirmDlg                         confirm_dlg;
     EditorView                         editor;
+    FormSelectUnit                     sel_unit_form; // pick a unit for a field's Unit expression
 
     int         pending_delete_idx         = -1; // connection
     int         pending_delete_folder_conn = -1; // folder

@@ -2,6 +2,7 @@
 #include "Clr.h"
 #include "FontAtlas.h"
 #include "back/BlockService.h"
+#include "back/ExprService.h"
 #include "back/UnitEditorState.h"
 #include "render_helpers.h"
 
@@ -133,9 +134,50 @@ namespace front {
   // Extra padding between the name and the divider — half a "W" wide.
   static float size_pad() { return text_w("W") * .5f; }
 
-  // Screen x where a field's size message / size editor begins — right of the name,
-  // past the gap, the half-"W" padding and the divider.
+  // Screen x where a field's size message / size editor / expression begins —
+  // right of the name, past the gap, the half-"W" padding and the divider.
   static float field_size_x(const BoxGeo &g, const Block &s) { return g.nx + (text_w(s.name.c_str()) + GAP + size_pad()) * g.z; }
+
+  // The text shown for a "self" expression (ThisObject / ThisUnit / ThisMethod).
+  static const char *expr_this_label(ExprType t)
+  {
+    switch (t) {
+      case ExprType::ThisObject: return "Этот Объект";
+      case ExprType::ThisUnit: return "Этот Юнит";
+      case ExprType::ThisMethod: return "Этот Метод";
+      default: return "";
+    }
+  }
+
+  // Error shown for a Unit expression whose unit reference does not resolve.
+  static constexpr const char *EXPR_UNIT_ERR = "ОШИБКА: Юнит не существует";
+
+  // The text drawn for a resolved expression (Unit name / error / "self" label).
+  static std::string expr_text(const Block &s)
+  {
+    if (s.expr_type == ExprType::Unit) return s.expr_unit_present ? s.expr_unit_name : EXPR_UNIT_ERR;
+    return expr_this_label(s.expr_type);
+  }
+
+  // Side of the empty-expression square / Unit diamond — about a glyph tall.
+  static float expr_square_side() { return FS * .85f; }
+
+  // Screen rect of a field's empty-expression cube square (the ContextMenuSelExpr
+  // affordance). Only meaningful when expr_id_used && !expr_present.
+  static void field_expr_square(const BoxGeo &g, const Block &s, float &x, float &y, float &side)
+  {
+    side = expr_square_side() * g.z;
+    x    = field_size_x(g, s);
+    y    = g.by + (BOX_H * g.z - side) * .5f;
+  }
+
+  // Unscaled width of a field's expression content, drawn right of the divider.
+  static float expr_content_width(const Block &s)
+  {
+    if (!s.expr_present) return expr_square_side();                                                    // cube square
+    if (s.expr_type == ExprType::Unit) return expr_square_side() + GAP + text_w(expr_text(s).c_str()); // diamond + text
+    return text_w(expr_text(s).c_str());                                                               // "self" text
+  }
 
   // Unscaled (world-unit) box width needed to fit `name`: matches box_geo's
   // horizontal layout (left pad + badge + gap + text + right pad).
@@ -150,10 +192,12 @@ namespace front {
   {
     float w = fit_width(s.name);
     for (const MethodArg &a : s.args) w = std::max(w, fit_width(a.name));
-    // A field with an explicit size also has to fit "Размер: N байт" after the name
-    // (plus the half-"W" divider padding).
-    if (s.type == BlockType::Field && !s.expr_id_used)
-      w = std::max(w, fit_width(s.name) + size_pad() + text_w(size_label(s.size_bytes).c_str()) + GAP);
+    // A field's right section (the "Размер: N байт" message or the expression)
+    // sits after the name, the half-"W" divider padding and the divider.
+    if (s.type == BlockType::Field) {
+      const float right = s.expr_id_used ? expr_content_width(s) : text_w(size_label(s.size_bytes).c_str());
+      w                 = std::max(w, fit_width(s.name) + size_pad() + right + GAP);
+    }
     return w;
   }
 
@@ -204,6 +248,40 @@ namespace front {
   static Clr scale_clr(Clr c, float f)
   {
     return Clr{static_cast<Uint8>(c.r * f), static_cast<Uint8>(c.g * f), static_cast<Uint8>(c.b * f), c.a};
+  }
+
+  // The "no expression yet" affordance: an outlined square holding a small cube
+  // (≈⅓ of the square). Clicking it opens ContextMenuSelExpr.
+  static void draw_expr_cube_square(SDL_Renderer *ren, float x, float y, float side, Clr c)
+  {
+    rect(ren, c, x, y, side, side);
+
+    const float cs = side / 3.f;                       // cube front-face side
+    const float d  = cs * .4f;                         // 3D depth offset
+    const float fx = x + (side - cs - d) * .5f;         // front face top-left
+    const float fy = y + (side - cs - d) * .5f + d;
+    rect(ren, c, fx, fy, cs, cs);                       // front face
+    sc(ren, c);                                         // top + right faces (edges only)
+    SDL_RenderLine(ren, fx, fy, fx + d, fy - d);
+    SDL_RenderLine(ren, fx + d, fy - d, fx + cs + d, fy - d);
+    SDL_RenderLine(ren, fx + cs + d, fy - d, fx + cs, fy);
+    SDL_RenderLine(ren, fx + cs, fy, fx + cs + d, fy - d);
+    SDL_RenderLine(ren, fx + cs + d, fy - d, fx + cs + d, fy + cs - d);
+    SDL_RenderLine(ren, fx + cs + d, fy + cs - d, fx + cs, fy + cs);
+  }
+
+  // The diamond emblem drawn before a Unit expression's name. A rhombus with a
+  // facet line near the top (a stylised brilliant).
+  static void draw_diamond(SDL_Renderer *ren, float cx, float cy, float size, Clr c)
+  {
+    const float hw = size * .5f, hh = size * .5f;
+    sc(ren, c);
+    SDL_RenderLine(ren, cx, cy - hh, cx + hw, cy);      // top-right
+    SDL_RenderLine(ren, cx + hw, cy, cx, cy + hh);      // bottom-right
+    SDL_RenderLine(ren, cx, cy + hh, cx - hw, cy);      // bottom-left
+    SDL_RenderLine(ren, cx - hw, cy, cx, cy - hh);      // top-left
+    const float ty = cy - hh * .4f;                     // table facet
+    SDL_RenderLine(ren, cx - hw * .6f, ty, cx + hw * .6f, ty);
   }
 
   // A small round +/- control inside `accent` circle. `plus` adds the vertical
@@ -471,6 +549,19 @@ namespace front {
     const float maxy = static_cast<float>(t->cam_y + ch / t->zoom);
     auto [rows, err] = load_blocks_in_view(t->conn, t->schema, t->unit_id, minx, miny, maxx, maxy);
     t->blocks         = std::move(rows);
+  }
+
+  void EditorView::refit_field(const std::string &id)
+  {
+    EditorTab *t = cur();
+    if (!t) return;
+    reload(); // pull current content (name, size, expression) before measuring
+    for (Block &b : t->blocks)
+      if (b.id == id) {
+        update_block_size(t->conn, t->schema, b.id, block_fit_width(b), box_height(b));
+        break;
+      }
+    reload();
   }
 
   void EditorView::start_edit_name(const Block &s, float fbx, float fby, float fbw, float fbh)
@@ -1101,19 +1192,40 @@ namespace front {
       draw_block(
           ren, g, s, letter, blank_name, editing_this && edit_is_arg ? edit_arg_id : std::string{}, hov_name, hov_arg, hov_plus, hov_minus);
 
-      // A field with an explicit size shows "Размер: N байт" right of the name,
-      // split off by a vertical divider. While the size is being edited the
-      // editor covers the message area (the divider stays); while the name is
-      // being edited the name editor spans the whole header, so skip both.
-      if (s.type == BlockType::Field && !s.expr_id_used) {
-        if (!(editing_this && !edit_is_size)) {
+      // A field's right section — the "Размер: N байт" message (when expr_id_used
+      // is false) or its expression (when true) — split off by a vertical divider.
+      // While the size is being edited the editor covers the message (divider
+      // stays); while the name is being edited the name editor spans the whole
+      // header, so the whole right section is skipped.
+      if (s.type == BlockType::Field) {
+        const bool editing_name = editing_this && !edit_is_size;
+        if (!editing_name) {
           // Divider: same colour/width as the box border, top edge to bottom edge.
-          fill(ren, C_BORDER, field_size_x(g, s) - GAP * z * .5f, g.by, 1.f, g.bh);
-        }
-        if (!editing_this) {
+          const float dx       = field_size_x(g, s) - GAP * z * .5f;
+          const float ex       = field_size_x(g, s);
           const Clr   txt      = s.disabled ? C_DIM : C_TEXT;
+          const Clr   accent   = s.disabled ? C_DIM : C_ACCENT;
           const float header_h = 2.f * (g.badge_y - g.by) + g.badge;
-          text_draw_scaled(ren, size_label(s.size_bytes).c_str(), field_size_x(g, s), center_baseline_scaled(g.by, header_h, z), txt, z);
+          const float baseline = center_baseline_scaled(g.by, header_h, z);
+          fill(ren, C_BORDER, dx, g.by, 1.f, g.bh);
+
+          if (!s.expr_id_used) {
+            if (!editing_this) // (size editor draws the value otherwise)
+              text_draw_scaled(ren, size_label(s.size_bytes).c_str(), ex, baseline, txt, z);
+          } else if (!s.expr_present) {
+            // No expression yet → the cube square (opens ContextMenuSelExpr).
+            const float side = expr_square_side() * z;
+            draw_expr_cube_square(ren, ex, g.by + (BOX_H * z - side) * .5f, side, accent);
+          } else if (s.expr_type == ExprType::Unit) {
+            // Diamond emblem, then the unit name (or a red error if unresolved).
+            const float side = expr_square_side() * z;
+            draw_diamond(ren, ex + side * .5f, g.by + BOX_H * z * .5f, side, accent);
+            const float tx = ex + side + GAP * z;
+            text_draw_scaled(ren, expr_text(s).c_str(), tx, baseline, s.expr_unit_present ? txt : C_ERR, z);
+          } else {
+            // A "self" expression: "Этот Объект" / "Этот Юнит" / "Этот Метод".
+            text_draw_scaled(ren, expr_text(s).c_str(), ex, baseline, txt, z);
+          }
         }
       }
 
@@ -1185,6 +1297,23 @@ namespace front {
       return;
     }
 
+    // Expression-selection menu takes precedence over everything else while open.
+    if (expr_menu.open) {
+      const std::string         fid = expr_menu.field_id;
+      ContextMenuSelExpr::Action act = expr_menu.render(ren, mx, my, ldown && !tab_clicked);
+      using A                        = ContextMenuSelExpr::Action;
+      if (act == A::SetThisObject || act == A::SetThisUnit || act == A::SetThisMethod) {
+        const ExprType et = act == A::SetThisObject ? ExprType::ThisObject : act == A::SetThisUnit ? ExprType::ThisUnit : ExprType::ThisMethod;
+        set_field_expr_this_type(t->conn, t->schema, fid, et);
+        refit_field(fid); // the expression label is wider than the cube square
+      } else if (act == A::OpenUnitForm) {
+        want_sel_unit          = true;
+        want_sel_unit_field_id = fid;
+      }
+      SDL_SetRenderClipRect(ren, nullptr);
+      return;
+    }
+
     // Block context menu: open on right-click over a block's name header
     // (methods and fields both have one).
     if (!method_menu_open && rdown && !chooser_open && !tab_clicked && hit(mx, my, cx, cy, cw, ch)) {
@@ -1234,7 +1363,16 @@ namespace front {
         const int ai = arg_row_at(tgeo, *target, mx, my);
         const bool on_size = target->type == BlockType::Field && !target->expr_id_used &&
                              hit(mx, my, field_size_x(tgeo, *target), tgeo.by, text_w(size_label(target->size_bytes).c_str()) * tgeo.z, BOX_H * tgeo.z);
-        if (ai >= 0) {
+        // A double-click on the empty-expression cube opens the menu (not name edit).
+        bool  on_cube = false;
+        float sqx, sqy, sqs;
+        if (target->type == BlockType::Field && target->expr_id_used && !target->expr_present) {
+          field_expr_square(tgeo, *target, sqx, sqy, sqs);
+          on_cube = hit(mx, my, sqx, sqy, sqs, sqs);
+        }
+        if (on_cube) {
+          expr_menu.open_at(sqx, sqy + sqs, target->id);
+        } else if (ai >= 0) {
           const float ay  = arg_row_y(tgeo, ai);
           const float fbh = std::min(ROW_H * tgeo.z - 2.f, FS + 8.f);
           const float fby = ay + (ROW_H * tgeo.z - fbh) * .5f;
@@ -1275,7 +1413,17 @@ namespace front {
       if (target) {
         int minus_i = arg_minus_at(tgeo, *target, mx, my);
         int arg_i   = target->type == BlockType::Method ? arg_row_at(tgeo, *target, mx, my) : -1;
-        if (minus_i >= 0) {
+        // A field with no expression yet: clicking its cube square opens the
+        // expression-selection menu instead of starting a drag.
+        bool  on_cube = false;
+        float sqx, sqy, sqs;
+        if (target->type == BlockType::Field && target->expr_id_used && !target->expr_present) {
+          field_expr_square(tgeo, *target, sqx, sqy, sqs);
+          on_cube = hit(mx, my, sqx, sqy, sqs, sqs);
+        }
+        if (on_cube) {
+          expr_menu.open_at(sqx, sqy + sqs, target->id);
+        } else if (minus_i >= 0) {
           del_arg(*target, target->args[minus_i].id);
         } else if (target->type == BlockType::Method && hit_circle(mx, my, tgeo.plus_cx, tgeo.plus_cy, tgeo.plus_r)) {
           add_arg(*target);

@@ -1,5 +1,6 @@
 #pragma once
 #include "BlockType.h"
+#include "ExprType.h"
 #include "MethodAccess.h"
 #include "MethodArg.h"
 #include "MethodType.h"
@@ -23,6 +24,14 @@ namespace back::model {
     MethodAccess           access = MethodAccess::Private;
     bool                   expr_id_used = false; // field-only: use the type expression instead of size_bytes
     int                    size_bytes   = 0;     // field-only: explicit size when expr_id_used is false
+
+    // Field-only expression render data, resolved through soft references
+    // (expr_id -> unit_e, and for Unit: unit_e_unit.unit_id -> unit). When
+    // expr_present is false the field has no resolvable expression.
+    bool     expr_present      = false;
+    ExprType expr_type         = ExprType::ThisObject;
+    bool     expr_unit_present = false; // (Unit) the referenced unit resolves
+    std::string expr_unit_name;         // (Unit) resolved unit.name
   };
 
 } // namespace back::model
