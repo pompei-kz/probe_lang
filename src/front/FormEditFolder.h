@@ -22,6 +22,11 @@ namespace front {
     InputField     name_field;
     SelectableText err_view;
 
+    // Keyboard focus order: 0 = name, 1 = Save, 2 = Cancel (indices >= 1 are buttons).
+    static constexpr int FOCUS_COUNT = 3, FIRST_BUTTON = 1, SAVE = 1, CANCEL = 2;
+    int                  focus    = 0;
+    bool                 activate = false; // Enter pressed on the focused button
+
     void open_add(int ci, int ri, const back::model::Conn &c, const std::string &schema, const std::string &parent_id);
     void open_edit(int ci, int ri, const back::model::Conn &c, const std::string &schema, const std::string &fid, const std::string &fname);
 

@@ -23,6 +23,25 @@ services:
       - "-c"
       - "max-connections=800"
 
+  pg2:
+    image: postgis/postgis:18-master
+    container_name: probe-lang-pg2
+    restart: always
+    mem_limit: 700M
+    environment:
+      POSTGRES_PASSWORD: "pI9Tm1CWZwBucPPULcnS"
+    ports:
+      - "18403:5432"
+    volumes:
+      - ${APP_DATA_ROOT}/postgres-data2:/var/lib/postgresql
+      - ./pg-init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - probe-lang
+    command:
+      - "docker-entrypoint.sh"
+      - "-c"
+      - "max-connections=800"
+
   pg-test:
     image: postgis/postgis:18-master
     container_name: probe-lang-pg-test

@@ -59,6 +59,25 @@ int main(int /*argc*/, char * /*argv*/[])
              app.sel_unit_form.open;
     };
 
+    // Shared form focus navigation: Tab/Shift+Tab cycles components; Enter on a
+    // field jumps to the next component, on a button (index >= first_button) it
+    // sets `activate` so the form's render presses it. Returns true if handled.
+    auto form_nav = [](int &focus, bool &activate, int count, int first_button, SDL_Keycode key, SDL_Keymod mod) {
+      const bool shift = (mod & SDL_KMOD_SHIFT) != 0;
+      if (key == SDLK_TAB) {
+        focus = (focus + (shift ? count - 1 : 1)) % count;
+        return true;
+      }
+      if (key == SDLK_RETURN || key == SDLK_KP_ENTER) {
+        if (focus >= first_button)
+          activate = true;
+        else
+          focus = (focus + 1) % count;
+        return true;
+      }
+      return false;
+    };
+
     SDL_Event ev;
     while (SDL_PollEvent(&ev)) {
       switch (ev.type) {
@@ -131,15 +150,15 @@ int main(int /*argc*/, char * /*argv*/[])
         case SDL_EVENT_TEXT_INPUT:
           if (app.dlg.open)
             app.dlg.fields[app.dlg.focus].handle_text(ev.text.text);
-          else if (app.repo_dlg.open)
-            app.repo_dlg.fields[app.repo_dlg.focus].handle_text(ev.text.text);
-          else if (app.folder_dlg.open)
-            app.folder_dlg.name_field.handle_text(ev.text.text);
-          else if (app.unit_dlg.open)
-            app.unit_dlg.name_field.handle_text(ev.text.text);
-          else if (app.sel_unit_form.open)
-            app.sel_unit_form.filter_field.handle_text(ev.text.text);
-          else if (app.editor.editing)
+          else if (app.repo_dlg.open) {
+            if (app.repo_dlg.focus < app.repo_dlg.FIRST_BUTTON) app.repo_dlg.fields[app.repo_dlg.focus].handle_text(ev.text.text);
+          } else if (app.folder_dlg.open) {
+            if (app.folder_dlg.focus == 0) app.folder_dlg.name_field.handle_text(ev.text.text);
+          } else if (app.unit_dlg.open) {
+            if (app.unit_dlg.focus == 0) app.unit_dlg.name_field.handle_text(ev.text.text);
+          } else if (app.sel_unit_form.open) {
+            if (app.sel_unit_form.focus == 0) app.sel_unit_form.filter_field.handle_text(ev.text.text);
+          } else if (app.editor.editing)
             app.editor.handle_text(ev.text.text);
           break;
 
@@ -176,42 +195,37 @@ int main(int /*argc*/, char * /*argv*/[])
               }
             }
           } else if (app.repo_dlg.open) {
-            SDL_Keymod mod      = ev.key.mod;
+            auto      &d   = app.repo_dlg;
+            SDL_Keymod mod = ev.key.mod;
             bool       consumed = false;
-            if (app.repo_dlg.err_view.focused) consumed = app.repo_dlg.err_view.handle_key(ev.key.key, mod);
-            if (!consumed) consumed = app.repo_dlg.fields[app.repo_dlg.focus].handle_key(ev.key.key, mod);
-            if (!consumed) {
-              switch (ev.key.key) {
-                case SDLK_TAB: app.repo_dlg.focus = (app.repo_dlg.focus + 1) % 2; break;
-                case SDLK_ESCAPE:
-                  app.repo_dlg.open = false;
-                  SDL_StopTextInput(app.win);
-                  break;
-                default: break;
-              }
+            if (d.err_view.focused) consumed = d.err_view.handle_key(ev.key.key, mod);
+            if (!consumed && d.focus < d.FIRST_BUTTON) consumed = d.fields[d.focus].handle_key(ev.key.key, mod);
+            if (!consumed && !form_nav(d.focus, d.activate, d.FOCUS_COUNT, d.FIRST_BUTTON, ev.key.key, mod) && ev.key.key == SDLK_ESCAPE) {
+              d.open = false;
+              SDL_StopTextInput(app.win);
             }
           } else if (app.folder_dlg.open) {
-            SDL_Keymod mod = ev.key.mod;
-            // ReSharper disable once CppTooWideScopeInitStatement
-            bool consumed  = app.folder_dlg.name_field.handle_key(ev.key.key, mod);
-            if (!consumed && ev.key.key == SDLK_ESCAPE) {
-              app.folder_dlg.open = false;
+            auto      &d        = app.folder_dlg;
+            SDL_Keymod mod      = ev.key.mod;
+            bool       consumed = d.focus == 0 && d.name_field.handle_key(ev.key.key, mod);
+            if (!consumed && !form_nav(d.focus, d.activate, d.FOCUS_COUNT, d.FIRST_BUTTON, ev.key.key, mod) && ev.key.key == SDLK_ESCAPE) {
+              d.open = false;
               SDL_StopTextInput(app.win);
             }
           } else if (app.unit_dlg.open) {
-            SDL_Keymod mod = ev.key.mod;
-            // ReSharper disable once CppTooWideScopeInitStatement
-            bool consumed  = app.unit_dlg.name_field.handle_key(ev.key.key, mod);
-            if (!consumed && ev.key.key == SDLK_ESCAPE) {
-              app.unit_dlg.open = false;
+            auto      &d        = app.unit_dlg;
+            SDL_Keymod mod      = ev.key.mod;
+            bool       consumed = d.focus == 0 && d.name_field.handle_key(ev.key.key, mod);
+            if (!consumed && !form_nav(d.focus, d.activate, d.FOCUS_COUNT, d.FIRST_BUTTON, ev.key.key, mod) && ev.key.key == SDLK_ESCAPE) {
+              d.open = false;
               SDL_StopTextInput(app.win);
             }
           } else if (app.sel_unit_form.open) {
-            SDL_Keymod mod = ev.key.mod;
-            // ReSharper disable once CppTooWideScopeInitStatement
-            bool consumed  = app.sel_unit_form.filter_field.handle_key(ev.key.key, mod);
-            if (!consumed && ev.key.key == SDLK_ESCAPE) {
-              app.sel_unit_form.close();
+            auto      &d        = app.sel_unit_form;
+            SDL_Keymod mod      = ev.key.mod;
+            bool       consumed = d.focus == 0 && d.filter_field.handle_key(ev.key.key, mod);
+            if (!consumed && !form_nav(d.focus, d.activate, d.FOCUS_COUNT, d.FIRST_BUTTON, ev.key.key, mod) && ev.key.key == SDLK_ESCAPE) {
+              d.close();
               SDL_StopTextInput(app.win);
             }
           } else if (app.editor.editing) {

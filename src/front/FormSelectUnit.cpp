@@ -2,6 +2,7 @@
 #include "Clr.h"
 #include "ContextMenu.h"
 #include "FontAtlas.h"
+#include "FormWidgets.h"
 #include "back/ExprService.h"
 #include "back/UnitService.h"
 #include "render_helpers.h"
@@ -27,6 +28,8 @@ namespace front {
     schema       = sch;
     field_id     = fid;
     filter_field = InputField{};
+    focus        = 0;
+    activate     = false;
     scroll_y     = 0.f;
     reset_for_filter("");
   }
@@ -95,17 +98,18 @@ namespace front {
 
     // ── Filter field ──────────────────────────────────────────────────────────
     const float fy = dy + 48;
-    filter_field.draw(ren, dx + 16, fy, fw, FFH, true);
-    if (ldown) filter_field.on_ldown(text_ox, mx, my, dx + 16, fy, fw, FFH, clicks);
+    filter_field.draw(ren, dx + 16, fy, fw, FFH, focus == 0);
+    if (ldown && filter_field.on_ldown(text_ox, mx, my, dx + 16, fy, fw, FFH, clicks)) focus = 0;
     if (rdown) filter_field.on_rdown(mx, my, dx + 16, fy, fw, FFH, clamp_cx, clamp_cy);
 
     // ── Buttons ────────────────────────────────────────────────────────────────
     constexpr float BH = 30.f, BW_C = 90.f;
     const float     btn_y = dy + FDH - 16 - BH;
     const float     cxb   = dx + FDW - 16 - BW_C;
-    const bool      h_can = !filter_field.ctx.open && hit(mx, my, cxb, btn_y, BW_C, BH);
-    fill(ren, h_can ? C_HOVER : C_BORDER, cxb, btn_y, BW_C, BH);
-    text_draw(ren, "Отмена", cxb + (BW_C - text_w("Отмена")) * .5f, center_baseline(btn_y, BH), C_TEXT);
+    const bool      act   = activate;
+    activate              = false;
+    const bool do_can =
+        form_button(ren, cxb, btn_y, BW_C, BH, "Отмена", false, !filter_field.ctx.open && hit(mx, my, cxb, btn_y, BW_C, BH), focus == CANCEL, ldown, act);
 
     // ── Unit list ───────────────────────────────────────────────────────────────
     list_x = dx + 16;
@@ -152,7 +156,7 @@ namespace front {
     filter_field.render_ctx(ren, mx, my, ldown, rdown);
 
     // ── Resolve clicks ──────────────────────────────────────────────────────────
-    if (ldown && h_can) {
+    if (do_can) {
       close();
       return -1;
     }

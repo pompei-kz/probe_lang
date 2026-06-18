@@ -2,6 +2,7 @@
 #include "Clr.h"
 #include "ContextMenu.h"
 #include "FontAtlas.h"
+#include "FormWidgets.h"
 #include "back/FolderService.h"
 #include "render_helpers.h"
 
@@ -27,6 +28,8 @@ namespace front {
     name_field.ed       = TextEditor{};
     name_field.ctx.open = false;
     err_view.set("");
+    focus               = 0;
+    activate            = false;
   }
 
   void FormEditFolder::open_edit(int ci, int ri, const Conn &c, const std::string &schema, const std::string &fid, const std::string &fname)
@@ -64,8 +67,8 @@ namespace front {
     float clamp_cy = dy + FDH - ContextMenu::N * ContextMenu::IH - 10.f;
 
     text_draw(ren, "Имя папки", dx + 16, dy + 48 + FS, C_DIM);
-    name_field.draw(ren, dx + 16, by, fw, FFH, true);
-    if (ldown) name_field.on_ldown(text_ox, mx, my, dx + 16, by, fw, FFH, clicks);
+    name_field.draw(ren, dx + 16, by, fw, FFH, focus == 0);
+    if (ldown && name_field.on_ldown(text_ox, mx, my, dx + 16, by, fw, FFH, clicks)) focus = 0;
     if (rdown) name_field.on_rdown(mx, my, dx + 16, by, fw, FFH, clamp_cx, clamp_cy);
 
     float ev_y = by + FFH + 8;
@@ -78,28 +81,22 @@ namespace front {
     float           sx    = dx + FDW - 16 - BW_S;
     float           cx    = sx - 10 - BW_C;
 
-    bool any_ctx = name_field.ctx.open;
-    bool h_save  = !any_ctx && hit(mx, my, sx, btn_y, BW_S, BH);
-    bool h_can   = !any_ctx && hit(mx, my, cx, btn_y, BW_C, BH);
-    fill(ren, h_save ? C_ACCENT : C_BORDER, sx, btn_y, BW_S, BH);
-    fill(ren, h_can ? C_HOVER : C_BORDER, cx, btn_y, BW_C, BH);
+    const bool any_ctx  = name_field.ctx.open;
+    const bool act      = activate;
+    activate            = false;
+    const bool do_save  = form_button(ren, sx, btn_y, BW_S, BH, "Сохранить", true, !any_ctx && hit(mx, my, sx, btn_y, BW_S, BH), focus == SAVE, ldown && !any_ctx, act);
+    const bool do_can   = form_button(ren, cx, btn_y, BW_C, BH, "Отмена", false, !any_ctx && hit(mx, my, cx, btn_y, BW_C, BH), focus == CANCEL, ldown && !any_ctx, act);
 
-    auto btn_t = [&](const char *t, float bx, float bw, Clr c) { text_draw(ren, t, bx + (bw - text_w(t)) * .5f, center_baseline(btn_y, BH), c); };
-    btn_t("Сохранить", sx, BW_S, h_save ? C_PANEL : C_TEXT);
-    btn_t("Отмена", cx, BW_C, C_TEXT);
-
-    if (ldown && !any_ctx) {
-      if (h_can) return -1;
-      if (h_save) {
-        const std::string &name = name_field.ed.buf;
-        if (name.empty()) {
-          err_view.set("Имя папки обязательно");
-          return 0;
-        }
-        auto [ok, msg] = editing ? rename_folder(conn, schema_name, folder_id, name) : create_folder(conn, schema_name, parent_folder_id, name);
-        if (ok) return 1;
-        err_view.set(msg);
+    if (do_can) return -1;
+    if (do_save) {
+      const std::string &name = name_field.ed.buf;
+      if (name.empty()) {
+        err_view.set("Имя папки обязательно");
+        return 0;
       }
+      auto [ok, msg] = editing ? rename_folder(conn, schema_name, folder_id, name) : create_folder(conn, schema_name, parent_folder_id, name);
+      if (ok) return 1;
+      err_view.set(msg);
     }
     return 0;
   }

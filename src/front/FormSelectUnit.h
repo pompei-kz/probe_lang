@@ -24,7 +24,11 @@ namespace front {
     std::string       field_id; // the field whose expression we are setting
 
     InputField                     filter_field;
-    std::vector<back::model::Unit> units;          // loaded so far (this filter)
+    // Focus order: 0 = filter, 1 = Cancel (index >= 1 is a button).
+    static constexpr int           FOCUS_COUNT = 2, FIRST_BUTTON = 1, CANCEL = 1;
+    int                            focus    = 0;
+    bool                           activate = false; // Enter pressed on the focused button
+    std::vector<back::model::Unit> units;            // loaded so far (this filter)
     int                            next_offset = 0; // DB offset for the next page
     bool                           has_more    = true;
     std::string                    applied_filter;  // filter the loaded pages reflect

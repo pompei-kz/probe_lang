@@ -25,6 +25,11 @@ namespace front {
     InputField     name_field;
     SelectableText err_view;
 
+    // Focus order: 0 = name, 1 = type combo, 2 = Save, 3 = Cancel (>= 2 are buttons).
+    static constexpr int FOCUS_COUNT = 4, FIRST_BUTTON = 2, COMBO = 1, SAVE = 2, CANCEL = 3;
+    int                  focus    = 0;
+    bool                 activate = false; // Enter pressed on the focused button
+
     void open_add(int ci, int ri, const back::model::Conn &c, const std::string &schema, const std::string &parent_id);
     void open_edit(int                      ci,
                    int                      ri,

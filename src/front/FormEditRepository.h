@@ -14,7 +14,10 @@ namespace front {
     bool              editing = false;
     std::string       original_schema;
     InputField        fields[2]; // [0]=schema name, [1]=repo name
-    int               focus = 0;
+    // Focus order: 0,1 = fields, 2 = Save, 3 = Cancel (indices >= 2 are buttons).
+    static constexpr int FOCUS_COUNT = 4, FIRST_BUTTON = 2, SAVE = 2, CANCEL = 3;
+    int               focus    = 0;
+    bool              activate = false; // Enter pressed on the focused button
     SelectableText    err_view;
     back::model::Conn conn;
 

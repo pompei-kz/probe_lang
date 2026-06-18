@@ -2,6 +2,7 @@
 #include "Clr.h"
 #include "ContextMenu.h"
 #include "FontAtlas.h"
+#include "FormWidgets.h"
 #include "back/RepoService.h"
 #include "render_helpers.h"
 
@@ -22,7 +23,8 @@ namespace front {
       f.ed       = TextEditor{};
       f.ctx.open = false;
     }
-    focus = 0;
+    focus    = 0;
+    activate = false;
     err_view.set("");
     conn            = c;
     editing         = false;
@@ -94,33 +96,27 @@ namespace front {
     float           sx    = dx + FDW - 16 - BW_S;
     float           cx    = sx - 10 - BW_C;
 
-    bool any_ctx = fields[0].ctx.open || fields[1].ctx.open;
-    bool h_save  = !any_ctx && hit(mx, my, sx, btn_y, BW_S, BH);
-    bool h_can   = !any_ctx && hit(mx, my, cx, btn_y, BW_C, BH);
-    fill(ren, h_save ? C_ACCENT : C_BORDER, sx, btn_y, BW_S, BH);
-    fill(ren, h_can ? C_HOVER : C_BORDER, cx, btn_y, BW_C, BH);
+    const bool any_ctx = fields[0].ctx.open || fields[1].ctx.open;
+    const bool act     = activate;
+    activate           = false;
+    const bool do_save = form_button(ren, sx, btn_y, BW_S, BH, "Save", true, !any_ctx && hit(mx, my, sx, btn_y, BW_S, BH), focus == SAVE, ldown && !any_ctx, act);
+    const bool do_can  = form_button(ren, cx, btn_y, BW_C, BH, "Cancel", false, !any_ctx && hit(mx, my, cx, btn_y, BW_C, BH), focus == CANCEL, ldown && !any_ctx, act);
 
-    auto btn_t = [&](const char *t, float bx, float bw, Clr c) { text_draw(ren, t, bx + (bw - text_w(t)) * .5f, center_baseline(btn_y, BH), c); };
-    btn_t("Save", sx, BW_S, h_save ? C_PANEL : C_TEXT);
-    btn_t("Cancel", cx, BW_C, C_TEXT);
-
-    if (ldown && !any_ctx) {
-      if (h_can) return -1;
-      if (h_save) {
-        const std::string &schema   = fields[0].ed.buf;
-        const std::string &reponame = fields[1].ed.buf;
-        if (schema.empty()) {
-          err_view.set("Schema name is required");
-          return 0;
-        }
-        if (reponame.empty()) {
-          err_view.set("Repository name is required");
-          return 0;
-        }
-        auto [ok, msg] = editing ? edit_repository(conn, original_schema, schema, reponame) : create_repository(conn, schema, reponame);
-        if (ok) return 1;
-        err_view.set(msg);
+    if (do_can) return -1;
+    if (do_save) {
+      const std::string &schema   = fields[0].ed.buf;
+      const std::string &reponame = fields[1].ed.buf;
+      if (schema.empty()) {
+        err_view.set("Schema name is required");
+        return 0;
       }
+      if (reponame.empty()) {
+        err_view.set("Repository name is required");
+        return 0;
+      }
+      auto [ok, msg] = editing ? edit_repository(conn, original_schema, schema, reponame) : create_repository(conn, schema, reponame);
+      if (ok) return 1;
+      err_view.set(msg);
     }
     return 0;
   }

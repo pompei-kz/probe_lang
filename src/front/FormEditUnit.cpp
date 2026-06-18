@@ -2,6 +2,7 @@
 #include "Clr.h"
 #include "ContextMenu.h"
 #include "FontAtlas.h"
+#include "FormWidgets.h"
 #include "back/UnitService.h"
 #include "render_helpers.h"
 
@@ -30,6 +31,8 @@ namespace front {
     name_field.ed       = TextEditor{};
     name_field.ctx.open = false;
     err_view.set("");
+    focus               = 0;
+    activate            = false;
   }
 
   void FormEditUnit::open_edit(
@@ -72,7 +75,7 @@ namespace front {
     text_draw(ren, "Тип юнита", dx + 16, ty_lbl_y + FS, C_DIM);
     float cby = ty_lbl_y + FS + 6;
     fill(ren, C_PANEL, dx + 16, cby, fw, FFH);
-    rect(ren, C_BORDER, dx + 16, cby, fw, FFH);
+    rect(ren, focus == COMBO ? C_TEXT : C_BORDER, dx + 16, cby, fw, FFH); // focus ring
     text_draw(ren, to_string(type), dx + 22, center_baseline(cby, FFH), C_TEXT);
     {
       float cxr = dx + 16 + fw - 16, cyr = cby + FFH * .5f;
@@ -87,8 +90,8 @@ namespace front {
     float ny_lbl_y = ty_lbl_y + 58;
     text_draw(ren, "Имя", dx + 16, ny_lbl_y + FS, C_DIM);
     float by = ny_lbl_y + FS + 6;
-    name_field.draw(ren, dx + 16, by, fw, FFH, !type_dropdown_open);
-    if (ldown && !type_dropdown_open) name_field.on_ldown(text_ox, mx, my, dx + 16, by, fw, FFH, clicks);
+    name_field.draw(ren, dx + 16, by, fw, FFH, focus == 0 && !type_dropdown_open);
+    if (ldown && !type_dropdown_open && name_field.on_ldown(text_ox, mx, my, dx + 16, by, fw, FFH, clicks)) focus = 0;
     if (rdown) name_field.on_rdown(mx, my, dx + 16, by, fw, FFH, clamp_cx, clamp_cy);
 
     // ── Error view ─────────────────────────────────────────────────────────
@@ -96,20 +99,6 @@ namespace front {
     err_view.render(ren, dx + 16, ev_y, fw, ERR_H, mx, my, ldown, rdown, C_ERR, clicks);
 
     name_field.render_ctx(ren, mx, my, ldown, rdown);
-
-    // ── Save / Cancel buttons ──────────────────────────────────────────────
-    constexpr float BH = 30.f, BW_S = 100.f, BW_C = 80.f;
-    float           btn_y   = dy + FDH - 50;
-    float           sx      = dx + FDW - 16 - BW_S;
-    float           cx      = sx - 10 - BW_C;
-    bool            blocked = type_dropdown_open || name_field.ctx.open;
-    bool            h_save  = !blocked && hit(mx, my, sx, btn_y, BW_S, BH);
-    bool            h_can   = !blocked && hit(mx, my, cx, btn_y, BW_C, BH);
-    fill(ren, h_save ? C_ACCENT : C_BORDER, sx, btn_y, BW_S, BH);
-    fill(ren, h_can ? C_HOVER : C_BORDER, cx, btn_y, BW_C, BH);
-    auto btn_t = [&](const char *t, float bx, float bw, Clr c) { text_draw(ren, t, bx + (bw - text_w(t)) * .5f, center_baseline(btn_y, BH), c); };
-    btn_t("Сохранить", sx, BW_S, h_save ? C_PANEL : C_TEXT);
-    btn_t("Отмена", cx, BW_C, C_TEXT);
 
     // ── Type dropdown (rendered on top) ────────────────────────────────────
     bool ate = false;
@@ -135,22 +124,32 @@ namespace front {
       }
     } else if (ldown && h_combo) {
       type_dropdown_open = true;
+      focus              = COMBO;
       ate                = true;
     }
 
-    // ── Save / Cancel actions ──────────────────────────────────────────────
-    if (ldown && !blocked && !ate) {
-      if (h_can) return -1;
-      if (h_save) {
-        const std::string &name = name_field.ed.buf;
-        if (name.empty()) {
-          err_view.set("Имя юнита обязательно");
-          return 0;
-        }
-        auto [ok, msg] = editing ? edit_unit(conn, schema_name, unit_id, name, type) : create_unit(conn, schema_name, parent_folder_id, name, type);
-        if (ok) return 1;
-        err_view.set(msg);
+    // ── Save / Cancel buttons + actions ────────────────────────────────────
+    constexpr float BH = 30.f, BW_S = 100.f, BW_C = 80.f;
+    const float     btn_y     = dy + FDH - 50;
+    const float     sx        = dx + FDW - 16 - BW_S;
+    const float     cx        = sx - 10 - BW_C;
+    const bool      blocked   = type_dropdown_open || name_field.ctx.open;
+    const bool      clickable = ldown && !blocked && !ate;
+    const bool      act       = activate;
+    activate                  = false;
+    const bool do_save = form_button(ren, sx, btn_y, BW_S, BH, "Сохранить", true, !blocked && hit(mx, my, sx, btn_y, BW_S, BH), focus == SAVE, clickable, act);
+    const bool do_can  = form_button(ren, cx, btn_y, BW_C, BH, "Отмена", false, !blocked && hit(mx, my, cx, btn_y, BW_C, BH), focus == CANCEL, clickable, act);
+
+    if (do_can) return -1;
+    if (do_save) {
+      const std::string &name = name_field.ed.buf;
+      if (name.empty()) {
+        err_view.set("Имя юнита обязательно");
+        return 0;
       }
+      auto [ok, msg] = editing ? edit_unit(conn, schema_name, unit_id, name, type) : create_unit(conn, schema_name, parent_folder_id, name, type);
+      if (ok) return 1;
+      err_view.set(msg);
     }
     return 0;
   }
