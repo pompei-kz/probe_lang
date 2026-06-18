@@ -602,12 +602,7 @@ namespace front {
         update_field_access(t->conn, t->schema, m->id, a);
     };
     switch (chosen) {
-      case ACT_TOGGLE:
-        if (is_method)
-          update_method_disabled(t->conn, t->schema, m->id, !m->disabled);
-        else
-          update_field_disabled(t->conn, t->schema, m->id, !m->disabled);
-        break;
+      case ACT_TOGGLE: update_block_disabled(t->conn, t->schema, m->id, !m->disabled); break;
       case ACT_DELETE: delete_block(t->conn, t->schema, m->id, m->type); break;
       case ACT_INNER: update_method_type(t->conn, t->schema, m->id, MethodType::Inner); break;
       case ACT_STATIC: update_method_type(t->conn, t->schema, m->id, MethodType::Static); break;

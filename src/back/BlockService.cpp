@@ -21,7 +21,7 @@ namespace back {
       pqxx::result      rows =
           txn.exec_params("SELECT s.id, s.unit_id, s.type, s.x, s.y, s.width, s.height, "
                           "       COALESCE(m.name, f.name, ''), "
-                          "       COALESCE(m.disabled, f.disabled, false), "
+                          "       s.disabled, "
                           "       COALESCE(m.type, 'Inner'), "
                           "       COALESCE(m.access, f.access, 'Private') "
                           "FROM " + qs + ".unit_b s "
@@ -272,9 +272,20 @@ namespace back {
     }
   }
 
-  std::pair<bool, std::string> update_method_disabled(const Conn &c, const std::string &schema, const std::string &id, bool disabled)
+  std::pair<bool, std::string> update_block_disabled(const Conn &c, const std::string &schema, const std::string &id, bool disabled)
   {
-    return update_method_column(c, schema, id, "disabled", disabled ? "true" : "false");
+    try {
+      pqxx::connection  pg(make_cs(c));
+      pqxx::work        txn(pg);
+      const std::string value = disabled ? "true" : "false";
+      txn.exec_params("UPDATE " + pg.quote_name(schema) + ".unit_b SET disabled = $1 WHERE id = $2", value, id);
+      txn.commit();
+      return {true, ""};
+    } catch (const pqxx::sql_error &e) {
+      return {false, sql_err_msg(e)};
+    } catch (const std::exception &e) {
+      return {false, e.what()};
+    }
   }
 
   std::pair<bool, std::string> update_method_type(const Conn &c, const std::string &schema, const std::string &id, MethodType type)
@@ -303,11 +314,6 @@ namespace back {
     } catch (const std::exception &e) {
       return {false, e.what()};
     }
-  }
-
-  std::pair<bool, std::string> update_field_disabled(const Conn &c, const std::string &schema, const std::string &id, bool disabled)
-  {
-    return update_field_column(c, schema, id, "disabled", disabled ? "true" : "false");
   }
 
   std::pair<bool, std::string> update_field_access(const Conn &c, const std::string &schema, const std::string &id, MethodAccess access)

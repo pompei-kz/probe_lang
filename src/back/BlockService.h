@@ -58,13 +58,14 @@ namespace back {
   std::pair<bool, std::string> reorder_method_args(
       const model::Conn &c, const std::string &schema, const std::string &owner_method_id, const std::vector<std::string> &ordered_ids);
 
-  // Update method-only attributes (unit_b_method.disabled / type / access).
-  std::pair<bool, std::string> update_method_disabled(const model::Conn &c, const std::string &schema, const std::string &id, bool disabled);
+  // Update a block's disabled flag (unit_b.disabled — common to methods and fields).
+  std::pair<bool, std::string> update_block_disabled(const model::Conn &c, const std::string &schema, const std::string &id, bool disabled);
+
+  // Update method-only attributes (unit_b_method.type / access).
   std::pair<bool, std::string> update_method_type(const model::Conn &c, const std::string &schema, const std::string &id, model::MethodType type);
   std::pair<bool, std::string> update_method_access(const model::Conn &c, const std::string &schema, const std::string &id, model::MethodAccess access);
 
-  // Update field attributes (unit_b_field.disabled / access).
-  std::pair<bool, std::string> update_field_disabled(const model::Conn &c, const std::string &schema, const std::string &id, bool disabled);
+  // Update field attributes (unit_b_field.access).
   std::pair<bool, std::string> update_field_access(const model::Conn &c, const std::string &schema, const std::string &id, model::MethodAccess access);
 
   // Delete a block: its unit_b row, its detail row (unit_b_method /

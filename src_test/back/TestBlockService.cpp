@@ -450,7 +450,7 @@ TEST_F(BlockServiceTest, UpdateMethodAttributesPersist)
 
   //
   //
-  auto disabled = update_method_disabled(conn(), schema, mid, true);
+  auto disabled = update_block_disabled(conn(), schema, mid, true);
   auto type     = update_method_type(conn(), schema, mid, MethodType::Constructor);
   auto access   = update_method_access(conn(), schema, mid, MethodAccess::Public);
   //
@@ -494,7 +494,7 @@ TEST_F(BlockServiceTest, UpdateFieldAttributesPersist)
 
   //
   //
-  auto disabled = update_field_disabled(conn(), schema, fid, true);
+  auto disabled = update_block_disabled(conn(), schema, fid, true);
   auto access   = update_field_access(conn(), schema, fid, MethodAccess::Protected);
   //
   //
