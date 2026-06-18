@@ -1,26 +1,12 @@
 #pragma once
+#include "BlockType.h"
+#include "MethodAccess.h"
+#include "MethodArg.h"
+#include "MethodType.h"
 #include <string>
 #include <vector>
 
 namespace back::model {
-
-  // A Block is one row of unit_b, displayed as a box on the editor canvas.
-  // It is either a Method (extra fields in unit_b_method) or a Field
-  // (extra fields in unit_b_field), discriminated by `type`.
-  enum class BlockType { Method, Field };
-
-  // Method-only attributes stored in unit_b_method.
-  enum class MethodType { Inner, Static, Constructor, Destructor };
-  enum class MethodAccess { Private, Protected, Public };
-
-  // One argument of a method block (a row of unit_b_method_arg). Drawn as a
-  // row below the method's badge; absent for field blocks.
-  struct MethodArg
-  {
-    std::string id;
-    std::string name;
-    double      order_index = 0; // sort key within the owning method
-  };
 
   struct Block
   {
@@ -36,56 +22,5 @@ namespace back::model {
     MethodType             method_type = MethodType::Inner; // method-only; ignored for fields
     MethodAccess           access = MethodAccess::Private;
   };
-
-  inline const char *to_string(BlockType t)
-  {
-    switch (t) {
-      case BlockType::Field: return "Field";
-      case BlockType::Method:
-      default: return "Method";
-    }
-  }
-
-  inline BlockType block_type_from_string(const std::string &s)
-  {
-    if (s == "Field") return BlockType::Field;
-    return BlockType::Method;
-  }
-
-  inline const char *to_string(MethodType t)
-  {
-    switch (t) {
-      case MethodType::Static: return "Static";
-      case MethodType::Constructor: return "Constructor";
-      case MethodType::Destructor: return "Destructor";
-      case MethodType::Inner:
-      default: return "Inner";
-    }
-  }
-
-  inline MethodType method_type_from_string(const std::string &s)
-  {
-    if (s == "Static") return MethodType::Static;
-    if (s == "Constructor") return MethodType::Constructor;
-    if (s == "Destructor") return MethodType::Destructor;
-    return MethodType::Inner;
-  }
-
-  inline const char *to_string(MethodAccess a)
-  {
-    switch (a) {
-      case MethodAccess::Protected: return "Protected";
-      case MethodAccess::Public: return "Public";
-      case MethodAccess::Private:
-      default: return "Private";
-    }
-  }
-
-  inline MethodAccess method_access_from_string(const std::string &s)
-  {
-    if (s == "Protected") return MethodAccess::Protected;
-    if (s == "Public") return MethodAccess::Public;
-    return MethodAccess::Private;
-  }
 
 } // namespace back::model

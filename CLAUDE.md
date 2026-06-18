@@ -159,3 +159,7 @@ GIST-indexed), and the detail tables `unit_b_method` / `unit_b_field` (1:1 with 
   custom brace wrapping). Run it on touched files.
 - The project is developed in CLion; `// ReSharper disable once ...` comments are intentional — leave
   them in place.
+- **One type per file**: every `enum`, `struct` and `class` lives in its own header named exactly after
+  it (e.g. `BlockType` → `model/BlockType.h`, `InitDb` → `back/InitDb.h`). An aggregate type that owns
+  others (e.g. `Block`) just `#include`s their headers. Its free `to_string` / `*_from_string` converters
+  stay in the same file as the type they convert.

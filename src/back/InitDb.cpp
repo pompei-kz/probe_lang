@@ -3,7 +3,11 @@
 
 namespace back {
 
-  InitDb::InitDb(pqxx::work &txn, pqxx::connection &pg, const std::string &schema) : txn_(txn), pg_(pg), schema_(schema) {}
+  InitDb::InitDb(pqxx::work &txn, pqxx::connection &pg, const std::string &schema)
+      : txn_(txn)
+      , pg_(pg)
+      , schema_(schema)
+  {}
 
   // Column definition for the folder table, shared by both creation paths.
   static constexpr const char *FOLDER_TABLE_DEF = "(id varchar(32) PRIMARY KEY, parent_id varchar(32), name text)";
@@ -18,18 +22,22 @@ namespace back {
     ensureLastModifiedAt(txn_, schema_, "folder");
   }
 
-  // Column definition for the unit table. No foreign keys; type is one of
-  // Class / Interface / Enum, enforced by a CHECK constraint.
-  static constexpr const char *UNIT_TABLE_DEF = "(id varchar(32) PRIMARY KEY,"
-                                                " parent_folder_id varchar(32),"
-                                                " name text,"
-                                                " type text CHECK (type IN ('Class','Interface','Enum'))"
-                                                ")";
-
   void InitDb::init_unit_table() const
   {
-    const std::string schemaQuote = pg_.quote_name(schema_);
-    txn_.exec("CREATE TABLE IF NOT EXISTS " + schemaQuote + ".unit " + UNIT_TABLE_DEF);
+    const std::string schemaQuoted = pg_.quote_name(schema_);
+
+    txn_.exec("CREATE TABLE IF NOT EXISTS " + schemaQuoted + ".unit " +
+              "(id varchar(32) PRIMARY KEY,"
+              " parent_folder_id varchar(32),"
+              " name text,"
+              " type text CHECK (type IN ('Class','Interface','Enum'))"
+              ")");
+
+    txn_.exec("COMMENT ON TABLE  " + schemaQuoted + ".unit         IS 'Юнит - один из: Класс, Интерфейс, Перечисление'");
+    txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit.id      IS 'Идентификатор юнита'");
+    txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit.name    IS 'Наименование юнита'");
+    txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit.type    IS 'Тип юнита: Класс, Интерфейс, Перечисление'");
+
     ensureCreatedAt(txn_, schema_, "unit");
     ensureLastModifiedAt(txn_, schema_, "unit");
 
@@ -38,12 +46,16 @@ namespace back {
 
   void InitDb::init_repo_schema() const
   {
-    const std::string schemaQuote = pg_.quote_name(schema_);
+    const std::string schemaQuoted = pg_.quote_name(schema_);
 
-    txn_.exec("CREATE SCHEMA IF NOT EXISTS " + schemaQuote);
-    txn_.exec("CREATE TABLE IF NOT EXISTS " + schemaQuote +
+    txn_.exec("CREATE SCHEMA IF NOT EXISTS " + schemaQuoted);
+    txn_.exec("CREATE TABLE IF NOT EXISTS " + schemaQuoted +
               ".lang_setting "
               "(name varchar(150) PRIMARY KEY, value text)");
+
+    txn_.exec("COMMENT ON TABLE  " + schemaQuoted + ".lang_setting         IS 'Настройки данного репозитория'");
+    txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".lang_setting.name    IS 'Имя настройки'");
+    txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".lang_setting.value   IS 'Текстовое представление данной настройки'");
 
     ensureCreatedAt(txn_, schema_, "lang_setting");
     ensureLastModifiedAt(txn_, schema_, "lang_setting");
@@ -64,11 +76,11 @@ namespace back {
 
     if (!hasTable(txn_, schema_, "unit_b")) {
       txn_.exec("CREATE TABLE " + schemaQuoted +
-                ".unit_b "
-                "("
+                ".unit_b ("
                 "  id        VARCHAR(32) primary key,"
                 "  unit_id   VARCHAR(32) not null,"
-                "  type VARCHAR(150) not null,"
+                "  type      VARCHAR(150) not null,"
+                "  disabled  BOOL default false,"
                 "  x         FLOAT4 not null,"
                 "  y         FLOAT4 not null,"
                 "  width     FLOAT4 not null,"
@@ -78,6 +90,16 @@ namespace back {
                 "    ST_MakeEnvelope(x, y, x + width, y + height, 0)"
                 "  ) STORED"
                 ")");
+
+      txn_.exec("COMMENT ON TABLE  " + schemaQuoted + ".unit_b          IS 'Базовая структура всех блоков'");
+      txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b.unit_id  IS 'Идентификатор юнита, которому принадлежит данный блок'");
+      txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b.type     IS 'Тип данного блока - соответствует перечислению BlockType'");
+      txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b.disabled IS 'Признак отключения данного блока'");
+      txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b.x        IS 'x координата расположения блока'");
+      txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b.y        IS 'y координата расположения блока'");
+      txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b.width    IS 'Ширина этой части блока и всех его внутренних частей'");
+      txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b.height   IS 'Высота этой части блока и всех его внутренних частей'");
+      txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b.geom     IS 'Геометрия данной части блока для индексирования'");
     }
 
     if (!hasIndex(txn_, schema_, "unit_b_geom")) {
@@ -91,13 +113,18 @@ namespace back {
       txn_.exec("CREATE TABLE " + schemaQuoted +
                 ".unit_b_method "
                 "("
-                "  id           varchar(32) primary key,"
-                "  type         text CHECK (type IN ('Inner','Static','Constructor','Destructor')) default 'Inner',"
-                "  access       text CHECK (access IN ('Public','Protected','Private')) default 'Private',"
-                "  next_unit_id varchar(32),"
-                "  disabled     bool default false,"
-                "  name         text"
+                "  id            varchar(32) primary key,"
+                "  type          text CHECK (type IN ('Inner','Static','Constructor','Destructor')) default 'Inner',"
+                "  access        text CHECK (access IN ('Public','Protected','Private')) default 'Private',"
+                "  next_block_id varchar(32),"
+                "  name          text"
                 ")");
+
+      txn_.exec("COMMENT ON TABLE  " + schemaQuoted + ".unit_b_method               IS 'Блок метода'");
+      txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b_method.type          IS 'Тип метода - соответствует перечислению MethodType'");
+      txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b_method.access        IS 'Доступ метода - соответствует перечислению MethodAccess'");
+      txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b_method.next_block_id IS 'Идентификатор блока прицепленный снизу'");
+      txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b_method.name          IS 'Имя данного метода'");
 
       ensureCreatedAt(txn_, schema_, "unit_b_method");
       ensureLastModifiedAt(txn_, schema_, "unit_b_method");
@@ -113,6 +140,11 @@ namespace back {
                 "  name            text"
                 ")");
 
+      txn_.exec("COMMENT ON TABLE  " + schemaQuoted + ".unit_b_method_arg                 IS 'Аргумент метода'");
+      txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b_method_arg.id              IS 'Идентификатор аргумента'");
+      txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b_method_arg.owner_method_id IS 'Идентификатор метода данного аргумента'");
+      txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b_method_arg.name            IS 'Имя аргумента'");
+
       ensureCreatedAt(txn_, schema_, "unit_b_method_arg");
       ensureLastModifiedAt(txn_, schema_, "unit_b_method_arg");
     }
@@ -121,45 +153,82 @@ namespace back {
       txn_.exec("CREATE TABLE " + schemaQuoted +
                 ".unit_b_field "
                 "("
-                "  id varchar(32) primary key,"
+                "  id           varchar(32) primary key,"
                 "  next_unit_id varchar(32),"
+                "  size_bytes   int4 default null,"
+                "  expr_id      varchar(32),"
                 "  access       text CHECK (access IN ('Public','Protected','Private')) default 'Private',"
-                "  commented    bool default false,"
-                "  disabled     bool default false,"
                 "  name text"
                 ")");
 
       ensureCreatedAt(txn_, schema_, "unit_b_field");
       ensureLastModifiedAt(txn_, schema_, "unit_b_field");
+
+      txn_.exec("COMMENT ON TABLE " + schemaQuoted +
+                ".unit_b_field IS 'Поле юнита. Его размер может быть задан на прямую через size_bytes либо через expr_id,"
+                " через которую вычисляется тип данного поля во время верификации'");
+
+      txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b_field.id           IS 'Идентификатор блока поля'");
+      txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b_field.next_unit_id IS 'Подвешенный снизу блок'");
+      txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b_field.size_bytes   IS 'Размер этого поля заданный изначально, или NULL'");
+      txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b_field.expr_id      IS 'Идентификатор выражения, определяющего тип этого поля'");
+      txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b_field.access       IS 'Доступ к этому полю'");
+      txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b_field.name         IS 'Наименование данного поля'");
     }
   }
 
   void InitDb::init_unit_e_tables() const
   {
     const std::string schemaQuoted = pg_.quote_name(schema_);
-    if (!hasTable(txn_, schema_, "unit_e")) {
-      txn_.exec("CREATE TABLE " + schemaQuoted +
-                ".unit_e ("
-                "  id        VARCHAR(32) primary key,"
-                "  unit_id   VARCHAR(32) not null,"
-                "  type      VARCHAR(150) not null,"
-                "  x         FLOAT4 not null,"
-                "  y         FLOAT4 not null,"
-                "  width     FLOAT4 not null,"
-                "  height    FLOAT4 not null,"
-                "  geom GEOMETRY(Polygon, 0)"
-                "  GENERATED ALWAYS AS ("
-                "    ST_MakeEnvelope(x, y, x + width, y + height, 0)"
-                "  ) STORED"
-                ")");
-    }
+    {
+      if (!hasTable(txn_, schema_, "unit_e")) {
+        txn_.exec("CREATE TABLE " + schemaQuoted +
+                  ".unit_e ("
+                  "  id        VARCHAR(32) primary key,"
+                  "  type      VARCHAR(150) not null,"
+                  "  x         FLOAT4 not null,"
+                  "  y         FLOAT4 not null,"
+                  "  width     FLOAT4 not null,"
+                  "  height    FLOAT4 not null,"
+                  "  geom GEOMETRY(Polygon, 0)"
+                  "  GENERATED ALWAYS AS ("
+                  "    ST_MakeEnvelope(x, y, x + width, y + height, 0)"
+                  "  ) STORED"
+                  ")");
 
-    if (!hasIndex(txn_, schema_, "unit_b_geom")) {
-      txn_.exec("CREATE INDEX unit_e_geom ON " + schemaQuoted + ".unit_b USING GIST(geom)");
-    }
+        txn_.exec("COMMENT ON TABLE " + schemaQuoted + ".unit_e         IS 'Базовая структура для всех частей выражений'");
+        txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_e.id     IS 'Идентификатор части выражения'");
+        txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_e.type   IS 'Тип выражение - соответствует перечислению ExprType'");
+        txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_e.x      IS 'x координата расположения выражения'");
+        txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_e.y      IS 'y координата расположения выражения'");
+        txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_e.width  IS 'Ширина этой части выражения и всех её внутренних частей'");
+        txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_e.height IS 'Высота этой части выражения и всех её внутренних частей'");
+        txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_e.geom   IS 'Геометрия данной части выражения для индексирования'");
+      }
 
-    ensureCreatedAt(txn_, schema_, "unit_e");
-    ensureLastModifiedAt(txn_, schema_, "unit_e");
+      if (!hasIndex(txn_, schema_, "unit_b_geom")) {
+        txn_.exec("CREATE INDEX unit_e_geom ON " + schemaQuoted + ".unit_b USING GIST(geom)");
+      }
+
+      ensureCreatedAt(txn_, schema_, "unit_e");
+      ensureLastModifiedAt(txn_, schema_, "unit_e");
+    }
+    {
+      if (!hasTable(txn_, schema_, "unit_e_unit")) {
+        txn_.exec("CREATE TABLE " + schemaQuoted +
+                  ".unit_e_unit ("
+                  "  id      VARCHAR(32) primary key,"
+                  "  unit_id VARCHAR(32)"
+                  ")");
+
+        txn_.exec("COMMENT ON TABLE  " + schemaQuoted + ".unit_e_unit         IS 'Выражение указывающее на юнит. Вычисляется при верификации'");
+        txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_e_unit.id      IS 'Идентификатор части выражения'");
+        txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_e_unit.unit_id IS 'Идентификатор юнита, на который указывает данное выражение'");
+      }
+
+      ensureCreatedAt(txn_, schema_, "unit_e_unit");
+      ensureLastModifiedAt(txn_, schema_, "unit_e_unit");
+    }
   }
 
 } // namespace back
