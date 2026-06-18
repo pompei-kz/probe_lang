@@ -79,6 +79,7 @@ add_executable(probe_lang_tests
         src_test/back/TestUnitService.cpp
         src_test/back/TestBlockService.cpp
         src_test/back/TestExprService.cpp
+        src_test/back/TestUndoService.cpp
         src_test/back/TestUnitEditorState.cpp
         src/back/CustomId.cpp
         src/back/ConnService.cpp
@@ -90,6 +91,7 @@ add_executable(probe_lang_tests
         src/back/UnitService.cpp
         src/back/BlockService.cpp
         src/back/ExprService.cpp
+        src/back/UndoService.cpp
         src/back/UnitEditorState.cpp
         src/back/model/UndoRowChange.h
         src/back/model/ExprType.h

@@ -1,0 +1,128 @@
+#include "DbTestBase.h"
+#include "back/UndoService.h"
+#include <gtest/gtest.h>
+
+using namespace back;
+using namespace back::model;
+
+class UndoServiceTest : public DbTest
+{
+protected:
+  // Run DDL/DML setup in its own committed transaction.
+  void setup_sql(const std::string &sql)
+  {
+    pqxx::work txn(*pg);
+    txn.exec(sql);
+    txn.commit();
+  }
+};
+
+TEST_F(UndoServiceTest, UpdateUndoCapturesOldColumnValue)
+{
+  make_schema();
+  setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
+  setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r1', 'old')");
+
+  UndoRowChange change{"t", "r1", false, "val", "new"};
+
+  pqxx::work  txn(*pg);
+  UndoService svc(txn, *pg, schema);
+  //
+  //
+  std::vector<UndoRowChange> undo = svc.collectUndoChanges({change});
+  //
+  //
+
+  ASSERT_EQ(undo.size(), 1u);
+  EXPECT_EQ(undo[0].tableName, "t");
+  EXPECT_EQ(undo[0].idValue, "r1");
+  EXPECT_FALSE(undo[0].toDelete);
+  EXPECT_EQ(undo[0].colName, "val");
+  ASSERT_TRUE(undo[0].value.has_value());
+  EXPECT_EQ(*undo[0].value, "old");
+}
+
+TEST_F(UndoServiceTest, UpdateUndoOfNullOldValueIsNullopt)
+{
+  make_schema();
+  setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
+  setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r2', NULL)");
+
+  UndoRowChange change{"t", "r2", false, "val", "x"};
+
+  pqxx::work  txn(*pg);
+  UndoService svc(txn, *pg, schema);
+  //
+  //
+  std::vector<UndoRowChange> undo = svc.collectUndoChanges({change});
+  //
+  //
+
+  ASSERT_EQ(undo.size(), 1u);
+  EXPECT_FALSE(undo[0].value.has_value()); // restore back to NULL
+}
+
+TEST_F(UndoServiceTest, ChangesAreUndoneInReverseOrder)
+{
+  make_schema();
+  setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
+  setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('a', '1'), ('b', '2')");
+
+  UndoRowChange first{"t", "a", false, "val", "A"};
+  UndoRowChange second{"t", "b", false, "val", "B"};
+
+  pqxx::work  txn(*pg);
+  UndoService svc(txn, *pg, schema);
+  //
+  //
+  std::vector<UndoRowChange> undo = svc.collectUndoChanges({first, second});
+  //
+  //
+
+  ASSERT_EQ(undo.size(), 2u);
+  // Reverse order: the last user change is undone first.
+  EXPECT_EQ(undo[0].idValue, "b");
+  EXPECT_EQ(*undo[0].value, "2");
+  EXPECT_EQ(undo[1].idValue, "a");
+  EXPECT_EQ(*undo[1].value, "1");
+}
+
+TEST_F(UndoServiceTest, UpdateOnMissingRowIsUndoneByDelete)
+{
+  make_schema();
+  setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
+
+  // Строки 'missing' ещё нет: применение изменения её создаст, поэтому отмена
+  // должна удалить эту строку.
+  UndoRowChange change{"t", "missing", false, "val", "x"};
+
+  pqxx::work  txn(*pg);
+  UndoService svc(txn, *pg, schema);
+  //
+  //
+  std::vector<UndoRowChange> undo = svc.collectUndoChanges({change});
+  //
+  //
+
+  ASSERT_EQ(undo.size(), 1u);
+  EXPECT_EQ(undo[0].tableName, "t");
+  EXPECT_EQ(undo[0].idValue, "missing");
+  EXPECT_TRUE(undo[0].toDelete);
+}
+
+TEST_F(UndoServiceTest, DeleteIsNotSupportedAndThrows)
+{
+  make_schema();
+  setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
+  setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r1', 'old')");
+
+  UndoRowChange change{"t", "r1", true, "", std::nullopt};
+
+  pqxx::work  txn(*pg);
+  UndoService svc(txn, *pg, schema);
+  //
+  //
+  EXPECT_THROW(svc.collectUndoChanges({change}), std::exception);
+  //
+  //
+}
