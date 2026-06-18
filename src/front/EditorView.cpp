@@ -1415,14 +1415,15 @@ namespace front {
         const int ai = arg_row_at(tgeo, *target, mx, my);
         const bool on_size = target->type == BlockType::Field && !target->expr_id_used &&
                              hit(mx, my, field_size_x(tgeo, *target), tgeo.by, text_w(size_label(target->size_bytes).c_str()) * tgeo.z, BOX_H * tgeo.z);
-        // A double-click on the empty-expression cube opens the menu (not name edit).
-        bool  on_cube = false;
+        // A double-click on the expression slot (empty cube or a set expression)
+        // opens the expression-selection menu (not name edit).
+        bool  on_expr_slot = false;
         float sqx, sqy, sqw, sqh;
-        if (target->type == BlockType::Field && target->expr_id_used && !target->expr_present) {
+        if (target->type == BlockType::Field && target->expr_id_used) {
           field_expr_slot(tgeo, *target, sqx, sqy, sqw, sqh);
-          on_cube = hit(mx, my, sqx, sqy, sqw, sqh);
+          on_expr_slot = hit(mx, my, sqx, sqy, sqw, sqh);
         }
-        if (on_cube) {
+        if (on_expr_slot) {
           expr_menu.open_at(sqx, sqy + sqh, target->id);
         } else if (ai >= 0) {
           const float ay  = arg_row_y(tgeo, ai);
@@ -1465,15 +1466,15 @@ namespace front {
       if (target) {
         int minus_i = arg_minus_at(tgeo, *target, mx, my);
         int arg_i   = target->type == BlockType::Method ? arg_row_at(tgeo, *target, mx, my) : -1;
-        // A field with no expression yet: clicking its cube square opens the
-        // expression-selection menu instead of starting a drag.
-        bool  on_cube = false;
+        // Clicking a field's expression slot (empty cube or a set expression)
+        // opens the expression-selection menu instead of starting a drag.
+        bool  on_expr_slot = false;
         float sqx, sqy, sqw, sqh;
-        if (target->type == BlockType::Field && target->expr_id_used && !target->expr_present) {
+        if (target->type == BlockType::Field && target->expr_id_used) {
           field_expr_slot(tgeo, *target, sqx, sqy, sqw, sqh);
-          on_cube = hit(mx, my, sqx, sqy, sqw, sqh);
+          on_expr_slot = hit(mx, my, sqx, sqy, sqw, sqh);
         }
-        if (on_cube) {
+        if (on_expr_slot) {
           expr_menu.open_at(sqx, sqy + sqh, target->id);
         } else if (minus_i >= 0) {
           del_arg(*target, target->args[minus_i].id);
