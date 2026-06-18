@@ -126,3 +126,44 @@ TEST_F(UndoServiceTest, DeleteIsNotSupportedAndThrows)
   //
   //
 }
+
+TEST_F(UndoServiceTest, UpdatesAcrossThreeColumnsCaptureEachOldValue)
+{
+  make_schema();
+  setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, a text, b int4, c bool)");
+  setup_sql("INSERT INTO " + qual("t") + " (id, a, b, c) VALUES ('r1', 'old_a', 7, true)");
+
+  // Three changes to the same row, one per non-id column.
+  UndoRowChange ca{"t", "r1", false, "a", "new_a"};
+  UndoRowChange cb{"t", "r1", false, "b", "42"};
+  UndoRowChange cc{"t", "r1", false, "c", "false"};
+
+  pqxx::work  txn(*pg);
+  UndoService svc(txn, *pg, schema);
+  //
+  //
+  std::vector<UndoRowChange> undo = svc.collectUndoChanges({ca, cb, cc});
+  //
+  //
+
+  // Reverse order of the input; each restores its column's old value (read as text).
+  ASSERT_EQ(undo.size(), 3u);
+
+  EXPECT_EQ(undo[0].colName, "c");
+  ASSERT_TRUE(undo[0].value.has_value());
+  EXPECT_EQ(*undo[0].value, "t"); // PostgreSQL bool text form; 't'::bool round-trips back
+
+  EXPECT_EQ(undo[1].colName, "b");
+  ASSERT_TRUE(undo[1].value.has_value());
+  EXPECT_EQ(*undo[1].value, "7");
+
+  EXPECT_EQ(undo[2].colName, "a");
+  ASSERT_TRUE(undo[2].value.has_value());
+  EXPECT_EQ(*undo[2].value, "old_a");
+
+  for (const UndoRowChange &u : undo) {
+    EXPECT_EQ(u.tableName, "t");
+    EXPECT_EQ(u.idValue, "r1");
+    EXPECT_FALSE(u.toDelete);
+  }
+}
