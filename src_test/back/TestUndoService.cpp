@@ -167,3 +167,36 @@ TEST_F(UndoServiceTest, UpdatesAcrossThreeColumnsCaptureEachOldValue)
     EXPECT_FALSE(u.toDelete);
   }
 }
+
+TEST_F(UndoServiceTest, UpdateUndoCapturesOldTimestampWithSubsecondPrecision)
+{
+  make_schema();
+  // PostgreSQL timestamp keeps microsecond precision (6 fractional digits) — its
+  // maximum; nanoseconds aren't representable in this type.
+  const std::string original = "2026-06-18 12:34:56.123456";
+  setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, ts timestamp)");
+  setup_sql("INSERT INTO " + qual("t") + " (id, ts) VALUES ('r1', '" + original + "')");
+
+  UndoRowChange change{"t", "r1", false, "ts", "2030-01-01 00:00:00"};
+
+  pqxx::work  txn(*pg);
+  UndoService svc(txn, *pg, schema);
+  //
+  //
+  std::vector<UndoRowChange> undo = svc.collectUndoChanges({change});
+  //
+  //
+
+  ASSERT_EQ(undo.size(), 1u);
+  EXPECT_EQ(undo[0].colName, "ts");
+  EXPECT_FALSE(undo[0].toDelete);
+  ASSERT_TRUE(undo[0].value.has_value());
+  // Full microsecond precision is captured (no milliseconds lost).
+  EXPECT_EQ(*undo[0].value, original);
+
+  // Round-trip: applying the captured value restores the exact same instant.
+  txn.exec_params("UPDATE " + qual("t") + " SET ts = '2030-01-01 00:00:00' WHERE id = 'r1'");
+  txn.exec_params("UPDATE " + qual("t") + " SET ts = $1 WHERE id = 'r1'", *undo[0].value);
+  const std::string restored = txn.exec("SELECT ts FROM " + qual("t") + " WHERE id = 'r1'")[0][0].c_str();
+  EXPECT_EQ(restored, original);
+}
