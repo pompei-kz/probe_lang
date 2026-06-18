@@ -308,8 +308,7 @@ namespace back {
                   "  id               VARCHAR(32)  primary key,"
                   "  undo_op_id       VARCHAR(32)  not null,"
                   "  table_name       TEXT         not null,"
-                  "  filter_col_name  TEXT         not null,"
-                  "  filter_col_value TEXT         not null,"
+                  "  id_value         VARCHAR(32)  not null,"
                   "  to_delete        BOOL         not null,"
                   "  direction        TEXT CHECK (direction IN ('Forward','ForUndo')),"
                   "  col_name         TEXT,"
@@ -325,22 +324,23 @@ namespace back {
                   "Если `toDelete == TRUE`, то выбранные строки удаляются.\n"
                   "Если `toDelete == FALSE`, то в выбранных строках значение полей у колонки `colName` принимают значение `value`.'");
 
-        txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".undo_row_change.id               IS 'Идентификатор изменения'");
+        txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".undo_row_change.id IS 'Идентификатор изменения'");
         txn_.exec("COMMENT ON COLUMN " + schemaQuoted +
-                  ".undo_row_change.undo_op_id       IS 'Идентификатор операции отмены (undo_op), которой принадлежит данное изменение'");
-        txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".undo_row_change.table_name       IS 'Имя таблицы, в которой нужно сделать изменения'");
-        txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".undo_row_change.filter_col_name  IS 'Имя поля, по которому будет формироваться фильтр'");
+                  ".undo_row_change.undo_op_id IS 'Идентификатор операции отмены (undo_op), которой принадлежит данное изменение'");
         txn_.exec("COMMENT ON COLUMN " + schemaQuoted +
-                  ".undo_row_change.filter_col_value IS '"
-                  "Значение для поля фильтра.\n"
-                  "Поле фильтра может иметь не текстовый тип - в этом случае нужно конвертировать данный текст в значение этого типа.'");
-        txn_.exec(
-            "COMMENT ON COLUMN " + schemaQuoted +
-            ".undo_row_change.to_delete        IS 'Признак удаления отфильтрованных записей: TRUE - они будут удалены, FALSE - будут изменены'");
+                  ".undo_row_change.table_name IS 'Имя таблицы, в которой нужно сделать изменения."
+                  " В этой таблице должен быть первичный ключ с именем `id`.'");
+
         txn_.exec("COMMENT ON COLUMN " + schemaQuoted +
-                  ".undo_row_change.col_name         IS 'Имя колонки, которую нужно изменить, если to_delete == FALSE'");
+                  ".undo_row_change.id_value "
+                  "IS 'Значение идентификатора строки в таблице - в таблице должна'");
+
         txn_.exec("COMMENT ON COLUMN " + schemaQuoted +
-                  ".undo_row_change.col_value        IS '"
+                  ".undo_row_change.to_delete IS 'Признак удаления отфильтрованных записей: TRUE - они будут удалены, FALSE - будут изменены'");
+        txn_.exec("COMMENT ON COLUMN " + schemaQuoted +
+                  ".undo_row_change.col_name IS 'Имя колонки, которую нужно изменить, если to_delete == FALSE'");
+        txn_.exec("COMMENT ON COLUMN " + schemaQuoted +
+                  ".undo_row_change.col_value IS '"
                   "Значение, которое нужно присвоить полям в указанной колонке.\n"
                   "Эта колонка может иметь не текстовый тип. В этом случае нужно конвертировать данный текст в этот тип.\n"
                   "Если col_value IS NULL, то нужно присвоить значение NULL.'");
