@@ -155,8 +155,9 @@ namespace back {
                 "("
                 "  id           varchar(32) primary key,"
                 "  next_unit_id varchar(32),"
-                "  size_bytes   int4 default null,"
+                "  size_bytes   int4 not null default 0,"
                 "  expr_id      varchar(32),"
+                "  expr_id_used bool not null default false,"
                 "  access       text CHECK (access IN ('Public','Protected','Private')) default 'Private',"
                 "  name text"
                 ")");
@@ -172,6 +173,7 @@ namespace back {
       txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b_field.next_unit_id IS 'Подвешенный снизу блок'");
       txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b_field.size_bytes   IS 'Размер этого поля заданный изначально, или NULL'");
       txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b_field.expr_id      IS 'Идентификатор выражения, определяющего тип этого поля'");
+      txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b_field.expr_id_used IS 'Признак того, что нужно использовать выражение, а не размер'");
       txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b_field.access       IS 'Доступ к этому полю'");
       txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b_field.name         IS 'Наименование данного поля'");
     }
