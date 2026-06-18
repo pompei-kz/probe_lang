@@ -3,6 +3,7 @@
 #include "InputField.h"
 #include "back/model/Conn.h"
 #include "back/model/Block.h"
+#include "back/model/Expr.h"
 #include "back/model/Unit.h"
 #include <SDL3/SDL.h>
 #include <string>
@@ -25,6 +26,7 @@ namespace front {
     float  last_cw = -1, last_ch = -1;
 
     std::vector<back::model::Block> blocks;
+    std::vector<back::model::Expr>  exprs; // expressions in view, drawn independently of blocks
   };
 
   // Tabbed graphical canvas in the right pane. A tab is opened by double-clicking
@@ -112,6 +114,10 @@ namespace front {
     // Recompute and persist a field's box size (its expression/size content may
     // have changed width), then reload.
     void refit_field(const std::string &id);
+
+    // Recompute and persist a field's expression slot (and the linked unit_e
+    // world rect). No-op unless the block is a field using an expression.
+    void sync_field_expr_rect(const back::model::Block &b);
 
     void render(SDL_Renderer *ren, float pane_x, float pane_y, float pane_w, float pane_h, float mx, float my, bool ldown, bool rdown, int clicks);
 

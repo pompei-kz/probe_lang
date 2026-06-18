@@ -162,13 +162,21 @@ namespace front {
   // Side of the empty-expression square / Unit diamond — about a glyph tall.
   static float expr_square_side() { return FS * .85f; }
 
-  // Screen rect of a field's empty-expression cube square (the ContextMenuSelExpr
-  // affordance). Only meaningful when expr_id_used && !expr_present.
-  static void field_expr_square(const BoxGeo &g, const Block &s, float &x, float &y, float &side)
+  // Screen rect of a field's expression slot: the stored slot (relative to the
+  // block) when present, else a cube-sized fallback right of the name.
+  static void field_expr_slot(const BoxGeo &g, const Block &s, float &x, float &y, float &w, float &h)
   {
-    side = expr_square_side() * g.z;
-    x    = field_size_x(g, s);
-    y    = g.by + (BOX_H * g.z - side) * .5f;
+    if (s.expr_has_rect) {
+      x = g.bx + s.expr_x * g.z;
+      y = g.by + s.expr_y * g.z;
+      w = s.expr_width * g.z;
+      h = s.expr_height * g.z;
+    } else {
+      w = expr_square_side() * g.z;
+      h = expr_square_side() * g.z;
+      x = field_size_x(g, s);
+      y = g.by + (BOX_H * g.z - h) * .5f;
+    }
   }
 
   // Unscaled width of a field's expression content, drawn right of the divider.
@@ -199,6 +207,17 @@ namespace front {
       w                 = std::max(w, fit_width(s.name) + size_pad() + right + GAP);
     }
     return w;
+  }
+
+  // The desired expression slot for a field, in world units relative to its block
+  // origin: right of the name + divider padding, content-wide, a glyph tall,
+  // vertically centred in the header band. Persisted via update_field_expr_rect.
+  static void compute_field_expr_slot(const Block &s, float &ex, float &ey, float &ew, float &eh)
+  {
+    ew = expr_content_width(s);
+    eh = expr_square_side();
+    ex = fit_width(s.name) + size_pad();
+    ey = (BOX_H - eh) * .5f;
   }
 
   static void draw_box(SDL_Renderer *ren, const BoxGeo &g, char letter, const char *name, bool hovered, float scale)
@@ -547,8 +566,21 @@ namespace front {
     const float miny = static_cast<float>(t->cam_y);
     const float maxx = static_cast<float>(t->cam_x + cw / t->zoom);
     const float maxy = static_cast<float>(t->cam_y + ch / t->zoom);
-    auto [rows, err] = load_blocks_in_view(t->conn, t->schema, t->unit_id, minx, miny, maxx, maxy);
-    t->blocks         = std::move(rows);
+    auto [rows, err]   = load_blocks_in_view(t->conn, t->schema, t->unit_id, minx, miny, maxx, maxy);
+    t->blocks          = std::move(rows);
+    // Expressions are queried independently against the same viewport.
+    auto [exprs, eerr] = load_exprs_in_view(t->conn, t->schema, t->unit_id, minx, miny, maxx, maxy);
+    t->exprs           = std::move(exprs);
+  }
+
+  void EditorView::sync_field_expr_rect(const Block &b)
+  {
+    if (b.type != BlockType::Field || !b.expr_id_used) return;
+    EditorTab *t = cur();
+    if (!t) return;
+    float ex, ey, ew, eh;
+    compute_field_expr_slot(b, ex, ey, ew, eh);
+    update_field_expr_rect(t->conn, t->schema, b.id, ex, ey, ew, eh);
   }
 
   void EditorView::refit_field(const std::string &id)
@@ -559,6 +591,7 @@ namespace front {
     for (Block &b : t->blocks)
       if (b.id == id) {
         update_block_size(t->conn, t->schema, b.id, block_fit_width(b), box_height(b));
+        sync_field_expr_rect(b); // the slot moves with the name width / content
         break;
       }
     reload();
@@ -764,11 +797,11 @@ namespace front {
     switch (chosen) {
       case ACT_TOGGLE: update_block_disabled(t->conn, t->schema, m->id, !m->disabled); break;
       case ACT_SET_TYPE: {
-        update_field_expr_id_used(t->conn, t->schema, m->id, !m->expr_id_used);
-        // The size message appears/disappears, so the box has to be resized.
-        Block resized      = *m;
-        resized.expr_id_used = !m->expr_id_used;
-        update_block_size(t->conn, t->schema, m->id, block_fit_width(resized), box_height(resized));
+        const std::string id = m->id;
+        update_field_expr_id_used(t->conn, t->schema, id, !m->expr_id_used);
+        // The size message / expression slot appears or disappears: resize the
+        // box and (re)store the slot. (refit_field reloads, invalidating m.)
+        refit_field(id);
         break;
       }
       case ACT_DELETE: delete_block(t->conn, t->schema, m->id, m->type); break;
@@ -830,6 +863,7 @@ namespace front {
           b.name = name;
         }
         update_block_size(t->conn, t->schema, b.id, block_fit_width(b), box_height(b));
+        sync_field_expr_rect(b); // the slot starts right of the name → moves with it
         break;
       }
     }
@@ -867,11 +901,18 @@ namespace front {
       const float dx = mx - drag_last_x;
       const float dy = my - drag_last_y;
       if (dx != 0 || dy != 0) {
+        const float wdx = static_cast<float>(dx / t->zoom), wdy = static_cast<float>(dy / t->zoom);
         for (Block &s : t->blocks)
           if (s.id == drag_id) {
-            s.x += static_cast<float>(dx / t->zoom);
-            s.y += static_cast<float>(dy / t->zoom);
+            s.x += wdx;
+            s.y += wdy;
             break;
+          }
+        // Drag the block's expression along (it's an independent entity).
+        for (Expr &e : t->exprs)
+          if (e.owner_block_id == drag_id) {
+            e.x += wdx;
+            e.y += wdy;
           }
         drag_moved = true;
       }
@@ -1193,38 +1234,30 @@ namespace front {
           ren, g, s, letter, blank_name, editing_this && edit_is_arg ? edit_arg_id : std::string{}, hov_name, hov_arg, hov_plus, hov_minus);
 
       // A field's right section — the "Размер: N байт" message (when expr_id_used
-      // is false) or its expression (when true) — split off by a vertical divider.
-      // While the size is being edited the editor covers the message (divider
-      // stays); while the name is being edited the name editor spans the whole
-      // header, so the whole right section is skipped.
+      // is false) or its expression slot (when true) — split off by a vertical
+      // divider. The expression itself is drawn separately (the expr pass below),
+      // so here the block only reserves the slot (and draws the empty-expression
+      // cube). While the size is being edited the editor covers the message
+      // (divider stays); while the name is being edited the editor spans the
+      // whole header, so the whole right section is skipped.
       if (s.type == BlockType::Field) {
         const bool editing_name = editing_this && !edit_is_size;
         if (!editing_name) {
-          // Divider: same colour/width as the box border, top edge to bottom edge.
-          const float dx       = field_size_x(g, s) - GAP * z * .5f;
-          const float ex       = field_size_x(g, s);
-          const Clr   txt      = s.disabled ? C_DIM : C_TEXT;
-          const Clr   accent   = s.disabled ? C_DIM : C_ACCENT;
-          const float header_h = 2.f * (g.badge_y - g.by) + g.badge;
-          const float baseline = center_baseline_scaled(g.by, header_h, z);
-          fill(ren, C_BORDER, dx, g.by, 1.f, g.bh);
-
+          const Clr txt = s.disabled ? C_DIM : C_TEXT;
           if (!s.expr_id_used) {
-            if (!editing_this) // (size editor draws the value otherwise)
-              text_draw_scaled(ren, size_label(s.size_bytes).c_str(), ex, baseline, txt, z);
-          } else if (!s.expr_present) {
-            // No expression yet → the cube square (opens ContextMenuSelExpr).
-            const float side = expr_square_side() * z;
-            draw_expr_cube_square(ren, ex, g.by + (BOX_H * z - side) * .5f, side, accent);
-          } else if (s.expr_type == ExprType::Unit) {
-            // Diamond emblem, then the unit name (or a red error if unresolved).
-            const float side = expr_square_side() * z;
-            draw_diamond(ren, ex + side * .5f, g.by + BOX_H * z * .5f, side, accent);
-            const float tx = ex + side + GAP * z;
-            text_draw_scaled(ren, expr_text(s).c_str(), tx, baseline, s.expr_unit_present ? txt : C_ERR, z);
+            const float dx = field_size_x(g, s) - GAP * z * .5f;
+            fill(ren, C_BORDER, dx, g.by, 1.f, g.bh); // divider
+            if (!editing_this) {                       // (size editor draws the value otherwise)
+              const float header_h = 2.f * (g.badge_y - g.by) + g.badge;
+              text_draw_scaled(ren, size_label(s.size_bytes).c_str(), field_size_x(g, s), center_baseline_scaled(g.by, header_h, z), txt, z);
+            }
           } else {
-            // A "self" expression: "Этот Объект" / "Этот Юнит" / "Этот Метод".
-            text_draw_scaled(ren, expr_text(s).c_str(), ex, baseline, txt, z);
+            float sx, sy, sw, sh;
+            field_expr_slot(g, s, sx, sy, sw, sh);
+            fill(ren, C_BORDER, sx - GAP * z * .5f, g.by, 1.f, g.bh); // divider left of the slot
+            if (!s.expr_present)                                      // empty expression → the cube affordance
+              draw_expr_cube_square(ren, sx, sy, std::min(sw, sh), s.disabled ? C_DIM : C_ACCENT);
+            // else: the expression is drawn by the independent expr pass below.
           }
         }
       }
@@ -1266,6 +1299,25 @@ namespace front {
           }
           edit_field.draw(ren, edit_bx, edit_by, edit_bw, edit_bh, true);
         }
+      }
+    }
+
+    // Expressions, drawn independently of the blocks at their own world rects.
+    const float ez = static_cast<float>(t->zoom);
+    for (const Expr &e : t->exprs) {
+      // While its block is being edited, the (opaque) editor occupies the slot —
+      // don't draw the expression over it.
+      if (editing && e.owner_block_id == edit_id) continue;
+      const float ex_s = to_screen_x(e.x), ey_s = to_screen_y(e.y);
+      const float h_s  = e.height * ez;
+      const float baseline = center_baseline_scaled(ey_s, h_s, ez);
+      if (e.type == ExprType::Unit) {
+        // Diamond emblem, then the unit name (or a red error if unresolved).
+        draw_diamond(ren, ex_s + h_s * .5f, ey_s + h_s * .5f, h_s, C_ACCENT);
+        text_draw_scaled(ren, e.unit_present ? e.unit_name.c_str() : EXPR_UNIT_ERR, ex_s + h_s + GAP * ez, baseline, e.unit_present ? C_TEXT : C_ERR, ez);
+      } else {
+        // A "self" expression: "Этот Объект" / "Этот Юнит" / "Этот Метод".
+        text_draw_scaled(ren, expr_this_label(e.type), ex_s, baseline, C_TEXT, ez);
       }
     }
 
@@ -1365,13 +1417,13 @@ namespace front {
                              hit(mx, my, field_size_x(tgeo, *target), tgeo.by, text_w(size_label(target->size_bytes).c_str()) * tgeo.z, BOX_H * tgeo.z);
         // A double-click on the empty-expression cube opens the menu (not name edit).
         bool  on_cube = false;
-        float sqx, sqy, sqs;
+        float sqx, sqy, sqw, sqh;
         if (target->type == BlockType::Field && target->expr_id_used && !target->expr_present) {
-          field_expr_square(tgeo, *target, sqx, sqy, sqs);
-          on_cube = hit(mx, my, sqx, sqy, sqs, sqs);
+          field_expr_slot(tgeo, *target, sqx, sqy, sqw, sqh);
+          on_cube = hit(mx, my, sqx, sqy, sqw, sqh);
         }
         if (on_cube) {
-          expr_menu.open_at(sqx, sqy + sqs, target->id);
+          expr_menu.open_at(sqx, sqy + sqh, target->id);
         } else if (ai >= 0) {
           const float ay  = arg_row_y(tgeo, ai);
           const float fbh = std::min(ROW_H * tgeo.z - 2.f, FS + 8.f);
@@ -1416,13 +1468,13 @@ namespace front {
         // A field with no expression yet: clicking its cube square opens the
         // expression-selection menu instead of starting a drag.
         bool  on_cube = false;
-        float sqx, sqy, sqs;
+        float sqx, sqy, sqw, sqh;
         if (target->type == BlockType::Field && target->expr_id_used && !target->expr_present) {
-          field_expr_square(tgeo, *target, sqx, sqy, sqs);
-          on_cube = hit(mx, my, sqx, sqy, sqs, sqs);
+          field_expr_slot(tgeo, *target, sqx, sqy, sqw, sqh);
+          on_cube = hit(mx, my, sqx, sqy, sqw, sqh);
         }
         if (on_cube) {
-          expr_menu.open_at(sqx, sqy + sqs, target->id);
+          expr_menu.open_at(sqx, sqy + sqh, target->id);
         } else if (minus_i >= 0) {
           del_arg(*target, target->args[minus_i].id);
         } else if (target->type == BlockType::Method && hit_circle(mx, my, tgeo.plus_cx, tgeo.plus_cy, tgeo.plus_r)) {

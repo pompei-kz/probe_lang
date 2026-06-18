@@ -178,10 +178,10 @@ namespace back {
       txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b_field.size_bytes   IS 'Размер этого поля заданный изначально, или NULL'");
       txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b_field.expr_id      IS 'Идентификатор выражения, определяющего тип этого поля'");
       txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b_field.expr_id_used IS 'Признак того, что нужно использовать выражение, а не размер'");
-      txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b_field.expr_x       IS 'x координата левого верхнего угла в мировой системе координат прямоугольника выражения'");
-      txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b_field.expr_y       IS 'y координата левого верхнего угла в мировой системе координат прямоугольника выражения'");
-      txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b_field.expr_width   IS 'ширина прямоугольника выражения'");
-      txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b_field.expr_height  IS 'высота прямоугольника выражения'");
+      txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b_field.expr_x       IS 'x левого верхнего угла прямоугольника выражения, ОТНОСИТЕЛЬНО unit_b.x'");
+      txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b_field.expr_y       IS 'y левого верхнего угла прямоугольника выражения, ОТНОСИТЕЛЬНО unit_b.y'");
+      txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b_field.expr_width   IS 'ширина прямоугольника выражения (= unit_e.width)'");
+      txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b_field.expr_height  IS 'высота прямоугольника выражения (= unit_e.height)'");
       txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b_field.access       IS 'Доступ к этому полю'");
       txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b_field.name         IS 'Наименование данного поля'");
     }

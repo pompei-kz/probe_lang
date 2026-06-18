@@ -112,6 +112,37 @@ TEST_F(ExprServiceTest, DanglingUnitReferenceIsTreatedAsAbsent)
   EXPECT_TRUE(b.expr_unit_name.empty());
 }
 
+TEST_F(ExprServiceTest, ExprRectSyncsWorldCoordsAndSpatialQuery)
+{
+  make_schema();
+  auto [fid, fmsg] = create_block(conn(), schema, "u1", BlockType::Field, 100, 200, 50, 20, "f");
+  ASSERT_FALSE(fid.empty()) << fmsg;
+  ASSERT_TRUE(update_field_expr_id_used(conn(), schema, fid, true).first);
+  ASSERT_TRUE(set_field_expr_this_type(conn(), schema, fid, ExprType::ThisUnit).first);
+
+  //
+  //
+  auto rect = update_field_expr_rect(conn(), schema, fid, 10.f, 2.f, 30.f, 12.f);
+  //
+  //
+
+  ASSERT_TRUE(rect.first) << rect.second;
+
+  // World rect = block.{x,y}(100,200) + slot(10,2), size 30x12 → (110,202,30,12).
+  auto [in_view, e1] = load_exprs_in_view(conn(), schema, "u1", 0, 0, 1000, 1000);
+  ASSERT_TRUE(e1.empty()) << e1;
+  ASSERT_EQ(in_view.size(), 1u);
+  EXPECT_FLOAT_EQ(in_view[0].x, 110.f);
+  EXPECT_FLOAT_EQ(in_view[0].y, 202.f);
+  EXPECT_FLOAT_EQ(in_view[0].width, 30.f);
+  EXPECT_EQ(in_view[0].type, ExprType::ThisUnit);
+
+  // A viewport far from the expression returns nothing.
+  auto [off_view, e2] = load_exprs_in_view(conn(), schema, "u1", -1000, -1000, -500, -500);
+  ASSERT_TRUE(e2.empty()) << e2;
+  EXPECT_TRUE(off_view.empty());
+}
+
 TEST_F(ExprServiceTest, NoExpressionWhenNoneSet)
 {
   make_schema();

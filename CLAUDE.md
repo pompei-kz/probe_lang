@@ -110,14 +110,27 @@ Two namespaces, cleanly separated — `back` (logic + persistence) never include
 
 #### Expressions on the canvas
 
-When `unit_b_field.expr_id_used` is TRUE, the field block draws its **expression** to the right of
-the name (instead of the "Размер: N байт" message):
-- no expression (soft ref `expr_id` absent) → an empty square sized like the field's "F" glyph, with
-  a little cube (≈⅓ of the square) drawn inside — this is the affordance that opens **ContextMenuSelExpr**;
+Blocks and expressions are **drawn and queried independently**. `EditorView::reload()` runs two
+viewport spatial queries for the active tab: `load_blocks_in_view` (blocks) and `load_exprs_in_view`
+(expressions) — each returns only rows whose `geom` intersects the visible rectangle.
+
+When `unit_b_field.expr_id_used` is TRUE the field reserves an **expression slot** —
+`unit_b_field.expr_{x,y,width,height}`, a rectangle **relative to the block's `unit_b.{x,y}`** — and
+the block is laid out/drawn around it. The block itself only draws, in that slot, the
+**empty-expression cube** (an outlined square with a ⅓-size cube inside) when there is no expression
+yet (soft ref `expr_id` absent); the cube is the affordance that opens **ContextMenuSelExpr**.
+
+The expression itself is a separate `unit_e` entity drawn by its own pass at its **world** rectangle
+`unit_e.{x,y,width,height}` (which is kept equal to the block's position plus the slot):
 - `ExprType::ThisObject` / `ThisUnit` / `ThisMethod` → the literal text "Этот Объект" / "Этот Юнит" /
   "Этот Метод";
 - `ExprType::Unit` → a diamond emblem, then the referenced `unit.name`; if the soft ref
   `unit_e_unit.unit_id -> unit.id` is absent, "ОШИБКА: Юнит не существует" in red instead.
+
+These two coordinate stores are **recomputed on save**: `update_field_expr_rect` writes the field slot
+and syncs `unit_e.{x,y,width,height}`; moving a block (`update_block_position`) drags its expression
+along (`unit_e.{x,y} = block.{x,y} + slot`). `EditorView::refit_field` recomputes the slot after any
+change to a field's expression.
 
 **ContextMenuSelExpr** (`Контекстное меню выбора выражения`) is a **multi-level** context menu opened
 on the cube square, used to choose what an expression is. It will keep growing; current items:

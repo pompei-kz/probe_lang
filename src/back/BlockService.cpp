@@ -25,7 +25,8 @@ namespace back {
                           "       COALESCE(m.type, 'Inner'), "
                           "       COALESCE(m.access, f.access, 'Private'), "
                           "       COALESCE(f.expr_id_used, false), "
-                          "       COALESCE(f.size_bytes, 0) "
+                          "       COALESCE(f.size_bytes, 0), "
+                          "       f.expr_x, f.expr_y, f.expr_width, f.expr_height "
                           "FROM " + qs + ".unit_b s "
                           "LEFT JOIN " + qs + ".unit_b_method m ON m.id = s.id "
                           "LEFT JOIN " + qs + ".unit_b_field  f ON f.id = s.id "
@@ -53,6 +54,13 @@ namespace back {
         s.access       = method_access_from_string(row[10].c_str());
         s.expr_id_used = row[11].as<bool>();
         s.size_bytes   = row[12].as<int>();
+        if (!row[15].is_null()) { // expr_width present → a slot has been stored
+          s.expr_has_rect = true;
+          s.expr_x        = row[13].is_null() ? 0.f : row[13].as<float>();
+          s.expr_y        = row[14].is_null() ? 0.f : row[14].as<float>();
+          s.expr_width    = row[15].as<float>();
+          s.expr_height   = row[16].is_null() ? 0.f : row[16].as<float>();
+        }
         out.push_back(std::move(s));
       }
 
@@ -427,9 +435,20 @@ namespace back {
       const Conn &c, const std::string &schema, const std::string &id, float x, float y)
   {
     try {
-      pqxx::connection pg(make_cs(c));
-      pqxx::work       txn(pg);
-      txn.exec_params("UPDATE " + pg.quote_name(schema) + ".unit_b SET x = $1, y = $2 WHERE id = $3", x, y, id);
+      pqxx::connection  pg(make_cs(c));
+      pqxx::work        txn(pg);
+      const std::string qs = pg.quote_name(schema);
+      txn.exec_params("UPDATE " + qs + ".unit_b SET x = $1, y = $2 WHERE id = $3", x, y, id);
+
+      // The block moved: drag its field's expression along (world coords =
+      // block.{x,y} + the field's relative slot). Soft/optional tables.
+      if (hasTable(txn, schema, "unit_e") && hasTable(txn, schema, "unit_b_field"))
+        txn.exec_params("UPDATE " + qs + ".unit_e e SET x = $1 + COALESCE(f.expr_x, 0), y = $2 + COALESCE(f.expr_y, 0) "
+                        "FROM " + qs + ".unit_b_field f WHERE f.id = $3 AND e.id = f.expr_id",
+                        x,
+                        y,
+                        id);
+
       txn.commit();
       return {true, ""};
     } catch (const pqxx::sql_error &e) {

@@ -32,6 +32,13 @@ namespace back::model {
     ExprType expr_type         = ExprType::ThisObject;
     bool     expr_unit_present = false; // (Unit) the referenced unit resolves
     std::string expr_unit_name;         // (Unit) resolved unit.name
+
+    // Field-only expression slot: the rectangle reserved for the expression,
+    // relative to this block's x/y. The block is drawn using this slot; the
+    // expression itself (unit_e) is drawn separately at the matching world rect.
+    // expr_has_rect is false until a slot has been stored.
+    bool  expr_has_rect = false;
+    float expr_x = 0, expr_y = 0, expr_width = 0, expr_height = 0;
   };
 
 } // namespace back::model
