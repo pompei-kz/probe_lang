@@ -116,6 +116,27 @@ namespace front {
   // Top (screen y) of argument row `i` for a method box (rows follow the header).
   static float arg_row_y(const BoxGeo &g, int i) { return g.by + (BOX_H + ROW_H * i) * g.z; }
 
+  // Russian plural for "байт": 1 байт, 2 байта, 5 байт.
+  static const char *byte_word(int n)
+  {
+    const int n100 = ((n % 100) + 100) % 100;
+    const int n10  = n100 % 10;
+    if (n100 >= 11 && n100 <= 14) return "байт";
+    if (n10 == 1) return "байт";
+    if (n10 >= 2 && n10 <= 4) return "байта";
+    return "байт";
+  }
+
+  // The "Размер: 34 байта" message shown for a field with an explicit size.
+  static std::string size_label(int n) { return "Размер: " + std::to_string(n) + " " + byte_word(n); }
+
+  // Extra padding between the name and the divider — half a "W" wide.
+  static float size_pad() { return text_w("W") * .5f; }
+
+  // Screen x where a field's size message / size editor begins — right of the name,
+  // past the gap, the half-"W" padding and the divider.
+  static float field_size_x(const BoxGeo &g, const Block &s) { return g.nx + (text_w(s.name.c_str()) + GAP + size_pad()) * g.z; }
+
   // Unscaled (world-unit) box width needed to fit `name`: matches box_geo's
   // horizontal layout (left pad + badge + gap + text + right pad).
   static float fit_width(const std::string &name)
@@ -129,6 +150,10 @@ namespace front {
   {
     float w = fit_width(s.name);
     for (const MethodArg &a : s.args) w = std::max(w, fit_width(a.name));
+    // A field with an explicit size also has to fit "Размер: N байт" after the name
+    // (plus the half-"W" divider padding).
+    if (s.type == BlockType::Field && !s.expr_id_used)
+      w = std::max(w, fit_width(s.name) + size_pad() + text_w(size_label(s.size_bytes).c_str()) + GAP);
     return w;
   }
 
@@ -191,6 +216,19 @@ namespace front {
     const float thick = std::max(1.5f, r * .28f);
     fill(ren, C_PANEL, cx - arm, cy - thick * .5f, 2.f * arm, thick);
     if (plus) fill(ren, C_PANEL, cx - thick * .5f, cy - arm, thick, 2.f * arm);
+  }
+
+  // A small rectangular +/- spinner button (used beside the size editor). `plus`
+  // adds the vertical bar; on hover the accent fill darkens slightly.
+  static void draw_spin_btn(SDL_Renderer *ren, float x, float y, float w, float h, bool plus, bool hovered)
+  {
+    fill(ren, hovered ? scale_clr(C_ACCENT, .8f) : C_ACCENT, x, y, w, h);
+    rect(ren, C_BORDER, x, y, w, h);
+    const float bcx = x + w * .5f, bcy = y + h * .5f;
+    const float arm = std::min(w, h) * .28f;
+    const float thick = std::max(1.5f, std::min(w, h) * .16f);
+    fill(ren, C_PANEL, bcx - arm, bcy - thick * .5f, 2.f * arm, thick);
+    if (plus) fill(ren, C_PANEL, bcx - thick * .5f, bcy - arm, thick, 2.f * arm);
   }
 
   // Centre + radius (screen) of the delete (−) control for argument row `i`. It
@@ -439,6 +477,7 @@ namespace front {
   {
     editing       = true;
     edit_is_arg   = false;
+    edit_is_size  = false;
     edit_arg_id.clear();
     edit_id       = s.id;
     edit_type     = s.type;
@@ -455,11 +494,29 @@ namespace front {
   {
     editing       = true;
     edit_is_arg   = true;
+    edit_is_size  = false;
     edit_arg_id   = a.id;
     edit_id       = m.id; // owning method (used to resize the box on commit)
     edit_type     = m.type;
     edit_field.ed = TextEditor{};
     edit_field.ed.set(a.name);
+    edit_field.ctx.open = false;
+    edit_bx             = fbx;
+    edit_by             = fby;
+    edit_bw             = fbw;
+    edit_bh             = fbh;
+  }
+
+  void EditorView::start_edit_size(const Block &s, float fbx, float fby, float fbw, float fbh)
+  {
+    editing       = true;
+    edit_is_arg   = false;
+    edit_is_size  = true;
+    edit_arg_id.clear();
+    edit_id       = s.id;
+    edit_type     = s.type;
+    edit_field.ed = TextEditor{};
+    edit_field.ed.set(std::to_string(s.size_bytes));
     edit_field.ctx.open = false;
     edit_bx             = fbx;
     edit_by             = fby;
@@ -615,7 +672,14 @@ namespace front {
     };
     switch (chosen) {
       case ACT_TOGGLE: update_block_disabled(t->conn, t->schema, m->id, !m->disabled); break;
-      case ACT_SET_TYPE: update_field_expr_id_used(t->conn, t->schema, m->id, !m->expr_id_used); break;
+      case ACT_SET_TYPE: {
+        update_field_expr_id_used(t->conn, t->schema, m->id, !m->expr_id_used);
+        // The size message appears/disappears, so the box has to be resized.
+        Block resized      = *m;
+        resized.expr_id_used = !m->expr_id_used;
+        update_block_size(t->conn, t->schema, m->id, block_fit_width(resized), box_height(resized));
+        break;
+      }
       case ACT_DELETE: delete_block(t->conn, t->schema, m->id, m->type); break;
       case ACT_INNER: update_method_type(t->conn, t->schema, m->id, MethodType::Inner); break;
       case ACT_STATIC: update_method_type(t->conn, t->schema, m->id, MethodType::Static); break;
@@ -633,6 +697,27 @@ namespace front {
   {
     if (!editing) return;
     EditorTab *t = cur();
+    if (t && edit_is_size) {
+      int v = 0;
+      try {
+        v = std::stoi(edit_field.ed.buf);
+      } catch (...) {
+        v = 0;
+      }
+      v = std::max(0, v);
+      update_field_size_bytes(t->conn, t->schema, edit_id, v);
+      // Resize the box: the size message width depends on the value's digit count.
+      for (Block &b : t->blocks) {
+        if (b.id != edit_id) continue;
+        b.size_bytes = v;
+        update_block_size(t->conn, t->schema, b.id, block_fit_width(b), box_height(b));
+        break;
+      }
+      editing      = false;
+      edit_is_size = false;
+      reload();
+      return;
+    }
     if (t) {
       const std::string name = edit_field.ed.buf;
       if (edit_is_arg)
@@ -657,8 +742,9 @@ namespace front {
         break;
       }
     }
-    editing     = false;
-    edit_is_arg = false;
+    editing      = false;
+    edit_is_arg  = false;
+    edit_is_size = false;
     reload();
   }
 
@@ -820,12 +906,28 @@ namespace front {
       editing = false; // cancel without saving
       return true;
     }
+    // In the size editor, Up/Down nudge the value by 1 (clamped at 0), like the spinner.
+    if (edit_is_size && (key == SDLK_UP || key == SDLK_DOWN)) {
+      int v = 0;
+      try {
+        v = std::stoi(edit_field.ed.buf);
+      } catch (...) {
+        v = 0;
+      }
+      edit_field.ed.set(std::to_string(std::max(0, v + (key == SDLK_UP ? 1 : -1))));
+      return true;
+    }
     return edit_field.handle_key(key, mod);
   }
 
   void EditorView::handle_text(const char *t)
   {
-    if (open && editing) edit_field.handle_text(t);
+    if (!open || !editing) return;
+    // The size editor accepts digits only.
+    if (edit_is_size)
+      for (const char *p = t; *p; ++p)
+        if (*p < '0' || *p > '9') return;
+    edit_field.handle_text(t);
   }
 
   // ── chooser popup ────────────────────────────────────────────────────────────
@@ -876,7 +978,11 @@ namespace front {
         e.chooser_open = false;
         e.reload();
       } else if (hf) {
-        create_block(t->conn, t->schema, t->unit_id, BlockType::Field, e.chooser_wx, e.chooser_wy, fit_width("Новое Поле"), BOX_H, "Новое Поле");
+        // A new field shows "Размер: 0 байт", so its box must fit that too.
+        Block nf{};
+        nf.type = BlockType::Field;
+        nf.name = "Новое Поле";
+        create_block(t->conn, t->schema, t->unit_id, BlockType::Field, e.chooser_wx, e.chooser_wy, block_fit_width(nf), BOX_H, "Новое Поле");
         e.chooser_open = false;
         e.reload();
       } else {
@@ -995,32 +1101,82 @@ namespace front {
       draw_block(
           ren, g, s, letter, blank_name, editing_this && edit_is_arg ? edit_arg_id : std::string{}, hov_name, hov_arg, hov_plus, hov_minus);
 
-      if (editing_this) {
-        edit_bx = g.nx;
-        edit_bw = g.nw;
-        edit_bh = std::min(ROW_H * static_cast<float>(t->zoom) - 2.f, FS + 8.f);
-        if (edit_is_arg) {
-          int ai = 0;
-          for (int i = 0; i < static_cast<int>(s.args.size()); i++)
-            if (s.args[i].id == edit_arg_id) {
-              ai = i;
-              break;
-            }
-          const float ay = arg_row_y(g, ai);
-          edit_by        = ay + (ROW_H * static_cast<float>(t->zoom) - edit_bh) * .5f;
-        } else {
-          edit_bh = std::min(BOX_H * static_cast<float>(t->zoom) - 6.f, FS + 8.f);
-          edit_by = g.by + (BOX_H * static_cast<float>(t->zoom) - edit_bh) * .5f;
+      // A field with an explicit size shows "Размер: N байт" right of the name,
+      // split off by a vertical divider. While the size is being edited the
+      // editor covers the message area (the divider stays); while the name is
+      // being edited the name editor spans the whole header, so skip both.
+      if (s.type == BlockType::Field && !s.expr_id_used) {
+        if (!(editing_this && !edit_is_size)) {
+          // Divider: same colour/width as the box border, top edge to bottom edge.
+          fill(ren, C_BORDER, field_size_x(g, s) - GAP * z * .5f, g.by, 1.f, g.bh);
         }
-        edit_field.draw(ren, edit_bx, edit_by, edit_bw, edit_bh, true);
+        if (!editing_this) {
+          const Clr   txt      = s.disabled ? C_DIM : C_TEXT;
+          const float header_h = 2.f * (g.badge_y - g.by) + g.badge;
+          text_draw_scaled(ren, size_label(s.size_bytes).c_str(), field_size_x(g, s), center_baseline_scaled(g.by, header_h, z), txt, z);
+        }
+      }
+
+      if (editing_this) {
+        if (edit_is_size) {
+          // Numeric size editor sized to its digits, with a +/- spinner to its right.
+          edit_bh = std::min(BOX_H * z - 6.f, FS + 8.f);
+          edit_by = g.by + (BOX_H * z - edit_bh) * .5f;
+          edit_bx = field_size_x(g, s);
+          // Five digits wide (grows if the value is longer, so nothing clips).
+          edit_bw = std::max(text_w("00000"), text_w(edit_field.ed.buf.c_str())) + 12.f;
+          edit_field.draw(ren, edit_bx, edit_by, edit_bw, edit_bh, true);
+
+          size_btn_w  = std::max(10.f, edit_bh * .85f);
+          size_btn_h  = edit_bh * .5f;
+          size_inc_bx = edit_bx + edit_bw + 2.f;
+          size_inc_by = edit_by;
+          size_dec_bx = size_inc_bx;
+          size_dec_by = edit_by + size_btn_h;
+          draw_spin_btn(ren, size_inc_bx, size_inc_by, size_btn_w, size_btn_h, true, hit(mx, my, size_inc_bx, size_inc_by, size_btn_w, size_btn_h));
+          draw_spin_btn(ren, size_dec_bx, size_dec_by, size_btn_w, size_btn_h, false, hit(mx, my, size_dec_bx, size_dec_by, size_btn_w, size_btn_h));
+        } else {
+          edit_bx = g.nx;
+          edit_bw = g.nw;
+          edit_bh = std::min(ROW_H * z - 2.f, FS + 8.f);
+          if (edit_is_arg) {
+            int ai = 0;
+            for (int i = 0; i < static_cast<int>(s.args.size()); i++)
+              if (s.args[i].id == edit_arg_id) {
+                ai = i;
+                break;
+              }
+            const float ay = arg_row_y(g, ai);
+            edit_by        = ay + (ROW_H * z - edit_bh) * .5f;
+          } else {
+            edit_bh = std::min(BOX_H * z - 6.f, FS + 8.f);
+            edit_by = g.by + (BOX_H * z - edit_bh) * .5f;
+          }
+          edit_field.draw(ren, edit_bx, edit_by, edit_bw, edit_bh, true);
+        }
       }
     }
 
     // Inline editing consumes all canvas interaction.
     if (editing) {
       const float text_ox = edit_bx + 6.f;
+      // Adjust the size buffer by `d`, clamped at 0 (does not commit — Enter or a
+      // click outside persists).
+      auto bump_size = [&](int d) {
+        int v = 0;
+        try {
+          v = std::stoi(edit_field.ed.buf);
+        } catch (...) {
+          v = 0;
+        }
+        edit_field.ed.set(std::to_string(std::max(0, v + d)));
+      };
       if (ldown && !tab_clicked) {
-        if (hit(mx, my, edit_bx, edit_by, edit_bw, edit_bh))
+        if (edit_is_size && hit(mx, my, size_inc_bx, size_inc_by, size_btn_w, size_btn_h))
+          bump_size(+1);
+        else if (edit_is_size && hit(mx, my, size_dec_bx, size_dec_by, size_btn_w, size_btn_h))
+          bump_size(-1);
+        else if (hit(mx, my, edit_bx, edit_by, edit_bw, edit_bh))
           edit_field.on_ldown(text_ox, mx, my, edit_bx, edit_by, edit_bw, edit_bh, clicks);
         else
           commit_edit();
@@ -1076,11 +1232,17 @@ namespace front {
       }
       if (target) {
         const int ai = arg_row_at(tgeo, *target, mx, my);
+        const bool on_size = target->type == BlockType::Field && !target->expr_id_used &&
+                             hit(mx, my, field_size_x(tgeo, *target), tgeo.by, text_w(size_label(target->size_bytes).c_str()) * tgeo.z, BOX_H * tgeo.z);
         if (ai >= 0) {
           const float ay  = arg_row_y(tgeo, ai);
           const float fbh = std::min(ROW_H * tgeo.z - 2.f, FS + 8.f);
           const float fby = ay + (ROW_H * tgeo.z - fbh) * .5f;
           start_edit_arg(*target, target->args[ai], tgeo.nx, fby, tgeo.nw, fbh);
+        } else if (on_size) {
+          const float fbh = std::min(BOX_H * tgeo.z - 6.f, FS + 8.f);
+          const float fby = tgeo.by + (BOX_H * tgeo.z - fbh) * .5f;
+          start_edit_size(*target, field_size_x(tgeo, *target), fby, 30.f, fbh);
         } else if (hit(mx, my, tgeo.bx, tgeo.by, tgeo.bw, BOX_H * tgeo.z)) {
           const float fbh = std::min(BOX_H * tgeo.z - 6.f, FS + 8.f);
           const float fby = tgeo.by + (BOX_H * tgeo.z - fbh) * .5f;

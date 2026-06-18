@@ -22,6 +22,7 @@ namespace back::model {
     MethodType             method_type = MethodType::Inner; // method-only; ignored for fields
     MethodAccess           access = MethodAccess::Private;
     bool                   expr_id_used = false; // field-only: use the type expression instead of size_bytes
+    int                    size_bytes   = 0;     // field-only: explicit size when expr_id_used is false
   };
 
 } // namespace back::model

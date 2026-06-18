@@ -72,9 +72,14 @@ namespace front {
     std::string            edit_id;
     back::model::BlockType edit_type = back::model::BlockType::Method;
     bool                   edit_is_arg = false;
+    bool                   edit_is_size = false; // editing a field's size_bytes (numeric)
     std::string            edit_arg_id;
     InputField             edit_field;
     float                  edit_bx = 0, edit_by = 0, edit_bw = 0, edit_bh = 0;
+
+    // Spinner controls shown while editing a field's size (screen rects). The up
+    // button increments the value by 1, the down button decrements it.
+    float size_inc_bx = 0, size_inc_by = 0, size_dec_bx = 0, size_dec_by = 0, size_btn_w = 0, size_btn_h = 0;
 
     // Open a unit (focus its tab if already open, else add a new one).
     void open_for(const back::model::Conn &c, const std::string &schema, const std::string &uid, const std::string &uname, back::model::UnitType utype);
@@ -111,6 +116,7 @@ namespace front {
     void save_view_state(); // persist the active tab's zoom + offset
     void start_edit_name(const back::model::Block &s, float fbx, float fby, float fbw, float fbh);
     void start_edit_arg(const back::model::Block &m, const back::model::MethodArg &a, float fbx, float fby, float fbw, float fbh);
+    void start_edit_size(const back::model::Block &s, float fbx, float fby, float fbw, float fbh);
     void add_arg(const back::model::Block &m);                   // append a new argument, persist, resize
     void del_arg(const back::model::Block &m, const std::string &arg_id); // delete an argument, persist, resize
     void commit_edit();

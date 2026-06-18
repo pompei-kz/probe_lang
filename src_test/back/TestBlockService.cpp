@@ -533,6 +533,30 @@ TEST_F(BlockServiceTest, UpdateFieldExprIdUsedPersists)
   EXPECT_TRUE(blocks[0].expr_id_used);
 }
 
+TEST_F(BlockServiceTest, UpdateFieldSizeBytesPersists)
+{
+  make_schema();
+  auto [fid, fmsg] = create_block(conn(), schema, "u1", BlockType::Field, 0, 0, 50, 20, "f");
+  ASSERT_FALSE(fid.empty()) << fmsg;
+
+  auto [before, before_err] = load_blocks_in_view(conn(), schema, "u1", -1000, -1000, 1000, 1000);
+  ASSERT_TRUE(before_err.empty()) << before_err;
+  ASSERT_EQ(before.size(), 1u);
+  ASSERT_EQ(before[0].size_bytes, 0);
+
+  //
+  //
+  auto sized = update_field_size_bytes(conn(), schema, fid, 34);
+  //
+  //
+
+  ASSERT_TRUE(sized.first) << sized.second;
+  auto [blocks, err] = load_blocks_in_view(conn(), schema, "u1", -1000, -1000, 1000, 1000);
+  ASSERT_TRUE(err.empty()) << err;
+  ASSERT_EQ(blocks.size(), 1u);
+  EXPECT_EQ(blocks[0].size_bytes, 34);
+}
+
 TEST_F(BlockServiceTest, DeleteBlockRemovesMethodAndItsArgs)
 {
   make_schema();

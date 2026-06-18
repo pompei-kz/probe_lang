@@ -24,7 +24,8 @@ namespace back {
                           "       s.disabled, "
                           "       COALESCE(m.type, 'Inner'), "
                           "       COALESCE(m.access, f.access, 'Private'), "
-                          "       COALESCE(f.expr_id_used, false) "
+                          "       COALESCE(f.expr_id_used, false), "
+                          "       COALESCE(f.size_bytes, 0) "
                           "FROM " + qs + ".unit_b s "
                           "LEFT JOIN " + qs + ".unit_b_method m ON m.id = s.id "
                           "LEFT JOIN " + qs + ".unit_b_field  f ON f.id = s.id "
@@ -51,6 +52,7 @@ namespace back {
         s.method_type  = method_type_from_string(row[9].c_str());
         s.access       = method_access_from_string(row[10].c_str());
         s.expr_id_used = row[11].as<bool>();
+        s.size_bytes   = row[12].as<int>();
         out.push_back(std::move(s));
       }
 
@@ -326,6 +328,11 @@ namespace back {
   std::pair<bool, std::string> update_field_expr_id_used(const Conn &c, const std::string &schema, const std::string &id, bool expr_id_used)
   {
     return update_field_column(c, schema, id, "expr_id_used", expr_id_used ? "true" : "false");
+  }
+
+  std::pair<bool, std::string> update_field_size_bytes(const Conn &c, const std::string &schema, const std::string &id, int size_bytes)
+  {
+    return update_field_column(c, schema, id, "size_bytes", std::to_string(size_bytes));
   }
 
   std::pair<bool, std::string> update_block_name(

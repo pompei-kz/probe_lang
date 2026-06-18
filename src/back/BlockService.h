@@ -71,6 +71,9 @@ namespace back {
   // Toggle whether a field's type comes from its expression (unit_b_field.expr_id_used).
   std::pair<bool, std::string> update_field_expr_id_used(const model::Conn &c, const std::string &schema, const std::string &id, bool expr_id_used);
 
+  // Set a field's explicit byte size (unit_b_field.size_bytes).
+  std::pair<bool, std::string> update_field_size_bytes(const model::Conn &c, const std::string &schema, const std::string &id, int size_bytes);
+
   // Delete a block: its unit_b row, its detail row (unit_b_method /
   // unit_b_field per `type`) and, for methods, all of its arguments.
   std::pair<bool, std::string> delete_block(const model::Conn &c, const std::string &schema, const std::string &id, model::BlockType type);
