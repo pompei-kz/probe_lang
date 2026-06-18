@@ -129,7 +129,7 @@ namespace back {
       pqxx::work       txn(pg);
       std::string      qsch = pg.quote_name(schema);
 
-      init_repo_schema(txn, pg, schema);
+      InitDb(txn, pg, schema).init_repo_schema();
       txn.exec_params("INSERT INTO " + qsch +
                           ".lang_setting (name, value) "
                           "VALUES ('name', $1) "
@@ -171,7 +171,7 @@ namespace back {
     try {
       pqxx::connection pg(make_cs(c));
       pqxx::work       txn(pg);
-      init_repo_schema(txn, pg, schema);
+      InitDb(txn, pg, schema).init_repo_schema();
       txn.commit();
       return {true, ""};
     } catch (const pqxx::sql_error &e) {

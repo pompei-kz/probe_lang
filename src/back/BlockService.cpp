@@ -119,7 +119,7 @@ namespace back {
       pqxx::work       txn(pg);
 
       // Create the unit_b tables in case the repo predates this feature.
-      init_unit_b_tables(txn, pg, schema);
+      InitDb(txn, pg, schema).init_unit_b_tables();
 
       const std::string qs       = pg.quote_name(schema);
       const std::string id       = new_id();
@@ -155,7 +155,7 @@ namespace back {
       pqxx::work       txn(pg);
 
       // Create the unit_b tables in case the repo predates this feature.
-      init_unit_b_tables(txn, pg, schema);
+      InitDb(txn, pg, schema).init_unit_b_tables();
 
       const std::string id = new_id();
       txn.exec_params("INSERT INTO " + pg.quote_name(schema) +
@@ -181,7 +181,7 @@ namespace back {
       pqxx::work       txn(pg);
 
       // Create the unit_b tables in case the repo predates this feature.
-      init_unit_b_tables(txn, pg, schema);
+      InitDb(txn, pg, schema).init_unit_b_tables();
 
       // Always append at the end: order_index = max(order_index in this method) + 1.
       // Computed in the same transaction so a prior delete can't shift it.

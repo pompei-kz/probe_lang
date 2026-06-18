@@ -65,7 +65,7 @@ namespace back {
       std::string      qsch = pg.quote_name(schema);
 
       // Create table in case repo was added before folder feature was introduced
-      init_folder_table(txn, pg, schema);
+      InitDb(txn, pg, schema).init_folder_table();
 
       std::string id = new_id();
       if (parent_id.empty()) {

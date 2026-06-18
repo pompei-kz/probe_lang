@@ -40,7 +40,7 @@ namespace back {
       std::string      schemaQuote = pg.quote_name(schema);
 
       // Create table in case repo predates the unit feature.
-      init_unit_table(txn, pg, schema);
+      InitDb(txn, pg, schema).init_unit_table();
 
       std::string       id       = new_id();
       const std::string type_str = to_string(type);
@@ -105,7 +105,8 @@ namespace back {
                                           "ORDER BY table_schema");
 
       for (const auto &row : schema_rows) {
-        init_unit_table(txn, pg, row[0].c_str());
+        const std::string schema = row[0].c_str();
+        InitDb(txn, pg, schema).init_unit_table();
       }
 
       txn.commit();

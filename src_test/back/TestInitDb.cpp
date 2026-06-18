@@ -10,7 +10,7 @@ protected:
   void init_repo()
   {
     pqxx::work txn(*pg);
-    init_repo_schema(txn, *pg, schema);
+    InitDb(txn, *pg, schema).init_repo_schema();
     txn.commit();
   }
 };
@@ -76,7 +76,7 @@ TEST_F(InitDbTest, InitRepoSchemaIsIdempotent)
   pqxx::work txn(*pg);
   //
   //
-  EXPECT_NO_THROW(init_repo_schema(txn, *pg, schema));
+  EXPECT_NO_THROW(InitDb(txn, *pg, schema).init_repo_schema());
   //
   //
   txn.commit();
@@ -98,7 +98,7 @@ TEST_F(InitDbTest, InitFolderTableCreatesTable)
     pqxx::work txn(*pg);
     //
     //
-    init_folder_table(txn, *pg, schema);
+    InitDb(txn, *pg, schema).init_folder_table();
     //
     //
     txn.commit();
@@ -115,14 +115,14 @@ TEST_F(InitDbTest, InitFolderTableIsIdempotent)
   make_schema();
   {
     pqxx::work txn(*pg);
-    init_folder_table(txn, *pg, schema); // first creation
+    InitDb(txn, *pg, schema).init_folder_table(); // first creation
     txn.commit();
   }
 
   pqxx::work txn(*pg);
   //
   //
-  EXPECT_NO_THROW(init_folder_table(txn, *pg, schema));
+  EXPECT_NO_THROW(InitDb(txn, *pg, schema).init_folder_table());
   //
   //
   txn.commit();
