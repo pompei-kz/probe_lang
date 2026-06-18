@@ -477,3 +477,64 @@ TEST_F(UtilDbTest, HasIndexFalseForMissingSchema)
   //
   EXPECT_FALSE(result);
 }
+
+// ---------------------------------------------------------------------------
+// hasSequence
+// ---------------------------------------------------------------------------
+
+TEST_F(UtilDbTest, HasSequenceTrueForExistingSequence)
+{
+  {
+    pqxx::work txn(*pg);
+    txn.exec("CREATE SEQUENCE " + qual("s"));
+    txn.commit();
+  }
+
+  pqxx::work txn(*pg);
+  //
+  //
+  const bool result = hasSequence(txn, schema, "s");
+  //
+  //
+  EXPECT_TRUE(result);
+}
+
+TEST_F(UtilDbTest, HasSequenceFalseForMissingSequence)
+{
+  pqxx::work txn(*pg);
+  //
+  //
+  const bool result = hasSequence(txn, schema, "no_such_sequence");
+  //
+  //
+  EXPECT_FALSE(result);
+}
+
+TEST_F(UtilDbTest, HasSequenceFalseWhenSequenceInDifferentSchema)
+{
+  // The sequence lives in `schema`, so it must not be found via `public`.
+  {
+    pqxx::work txn(*pg);
+    txn.exec("CREATE SEQUENCE " + qual("s"));
+    txn.commit();
+  }
+
+  pqxx::work txn(*pg);
+  //
+  //
+  const bool result = hasSequence(txn, "public", "s");
+  //
+  //
+  EXPECT_FALSE(result);
+}
+
+TEST_F(UtilDbTest, HasSequenceFalseForMissingSchema)
+{
+  pqxx::work txn(*pg);
+  //
+  //
+  const bool result = hasSequence(txn, schema + "_does_not_exist", "s");
+  //
+  //
+  EXPECT_FALSE(result);
+}

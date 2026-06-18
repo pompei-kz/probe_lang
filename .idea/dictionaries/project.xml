@@ -3,6 +3,8 @@
     <words>
       <w>abcdefghijklmnopqrstuvwxyz</w>
       <w>fetchcontent</w>
+      <w>nextval</w>
+      <w>regclass</w>
     </words>
   </dictionary>
 </component>

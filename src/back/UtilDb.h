@@ -39,4 +39,13 @@ namespace back {
    */
   bool hasIndex(pqxx::work &txn, const std::string &schemaName, const std::string &indexName);
 
+  /**
+   * Проверяет существование указанной последовательности в указанной схеме
+   * @param txn Транзакция
+   * @param schemaName Имя указанной схемы
+   * @param sequenceName Имя указанной последовательности
+   * @return Признак наличия данной последовательности
+   */
+  bool hasSequence(pqxx::work &txn, const std::string &schemaName, const std::string &sequenceName);
+
 } // namespace back

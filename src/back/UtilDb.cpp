@@ -45,6 +45,15 @@ namespace back {
     return !check.empty();
   }
 
+  bool hasSequence(pqxx::work &txn, const std::string &schemaName, const std::string &sequenceName)
+  {
+    pqxx::result check = txn.exec_params("SELECT 1 FROM information_schema.sequences "
+                                         "WHERE sequence_schema = $1 AND sequence_name = $2 LIMIT 1",
+                                         schemaName,
+                                         sequenceName);
+    return !check.empty();
+  }
+
   bool hasIndex(pqxx::work &txn, const std::string &schemaName, const std::string &indexName)
   {
     pqxx::result check = txn.exec_params("SELECT 1 FROM pg_indexes "

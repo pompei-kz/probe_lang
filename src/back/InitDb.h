@@ -9,7 +9,12 @@ namespace back {
 
   // Holds (but does not own) the transaction, connection and schema name used
   // by every DDL method. Construct one per schema, then call the init methods.
-  class InitDb {
+  class InitDb
+  {
+    pqxx::work        &txn_;
+    pqxx::connection  &pg_;
+    const std::string &schema_;
+
   public:
     InitDb(pqxx::work &txn, pqxx::connection &pg, const std::string &schema);
 
@@ -28,10 +33,7 @@ namespace back {
 
     void init_unit_e_tables() const;
 
-  private:
-    pqxx::work        &txn_;
-    pqxx::connection  &pg_;
-    const std::string &schema_;
+    void init_undo_tables() const;
   };
 
 } // namespace back

@@ -64,6 +64,7 @@ namespace back {
     init_unit_table();
     init_unit_b_tables();
     init_unit_e_tables();
+    init_undo_tables();
   }
 
   void InitDb::init_unit_b_tables() const
@@ -178,8 +179,10 @@ namespace back {
       txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b_field.size_bytes   IS 'Размер этого поля заданный изначально, или NULL'");
       txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b_field.expr_id      IS 'Идентификатор выражения, определяющего тип этого поля'");
       txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b_field.expr_id_used IS 'Признак того, что нужно использовать выражение, а не размер'");
-      txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b_field.expr_x       IS 'x левого верхнего угла прямоугольника выражения, ОТНОСИТЕЛЬНО unit_b.x'");
-      txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b_field.expr_y       IS 'y левого верхнего угла прямоугольника выражения, ОТНОСИТЕЛЬНО unit_b.y'");
+      txn_.exec("COMMENT ON COLUMN " + schemaQuoted +
+                ".unit_b_field.expr_x       IS 'x левого верхнего угла прямоугольника выражения, ОТНОСИТЕЛЬНО unit_b.x'");
+      txn_.exec("COMMENT ON COLUMN " + schemaQuoted +
+                ".unit_b_field.expr_y       IS 'y левого верхнего угла прямоугольника выражения, ОТНОСИТЕЛЬНО unit_b.y'");
       txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b_field.expr_width   IS 'ширина прямоугольника выражения (= unit_e.width)'");
       txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b_field.expr_height  IS 'высота прямоугольника выражения (= unit_e.height)'");
       txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".unit_b_field.access       IS 'Доступ к этому полю'");
@@ -238,6 +241,118 @@ namespace back {
 
       ensureCreatedAt(txn_, schema_, "unit_e_unit");
       ensureLastModifiedAt(txn_, schema_, "unit_e_unit");
+    }
+  }
+
+  void InitDb::init_undo_tables() const
+  {
+    const std::string schemaQuoted = pg_.quote_name(schema_);
+    {
+      if (!hasTable(txn_, schema_, "undo_buffer")) {
+        txn_.exec("CREATE TABLE " + schemaQuoted +
+                  ".undo_buffer ("
+                  "  id          VARCHAR(32)  primary key,"
+                  "  target_id   VARCHAR(32)  not null,"
+                  "  target_type VARCHAR(150) not null,"
+                  "  order_index BIGINT       not null,"
+                  "  updated_at  timestamp DEFAULT now()"
+                  ")");
+
+        txn_.exec("COMMENT ON TABLE  " + schemaQuoted + ".undo_buffer             IS 'Буфер отмены'");
+        txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".undo_buffer.id          IS 'Идентификатор буфера отмены'");
+        txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".undo_buffer.target_id   IS 'Ссылается на объект, для которого делается буфер'");
+        txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".undo_buffer.target_type IS 'Тип цели. Один из: Unit (пока только один)'");
+        txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".undo_buffer.order_index IS 'Индекс активной операции'");
+        txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".undo_buffer.updated_at  IS 'Показывает когда что-то изменилось в этом буфере'");
+      }
+
+      ensureCreatedAt(txn_, schema_, "undo_buffer");
+      ensureLastModifiedAt(txn_, schema_, "undo_buffer");
+    }
+    {
+      if (!hasSequence(txn_, schema_, "undo_op_seq")) {
+        txn_.exec("CREATE SEQUENCE " + schemaQuoted + ".undo_op_seq");
+        txn_.exec("COMMENT ON SEQUENCE  " + schemaQuoted +
+                  ".undo_op_seq IS 'Последовательность для генерации значения"
+                  " поля undo_op.order_index'");
+      }
+      if (!hasTable(txn_, schema_, "undo_op")) {
+        txn_.exec("CREATE TABLE " + schemaQuoted +
+                  ".undo_op ("
+                  "  id               VARCHAR(32)  primary key,"
+                  "  undo_buffer_id   VARCHAR(32)  not null,"
+                  "  order_index      BIGINT       not null default nextval('" +
+                  schemaQuoted +
+                  ".undo_op_seq'::regclass),"
+                  "  undone           BOOL         not null default false,"
+                  "  group_name       TEXT,"
+                  "  name             TEXT"
+                  ")");
+
+        txn_.exec("COMMENT ON TABLE  " + schemaQuoted + ".undo_op                IS 'Сделанная на данный момент операция'");
+        txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".undo_op.id             IS 'Идентификатор операции'");
+        txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".undo_op.undo_buffer_id IS 'Ссылается на буфер, в рамках которого эта операция'");
+        txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".undo_op.order_index    IS 'Индекс последовательности применения операций'");
+        txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".undo_op.undone IS 'Признак того, что данная операция отменена. Она доступна для redo'");
+        txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".undo_op.group_name IS 'Имя группы операций. Отменяется не операции, а группы операций'");
+        txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".undo_op.name           IS 'Имя операции'");
+      }
+
+      ensureCreatedAt(txn_, schema_, "undo_op");
+      ensureLastModifiedAt(txn_, schema_, "undo_op");
+    }
+    {
+      if (!hasTable(txn_, schema_, "undo_row_change")) {
+        txn_.exec("CREATE TABLE " + schemaQuoted +
+                  ".undo_row_change ("
+                  "  id               VARCHAR(32)  primary key,"
+                  "  undo_op_id       VARCHAR(32)  not null,"
+                  "  table_name       TEXT         not null,"
+                  "  filter_col_name  TEXT         not null,"
+                  "  filter_col_value TEXT         not null,"
+                  "  to_delete        BOOL         not null,"
+                  "  direction        TEXT CHECK (direction IN ('Forward','ForUndo')),"
+                  "  col_name         TEXT,"
+                  "  col_value        TEXT"
+                  ")");
+
+        txn_.exec("COMMENT ON TABLE  " + schemaQuoted +
+                  ".undo_row_change IS '"
+                  "Содержит информации об изменении данных в БД.\n"
+                  "Применив данную структуру можно изменить одну или несколько строк в таблице.\n"
+                  "Изменения происходят такие:\n"
+                  "Выбираются строки в таблице `tableName`, у которых колонка `filterColName` имеет значение `filterColValue`.\n"
+                  "Если `toDelete == TRUE`, то выбранные строки удаляются.\n"
+                  "Если `toDelete == FALSE`, то в выбранных строках значение полей у колонки `colName` принимают значение `value`.'");
+
+        txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".undo_row_change.id               IS 'Идентификатор изменения'");
+        txn_.exec("COMMENT ON COLUMN " + schemaQuoted +
+                  ".undo_row_change.undo_op_id       IS 'Идентификатор операции отмены (undo_op), которой принадлежит данное изменение'");
+        txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".undo_row_change.table_name       IS 'Имя таблицы, в которой нужно сделать изменения'");
+        txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".undo_row_change.filter_col_name  IS 'Имя поля, по которому будет формироваться фильтр'");
+        txn_.exec("COMMENT ON COLUMN " + schemaQuoted +
+                  ".undo_row_change.filter_col_value IS '"
+                  "Значение для поля фильтра.\n"
+                  "Поле фильтра может иметь не текстовый тип - в этом случае нужно конвертировать данный текст в значение этого типа.'");
+        txn_.exec(
+            "COMMENT ON COLUMN " + schemaQuoted +
+            ".undo_row_change.to_delete        IS 'Признак удаления отфильтрованных записей: TRUE - они будут удалены, FALSE - будут изменены'");
+        txn_.exec("COMMENT ON COLUMN " + schemaQuoted +
+                  ".undo_row_change.col_name         IS 'Имя колонки, которую нужно изменить, если to_delete == FALSE'");
+        txn_.exec("COMMENT ON COLUMN " + schemaQuoted +
+                  ".undo_row_change.col_value        IS '"
+                  "Значение, которое нужно присвоить полям в указанной колонке.\n"
+                  "Эта колонка может иметь не текстовый тип. В этом случае нужно конвертировать данный текст в этот тип.\n"
+                  "Если col_value IS NULL, то нужно присвоить значение NULL.'");
+        txn_.exec("COMMENT ON COLUMN " + schemaQuoted +
+                  ".undo_row_change.direction IS 'Группа, к которой относиться данное изменение. "
+                  "User - Группа изменений, которые сделал пользователь. "
+                  "ForUndo - Группа изменений, которые отменяют пользовательские изменений."
+                  "Группа ForUndo составляется так, чтобы она полностью отменяла все изменения пользователя'");
+      }
+
+      ensureCreatedAt(txn_, schema_, "undo_row_change");
+      ensureLastModifiedAt(txn_, schema_, "undo_row_change");
     }
   }
 
