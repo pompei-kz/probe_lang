@@ -49,6 +49,7 @@ namespace back {
     init_folder_table(txn, pg, schema);
     init_unit_table(txn, pg, schema);
     init_unit_b_tables(txn, pg, schema);
+    init_unit_e_tables(txn, pg, schema);
   }
 
   void init_unit_b_tables(pqxx::work &txn, pqxx::connection &pg, const std::string &schema)
@@ -100,12 +101,6 @@ namespace back {
       ensureLastModifiedAt(txn, schema, "unit_b_method");
     }
 
-    // Migrate older unit_b_method tables that predate these columns.
-    const std::string qMethod = schemaQuoted + ".unit_b_method";
-    txn.exec("ALTER TABLE " + qMethod + " ADD COLUMN IF NOT EXISTS type text default 'Inner'");
-    txn.exec("ALTER TABLE " + qMethod + " ADD COLUMN IF NOT EXISTS access text default 'Private'");
-    txn.exec("ALTER TABLE " + qMethod + " ADD COLUMN IF NOT EXISTS disabled bool default false");
-
     if (!hasTable(txn, schema, "unit_b_method_arg")) {
       txn.exec("CREATE TABLE " + schemaQuoted +
                ".unit_b_method_arg "
@@ -135,11 +130,34 @@ namespace back {
       ensureCreatedAt(txn, schema, "unit_b_field");
       ensureLastModifiedAt(txn, schema, "unit_b_field");
     }
-
-    // Migrate older unit_b_field tables that predate these columns.
-    const std::string qField = schemaQuoted + ".unit_b_field";
-    txn.exec("ALTER TABLE " + qField + " ADD COLUMN IF NOT EXISTS access text default 'Private'");
-    txn.exec("ALTER TABLE " + qField + " ADD COLUMN IF NOT EXISTS commented bool default false");
-    txn.exec("ALTER TABLE " + qField + " ADD COLUMN IF NOT EXISTS disabled bool default false");
   }
+
+  void init_unit_e_tables(pqxx::work &txn, pqxx::connection &pg, const std::string &schema)
+  {
+    const std::string schemaQuoted = pg.quote_name(schema);
+    if (!hasTable(txn, schema, "unit_e")) {
+      txn.exec("CREATE TABLE " + schemaQuoted +
+               ".unit_e ("
+               "  id        VARCHAR(32) primary key,"
+               "  unit_id   VARCHAR(32) not null,"
+               "  type      VARCHAR(150) not null,"
+               "  x         FLOAT4 not null,"
+               "  y         FLOAT4 not null,"
+               "  width     FLOAT4 not null,"
+               "  height    FLOAT4 not null,"
+               "  geom GEOMETRY(Polygon, 0)"
+               "  GENERATED ALWAYS AS ("
+               "    ST_MakeEnvelope(x, y, x + width, y + height, 0)"
+               "  ) STORED"
+               ")");
+    }
+
+    if (!hasIndex(txn, schema, "unit_b_geom")) {
+      txn.exec("CREATE INDEX unit_e_geom ON " + schemaQuoted + ".unit_b USING GIST(geom)");
+    }
+
+    ensureCreatedAt(txn, schema, "unit_e");
+    ensureLastModifiedAt(txn, schema, "unit_e");
+  }
+
 } // namespace back

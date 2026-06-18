@@ -20,4 +20,6 @@ namespace back {
 
   void init_unit_b_tables(pqxx::work &txn, pqxx::connection &pg, const std::string &schema);
 
+  void init_unit_e_tables(pqxx::work &txn, pqxx::connection &pg, const std::string &schema);
+
 } // namespace back
