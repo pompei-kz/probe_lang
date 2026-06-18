@@ -163,7 +163,19 @@ int main(int /*argc*/, char * /*argv*/[])
           break;
 
         case SDL_EVENT_KEY_DOWN:
-          if (app.dlg.open) {
+          if (app.dlg.open && (ev.key.mod & SDL_KMOD_CTRL) && (ev.key.key == SDLK_RETURN || ev.key.key == SDLK_KP_ENTER)) {
+            // Ctrl+Enter presses Save from anywhere — only when Save is active.
+            if (app.dlg.save_enabled()) {
+              if (Conn c = app.dlg.to_conn(); !c.name.empty()) {
+                save_conn(c, app.dlg.old_name);
+                app.reload_conns();
+                app.dlg.open = false;
+                SDL_StopTextInput(app.win);
+              } else {
+                app.dlg.err = "Name is required";
+              }
+            }
+          } else if (app.dlg.open) {
             // ReSharper disable once CppUseStructuredBinding
             for (InputField &f : app.dlg.fields)
               f.ctx.open = false;
@@ -195,30 +207,48 @@ int main(int /*argc*/, char * /*argv*/[])
               }
             }
           } else if (app.repo_dlg.open) {
-            auto      &d   = app.repo_dlg;
-            SDL_Keymod mod = ev.key.mod;
-            bool       consumed = false;
-            if (d.err_view.focused) consumed = d.err_view.handle_key(ev.key.key, mod);
-            if (!consumed && d.focus < d.FIRST_BUTTON) consumed = d.fields[d.focus].handle_key(ev.key.key, mod);
-            if (!consumed && !form_nav(d.focus, d.activate, d.FOCUS_COUNT, d.FIRST_BUTTON, ev.key.key, mod) && ev.key.key == SDLK_ESCAPE) {
-              d.open = false;
-              SDL_StopTextInput(app.win);
+            auto      &d    = app.repo_dlg;
+            SDL_Keymod mod  = ev.key.mod;
+            const bool ent  = ev.key.key == SDLK_RETURN || ev.key.key == SDLK_KP_ENTER;
+            if ((mod & SDL_KMOD_CTRL) && ent) { // Ctrl+Enter presses OK (render gates on active)
+              d.focus    = d.SAVE;
+              d.activate = true;
+            } else {
+              bool consumed = false;
+              if (d.err_view.focused) consumed = d.err_view.handle_key(ev.key.key, mod);
+              if (!consumed && d.focus < d.FIRST_BUTTON) consumed = d.fields[d.focus].handle_key(ev.key.key, mod);
+              if (!consumed && !form_nav(d.focus, d.activate, d.FOCUS_COUNT, d.FIRST_BUTTON, ev.key.key, mod) && ev.key.key == SDLK_ESCAPE) {
+                d.open = false;
+                SDL_StopTextInput(app.win);
+              }
             }
           } else if (app.folder_dlg.open) {
-            auto      &d        = app.folder_dlg;
-            SDL_Keymod mod      = ev.key.mod;
-            bool       consumed = d.focus == 0 && d.name_field.handle_key(ev.key.key, mod);
-            if (!consumed && !form_nav(d.focus, d.activate, d.FOCUS_COUNT, d.FIRST_BUTTON, ev.key.key, mod) && ev.key.key == SDLK_ESCAPE) {
-              d.open = false;
-              SDL_StopTextInput(app.win);
+            auto      &d   = app.folder_dlg;
+            SDL_Keymod mod = ev.key.mod;
+            const bool ent = ev.key.key == SDLK_RETURN || ev.key.key == SDLK_KP_ENTER;
+            if ((mod & SDL_KMOD_CTRL) && ent) {
+              d.focus    = d.SAVE;
+              d.activate = true;
+            } else {
+              bool consumed = d.focus == 0 && d.name_field.handle_key(ev.key.key, mod);
+              if (!consumed && !form_nav(d.focus, d.activate, d.FOCUS_COUNT, d.FIRST_BUTTON, ev.key.key, mod) && ev.key.key == SDLK_ESCAPE) {
+                d.open = false;
+                SDL_StopTextInput(app.win);
+              }
             }
           } else if (app.unit_dlg.open) {
-            auto      &d        = app.unit_dlg;
-            SDL_Keymod mod      = ev.key.mod;
-            bool       consumed = d.focus == 0 && d.name_field.handle_key(ev.key.key, mod);
-            if (!consumed && !form_nav(d.focus, d.activate, d.FOCUS_COUNT, d.FIRST_BUTTON, ev.key.key, mod) && ev.key.key == SDLK_ESCAPE) {
-              d.open = false;
-              SDL_StopTextInput(app.win);
+            auto      &d   = app.unit_dlg;
+            SDL_Keymod mod = ev.key.mod;
+            const bool ent = ev.key.key == SDLK_RETURN || ev.key.key == SDLK_KP_ENTER;
+            if ((mod & SDL_KMOD_CTRL) && ent) {
+              d.focus    = d.SAVE;
+              d.activate = true;
+            } else {
+              bool consumed = d.focus == 0 && d.name_field.handle_key(ev.key.key, mod);
+              if (!consumed && !form_nav(d.focus, d.activate, d.FOCUS_COUNT, d.FIRST_BUTTON, ev.key.key, mod) && ev.key.key == SDLK_ESCAPE) {
+                d.open = false;
+                SDL_StopTextInput(app.win);
+              }
             }
           } else if (app.sel_unit_form.open) {
             auto      &d        = app.sel_unit_form;

@@ -135,7 +135,7 @@ namespace front {
     const float     cx        = sx - 10 - BW_C;
     const bool      blocked   = type_dropdown_open || name_field.ctx.open;
     const bool      clickable = ldown && !blocked && !ate;
-    const bool      act       = activate;
+    const bool      act       = activate && !blocked; // OK is "active" only when not blocked
     activate                  = false;
     const bool do_save = form_button(ren, sx, btn_y, BW_S, BH, "Сохранить", true, !blocked && hit(mx, my, sx, btn_y, BW_S, BH), focus == SAVE, clickable, act);
     const bool do_can  = form_button(ren, cx, btn_y, BW_C, BH, "Отмена", false, !blocked && hit(mx, my, cx, btn_y, BW_C, BH), focus == CANCEL, clickable, act);
