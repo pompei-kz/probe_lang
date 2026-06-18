@@ -68,6 +68,9 @@ namespace back {
   // Update field attributes (unit_b_field.access).
   std::pair<bool, std::string> update_field_access(const model::Conn &c, const std::string &schema, const std::string &id, model::MethodAccess access);
 
+  // Toggle whether a field's type comes from its expression (unit_b_field.expr_id_used).
+  std::pair<bool, std::string> update_field_expr_id_used(const model::Conn &c, const std::string &schema, const std::string &id, bool expr_id_used);
+
   // Delete a block: its unit_b row, its detail row (unit_b_method /
   // unit_b_field per `type`) and, for methods, all of its arguments.
   std::pair<bool, std::string> delete_block(const model::Conn &c, const std::string &schema, const std::string &id, model::BlockType type);

@@ -23,7 +23,8 @@ namespace back {
                           "       COALESCE(m.name, f.name, ''), "
                           "       s.disabled, "
                           "       COALESCE(m.type, 'Inner'), "
-                          "       COALESCE(m.access, f.access, 'Private') "
+                          "       COALESCE(m.access, f.access, 'Private'), "
+                          "       COALESCE(f.expr_id_used, false) "
                           "FROM " + qs + ".unit_b s "
                           "LEFT JOIN " + qs + ".unit_b_method m ON m.id = s.id "
                           "LEFT JOIN " + qs + ".unit_b_field  f ON f.id = s.id "
@@ -47,8 +48,9 @@ namespace back {
         s.height      = row[6].as<float>();
         s.name        = row[7].c_str();
         s.disabled    = row[8].as<bool>();
-        s.method_type = method_type_from_string(row[9].c_str());
-        s.access      = method_access_from_string(row[10].c_str());
+        s.method_type  = method_type_from_string(row[9].c_str());
+        s.access       = method_access_from_string(row[10].c_str());
+        s.expr_id_used = row[11].as<bool>();
         out.push_back(std::move(s));
       }
 
@@ -319,6 +321,11 @@ namespace back {
   std::pair<bool, std::string> update_field_access(const Conn &c, const std::string &schema, const std::string &id, MethodAccess access)
   {
     return update_field_column(c, schema, id, "access", to_string(access));
+  }
+
+  std::pair<bool, std::string> update_field_expr_id_used(const Conn &c, const std::string &schema, const std::string &id, bool expr_id_used)
+  {
+    return update_field_column(c, schema, id, "expr_id_used", expr_id_used ? "true" : "false");
   }
 
   std::pair<bool, std::string> update_block_name(

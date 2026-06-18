@@ -521,8 +521,8 @@ namespace front {
     // the access group and the deactivate/activate toggle at the bottom. A dot
     // marks the current value (shown normally, but not selectable); the other
     // values have no marker.
-    enum { ACT_TOGGLE, ACT_DELETE, ACT_INNER, ACT_STATIC, ACT_CTOR, ACT_DTOR, ACT_PRIVATE, ACT_PROTECTED, ACT_PUBLIC };
-    enum Mark { MARK_NONE, MARK_CURRENT, MARK_SWITCH };
+    enum { ACT_TOGGLE, ACT_DELETE, ACT_INNER, ACT_STATIC, ACT_CTOR, ACT_DTOR, ACT_PRIVATE, ACT_PROTECTED, ACT_PUBLIC, ACT_SET_TYPE };
+    enum Mark { MARK_NONE, MARK_CURRENT, MARK_SWITCH, MARK_CHECK };
     struct Item
     {
       std::string label;
@@ -535,6 +535,12 @@ namespace front {
     };
 
     std::vector<Item> items;
+    if (!is_method) {
+      // Field-only: a checkable toggle for "use the type expression". The check
+      // mark shows when unit_b_field.expr_id_used is TRUE.
+      items.push_back({"Задать тип", false, ACT_SET_TYPE, m->expr_id_used ? MARK_CHECK : MARK_NONE});
+      items.push_back({"", true, -1, MARK_NONE});
+    }
     if (is_method) {
       items.push_back(grp(m->method_type == MethodType::Inner, "Внутренний", ACT_INNER));
       items.push_back(grp(m->method_type == MethodType::Static, "Статичный", ACT_STATIC));
@@ -585,6 +591,12 @@ namespace front {
 
       if (it.mark == MARK_CURRENT)
         fill_circle(ren, C_ACCENT, ox + PADX + GUTTER * .5f, iy + IH * .5f, 3.f);
+      else if (it.mark == MARK_CHECK) {
+        const float gx = ox + PADX + GUTTER * .5f, gy = iy + IH * .5f;
+        sc(ren, C_ACCENT);
+        SDL_RenderLine(ren, gx - 4.f, gy, gx - 1.f, gy + 3.f);
+        SDL_RenderLine(ren, gx - 1.f, gy + 3.f, gx + 4.f, gy - 3.f);
+      }
 
       text_draw(ren, it.label.c_str(), ox + label_x, center_baseline(iy, IH), C_TEXT);
       if (ldown && hov) chosen = it.action;
@@ -603,6 +615,7 @@ namespace front {
     };
     switch (chosen) {
       case ACT_TOGGLE: update_block_disabled(t->conn, t->schema, m->id, !m->disabled); break;
+      case ACT_SET_TYPE: update_field_expr_id_used(t->conn, t->schema, m->id, !m->expr_id_used); break;
       case ACT_DELETE: delete_block(t->conn, t->schema, m->id, m->type); break;
       case ACT_INNER: update_method_type(t->conn, t->schema, m->id, MethodType::Inner); break;
       case ACT_STATIC: update_method_type(t->conn, t->schema, m->id, MethodType::Static); break;

@@ -509,6 +509,30 @@ TEST_F(BlockServiceTest, UpdateFieldAttributesPersist)
   EXPECT_EQ(blocks[0].access, MethodAccess::Protected);
 }
 
+TEST_F(BlockServiceTest, UpdateFieldExprIdUsedPersists)
+{
+  make_schema();
+  auto [fid, fmsg] = create_block(conn(), schema, "u1", BlockType::Field, 0, 0, 50, 20, "f");
+  ASSERT_FALSE(fid.empty()) << fmsg;
+
+  auto [before, before_err] = load_blocks_in_view(conn(), schema, "u1", -1000, -1000, 1000, 1000);
+  ASSERT_TRUE(before_err.empty()) << before_err;
+  ASSERT_EQ(before.size(), 1u);
+  ASSERT_FALSE(before[0].expr_id_used);
+
+  //
+  //
+  auto used = update_field_expr_id_used(conn(), schema, fid, true);
+  //
+  //
+
+  ASSERT_TRUE(used.first) << used.second;
+  auto [blocks, err] = load_blocks_in_view(conn(), schema, "u1", -1000, -1000, 1000, 1000);
+  ASSERT_TRUE(err.empty()) << err;
+  ASSERT_EQ(blocks.size(), 1u);
+  EXPECT_TRUE(blocks[0].expr_id_used);
+}
+
 TEST_F(BlockServiceTest, DeleteBlockRemovesMethodAndItsArgs)
 {
   make_schema();
