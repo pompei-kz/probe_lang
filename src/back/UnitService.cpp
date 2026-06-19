@@ -40,19 +40,19 @@ namespace back {
       pqxx::connection pg(make_cs(c));
       pqxx::work       txn(pg);
 
-      pqxx::result check = txn.exec_params("SELECT 1 FROM information_schema.tables "
-                                           "WHERE table_schema = $1 AND table_name = 'unit' LIMIT 1",
-                                           schema);
+      pqxx::result check = txn.exec("SELECT 1 FROM information_schema.tables "
+                                    "WHERE table_schema = $1 AND table_name = 'unit' LIMIT 1",
+                                    pqxx::params{txn, schema});
       if (check.empty()) return {{}, ""};
 
-      pqxx::result rows = txn.exec_params("SELECT id, COALESCE(parent_folder_id, ''), name, type "
-                                          "FROM " + pg.quote_name(schema) + ".unit "
-                                          "WHERE name ILIKE $1 "
-                                          "ORDER BY name, id "
-                                          "OFFSET $2 LIMIT $3",
-                                          words_ilike_pattern(filter),
-                                          std::max(0, offset),
-                                          std::max(0, limit));
+      pqxx::result rows = txn.exec("SELECT id, COALESCE(parent_folder_id, ''), name, type "
+                                   "FROM " +
+                                       pg.quote_name(schema) +
+                                       ".unit "
+                                       "WHERE name ILIKE $1 "
+                                       "ORDER BY name, id "
+                                       "OFFSET $2 LIMIT $3",
+                                   pqxx::params{txn, words_ilike_pattern(filter), std::max(0, offset), std::max(0, limit)});
 
       std::vector<Unit> units;
       for (const auto &row : rows) {
@@ -74,9 +74,9 @@ namespace back {
   std::vector<Unit> load_units_for_schema(pqxx::work &txn, const pqxx::connection &pg, const std::string &sch)
   {
     // Check the unit table exists first.
-    pqxx::result check = txn.exec_params("SELECT 1 FROM information_schema.tables "
-                                         "WHERE table_schema = $1 AND table_name = 'unit' LIMIT 1",
-                                         sch);
+    pqxx::result check = txn.exec("SELECT 1 FROM information_schema.tables "
+                                  "WHERE table_schema = $1 AND table_name = 'unit' LIMIT 1",
+                                  pqxx::params{txn, sch});
     if (check.empty()) return {};
 
     pqxx::result rows = txn.exec("SELECT id, COALESCE(parent_folder_id, ''), name, type "
@@ -109,13 +109,10 @@ namespace back {
       std::string       id       = new_id();
       const std::string type_str = to_string(type);
       if (parent_folder_id.empty()) {
-        txn.exec_params("INSERT INTO " + schemaQuote + ".unit (id, name, type) VALUES ($1, $2, $3)", id, name, type_str);
+        txn.exec("INSERT INTO " + schemaQuote + ".unit (id, name, type) VALUES ($1, $2, $3)", pqxx::params{txn, id, name, type_str});
       } else {
-        txn.exec_params("INSERT INTO " + schemaQuote + ".unit (id, parent_folder_id, name, type) VALUES ($1, $2, $3, $4)",
-                        id,
-                        parent_folder_id,
-                        name,
-                        type_str);
+        txn.exec("INSERT INTO " + schemaQuote + ".unit (id, parent_folder_id, name, type) VALUES ($1, $2, $3, $4)",
+                 pqxx::params{txn, id, parent_folder_id, name, type_str});
       }
       txn.commit();
       return {true, ""};
@@ -132,7 +129,7 @@ namespace back {
       pqxx::connection  pg(make_cs(c));
       pqxx::work        txn(pg);
       const std::string type_str = to_string(type);
-      txn.exec_params("UPDATE " + pg.quote_name(schema) + ".unit SET name = $1, type = $2 WHERE id = $3", name, type_str, id);
+      txn.exec("UPDATE " + pg.quote_name(schema) + ".unit SET name = $1, type = $2 WHERE id = $3", pqxx::params{txn, name, type_str, id});
       txn.commit();
       return {true, ""};
     } catch (const pqxx::sql_error &e) {
@@ -147,7 +144,7 @@ namespace back {
     try {
       pqxx::connection pg(make_cs(c));
       pqxx::work       txn(pg);
-      txn.exec_params("DELETE FROM " + pg.quote_name(schema) + ".unit WHERE id = $1", id);
+      txn.exec("DELETE FROM " + pg.quote_name(schema) + ".unit WHERE id = $1", pqxx::params{txn, id});
       txn.commit();
       return {true, ""};
     } catch (const pqxx::sql_error &e) {

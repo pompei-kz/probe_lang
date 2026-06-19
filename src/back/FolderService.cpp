@@ -26,9 +26,9 @@ namespace back {
   std::vector<FolderNode> load_folders_for_schema(pqxx::work &txn, pqxx::connection &pg, const std::string &sch)
   {
     // Check if folder table exists
-    auto check = txn.exec_params("SELECT 1 FROM information_schema.tables "
-                                 "WHERE table_schema = $1 AND table_name = 'folder' LIMIT 1",
-                                 sch);
+    auto check = txn.exec("SELECT 1 FROM information_schema.tables "
+                          "WHERE table_schema = $1 AND table_name = 'folder' LIMIT 1",
+                          pqxx::params{txn, sch});
     if (check.empty()) return {};
 
     auto rows = txn.exec("SELECT id, COALESCE(parent_id, ''), name "
@@ -69,9 +69,9 @@ namespace back {
 
       std::string id = new_id();
       if (parent_id.empty()) {
-        txn.exec_params("INSERT INTO " + qsch + ".folder (id, name) VALUES ($1, $2)", id, name);
+        txn.exec("INSERT INTO " + qsch + ".folder (id, name) VALUES ($1, $2)", pqxx::params{txn, id, name});
       } else {
-        txn.exec_params("INSERT INTO " + qsch + ".folder (id, parent_id, name) VALUES ($1, $2, $3)", id, parent_id, name);
+        txn.exec("INSERT INTO " + qsch + ".folder (id, parent_id, name) VALUES ($1, $2, $3)", pqxx::params{txn, id, parent_id, name});
       }
       txn.commit();
       return {true, ""};
@@ -87,7 +87,7 @@ namespace back {
     try {
       pqxx::connection pg(make_cs(c));
       pqxx::work       txn(pg);
-      txn.exec_params("UPDATE " + pg.quote_name(schema) + ".folder SET name = $1 WHERE id = $2", new_name, id);
+      txn.exec("UPDATE " + pg.quote_name(schema) + ".folder SET name = $1 WHERE id = $2", pqxx::params{txn, new_name, id});
       txn.commit();
       return {true, ""};
     } catch (const pqxx::sql_error &e) {
@@ -104,19 +104,19 @@ namespace back {
       pqxx::work       txn(pg);
       std::string      qsch = pg.quote_name(schema);
 
-      txn.exec_params("WITH RECURSIVE descendants AS ("
-                      "  SELECT id FROM " +
-                          qsch +
-                          ".folder WHERE id = $1 "
-                          "  UNION ALL "
-                          "  SELECT f.id FROM " +
-                          qsch +
-                          ".folder f "
-                          "  JOIN descendants d ON f.parent_id = d.id"
-                          ") "
-                          "DELETE FROM " +
-                          qsch + ".folder WHERE id IN (SELECT id FROM descendants)",
-                      id);
+      txn.exec("WITH RECURSIVE descendants AS ("
+               "  SELECT id FROM " +
+                   qsch +
+                   ".folder WHERE id = $1 "
+                   "  UNION ALL "
+                   "  SELECT f.id FROM " +
+                   qsch +
+                   ".folder f "
+                   "  JOIN descendants d ON f.parent_id = d.id"
+                   ") "
+                   "DELETE FROM " +
+                   qsch + ".folder WHERE id IN (SELECT id FROM descendants)",
+               pqxx::params{txn, id});
       txn.commit();
       return {true, ""};
     } catch (const pqxx::sql_error &e) {

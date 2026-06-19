@@ -53,23 +53,21 @@ protected:
   bool schema_exists(const std::string &name)
   {
     pqxx::work txn(*pg);
-    return !txn.exec_params("SELECT 1 FROM information_schema.schemata WHERE schema_name=$1", name).empty();
+    return !txn.exec("SELECT 1 FROM information_schema.schemata WHERE schema_name=$1", pqxx::params{txn, name}).empty();
   }
 
   bool table_exists(const std::string &table)
   {
     pqxx::work txn(*pg);
-    return !txn.exec_params("SELECT 1 FROM information_schema.tables WHERE table_schema=$1 AND table_name=$2", schema, table).empty();
+    return !txn.exec("SELECT 1 FROM information_schema.tables WHERE table_schema=$1 AND table_name=$2", pqxx::params{txn, schema, table}).empty();
   }
 
   bool column_exists(const std::string &table, const std::string &col)
   {
     pqxx::work txn(*pg);
-    return !txn.exec_params("SELECT 1 FROM information_schema.columns "
-                            "WHERE table_schema=$1 AND table_name=$2 AND column_name=$3",
-                            schema,
-                            table,
-                            col)
+    return !txn.exec("SELECT 1 FROM information_schema.columns "
+                     "WHERE table_schema=$1 AND table_name=$2 AND column_name=$3",
+                     pqxx::params{txn, schema, table, col})
                 .empty();
   }
 };

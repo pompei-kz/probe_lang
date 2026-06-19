@@ -30,36 +30,33 @@ namespace back {
 
   bool hasSchema(pqxx::work &txn, const std::string &schemaName)
   {
-    pqxx::result check = txn.exec_params("SELECT 1 FROM information_schema.schemata "
-                                         "WHERE schema_name = $1 LIMIT 1",
-                                         schemaName);
+    pqxx::result check = txn.exec("SELECT 1 FROM information_schema.schemata "
+                                  "WHERE schema_name = $1 LIMIT 1",
+                                  pqxx::params{txn, schemaName});
     return !check.empty();
   }
 
   bool hasTable(pqxx::work &txn, const std::string &schemaName, const std::string &tableName)
   {
-    pqxx::result check = txn.exec_params("SELECT 1 FROM information_schema.tables "
-                                         "WHERE table_schema = $1 AND table_name = $2 LIMIT 1",
-                                         schemaName,
-                                         tableName);
+    pqxx::result check = txn.exec("SELECT 1 FROM information_schema.tables "
+                                  "WHERE table_schema = $1 AND table_name = $2 LIMIT 1",
+                                  pqxx::params{txn, schemaName, tableName});
     return !check.empty();
   }
 
   bool hasSequence(pqxx::work &txn, const std::string &schemaName, const std::string &sequenceName)
   {
-    pqxx::result check = txn.exec_params("SELECT 1 FROM information_schema.sequences "
-                                         "WHERE sequence_schema = $1 AND sequence_name = $2 LIMIT 1",
-                                         schemaName,
-                                         sequenceName);
+    pqxx::result check = txn.exec("SELECT 1 FROM information_schema.sequences "
+                                  "WHERE sequence_schema = $1 AND sequence_name = $2 LIMIT 1",
+                                  pqxx::params{txn, schemaName, sequenceName});
     return !check.empty();
   }
 
   bool hasIndex(pqxx::work &txn, const std::string &schemaName, const std::string &indexName)
   {
-    pqxx::result check = txn.exec_params("SELECT 1 FROM pg_indexes "
-                                         "WHERE schemaname = $1 AND indexname = $2 LIMIT 1",
-                                         schemaName,
-                                         indexName);
+    pqxx::result check = txn.exec("SELECT 1 FROM pg_indexes "
+                                  "WHERE schemaname = $1 AND indexname = $2 LIMIT 1",
+                                  pqxx::params{txn, schemaName, indexName});
     return !check.empty();
   }
 

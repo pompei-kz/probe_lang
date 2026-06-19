@@ -130,11 +130,11 @@ namespace back {
       std::string      qsch = pg.quote_name(schema);
 
       InitDb(txn, pg, schema).init_repo_schema();
-      txn.exec_params("INSERT INTO " + qsch +
-                          ".lang_setting (name, value) "
-                          "VALUES ('name', $1) "
-                          "ON CONFLICT (name) DO UPDATE SET value = EXCLUDED.value",
-                      repo_name);
+      txn.exec("INSERT INTO " + qsch +
+                   ".lang_setting (name, value) "
+                   "VALUES ('name', $1) "
+                   "ON CONFLICT (name) DO UPDATE SET value = EXCLUDED.value",
+               pqxx::params{txn, repo_name});
       txn.commit();
       return {true, ""};
     } catch (const pqxx::sql_error &e) {
@@ -156,7 +156,7 @@ namespace back {
       if (old_schema != new_schema) {
         txn.exec("ALTER SCHEMA " + pg.quote_name(old_schema) + " RENAME TO " + pg.quote_name(new_schema));
       }
-      txn.exec_params("UPDATE " + pg.quote_name(new_schema) + ".lang_setting SET value = $1 WHERE name = 'name'", new_repo_name);
+      txn.exec("UPDATE " + pg.quote_name(new_schema) + ".lang_setting SET value = $1 WHERE name = 'name'", pqxx::params{txn, new_repo_name});
       txn.commit();
       return {true, ""};
     } catch (const pqxx::sql_error &e) {

@@ -24,15 +24,16 @@ namespace back {
       const std::string qtable = pg.quote_name(schema) + "." + pg.quote_name(c.tableName);
 
       if (c.toDelete) {
-        txn.exec_params("DELETE FROM " + qtable + " WHERE id = $1", c.idValue);
+        txn.exec("DELETE FROM " + qtable + " WHERE id = $1", pqxx::params{txn, c.idValue});
         return;
       }
 
       const std::string qcol = pg.quote_name(c.colName);
-      txn.exec_params("INSERT INTO " + qtable + " (id, " + qcol + ") VALUES ($1, $2) " //
-                          "ON CONFLICT (id) DO UPDATE SET " +
-                          qcol + " = EXCLUDED." + qcol,
-                      c.idValue, c.value);
+      txn.exec("INSERT INTO " + qtable + " (id, " + qcol +
+                   ") VALUES ($1, $2) " //
+                   "ON CONFLICT (id) DO UPDATE SET " +
+                   qcol + " = EXCLUDED." + qcol,
+               pqxx::params{txn, c.idValue, c.value});
     }
 
   } // namespace
@@ -58,7 +59,7 @@ namespace back {
         // набором обновлений — по одному изменению на каждую колонку текущей
         // строки. Первое применённое изменение создаст строку (upsert по id),
         // остальные проставят оставшиеся колонки.
-        pqxx::result rows = txn_.exec_params("SELECT * FROM " + qtable + " WHERE id = $1", u.idValue);
+        pqxx::result rows = txn_.exec("SELECT * FROM " + qtable + " WHERE id = $1", pqxx::params{txn_, u.idValue});
         if (rows.empty()) continue; // строки нет — удаление ничего не сделает, отменять нечего
 
         for (const auto &f : rows[0]) {
@@ -76,7 +77,7 @@ namespace back {
       }
 
       // Отмена обновления строки (id == idValue).
-      pqxx::result rows = txn_.exec_params("SELECT " + pg_.quote_name(u.colName) + " FROM " + qtable + " WHERE id = $1", u.idValue);
+      pqxx::result rows = txn_.exec("SELECT " + pg_.quote_name(u.colName) + " FROM " + qtable + " WHERE id = $1", pqxx::params{txn_, u.idValue});
 
       RowChange undo;
       undo.tableName = u.tableName;
@@ -105,12 +106,12 @@ namespace back {
     // 1. Найти буфер отмены для цели; если его ещё нет — создать.
     std::string bufferId;
     {
-      pqxx::result r =
-          txn_.exec_params("SELECT id FROM " + sq + ".undo_buffer WHERE target_id = $1 AND target_type = $2", target.targetId, target.targetType);
+      pqxx::result r = txn_.exec("SELECT id FROM " + sq + ".undo_buffer WHERE target_id = $1 AND target_type = $2",
+                                 pqxx::params{txn_, target.targetId, target.targetType});
       if (r.empty()) {
         bufferId = new_id();
-        txn_.exec_params("INSERT INTO " + sq + ".undo_buffer (id, target_id, target_type, order_index) VALUES ($1, $2, $3, 0)", bufferId,
-                         target.targetId, target.targetType);
+        txn_.exec("INSERT INTO " + sq + ".undo_buffer (id, target_id, target_type, order_index) VALUES ($1, $2, $3, 0)",
+                  pqxx::params{txn_, bufferId, target.targetId, target.targetType});
       } else {
         bufferId = r[0][0].c_str();
       }
@@ -118,22 +119,25 @@ namespace back {
 
     // 2. Стереть redo: новое действие делает ранее отменённые операции
     //    недоступными для повтора, поэтому удаляем их вместе с изменениями.
-    txn_.exec_params("DELETE FROM " + sq + ".undo_row_change WHERE undo_op_id IN (" //
-                         "SELECT id FROM " +
-                         sq + ".undo_op WHERE undo_buffer_id = $1 AND undone = TRUE)",
-                     bufferId);
-    txn_.exec_params("DELETE FROM " + sq + ".undo_op WHERE undo_buffer_id = $1 AND undone = TRUE", bufferId);
+    txn_.exec("DELETE FROM " + sq +
+                  ".undo_row_change WHERE undo_op_id IN (" //
+                  "SELECT id FROM " +
+                  sq + ".undo_op WHERE undo_buffer_id = $1 AND undone = TRUE)",
+              pqxx::params{txn_, bufferId});
+    txn_.exec("DELETE FROM " + sq + ".undo_op WHERE undo_buffer_id = $1 AND undone = TRUE", pqxx::params{txn_, bufferId});
 
     // 3. Собрать отменяющие изменения ДО применения userChanges: они читают
     //    текущее (старое) состояние строк из БД.
     std::vector<RowChange> undoChanges = collectUndoChanges(userChanges);
 
     // 4. Создать новую операцию в буфере (order_index выдаётся последовательностью).
-    const std::string opId = new_id();
-    pqxx::result      opRes =
-        txn_.exec_params("INSERT INTO " + sq +
-                             ".undo_op (id, undo_buffer_id, undone, group_name, name) VALUES ($1, $2, FALSE, $3, $4) RETURNING order_index",
-                         opId, bufferId, operation.group, operation.operation);
+    const std::string opId  = new_id();
+    pqxx::result      opRes = txn_.exec("INSERT INTO " + sq +
+                                       ".undo_op (id, undo_buffer_id, undone, group_name, name)"
+                                            " VALUES ($1, $2, FALSE, $3, $4)"
+                                            " RETURNING order_index",
+                                   pqxx::params{txn_, opId, bufferId, operation.group, operation.operation});
+
     const std::string opOrderIndex = opRes[0][0].c_str();
 
     // 5. Сохранить изменения операции: Forward — что сделал пользователь,
@@ -141,21 +145,25 @@ namespace back {
     auto saveRowChange = [&](const RowChange &c, const char *direction) {
       const std::optional<std::string> colName  = c.toDelete ? std::nullopt : std::optional<std::string>(c.colName);
       const std::optional<std::string> colValue = c.toDelete ? std::nullopt : c.value;
-      txn_.exec_params("INSERT INTO " + sq +
-                           ".undo_row_change (id, undo_op_id, table_name, id_value, to_delete, direction, col_name, col_value) "
-                           "VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
-                       new_id(), opId, c.tableName, c.idValue, c.toDelete, direction, colName, colValue);
+      txn_.exec("INSERT INTO " + sq +
+                    ".undo_row_change (id, undo_op_id, table_name, id_value, to_delete, direction, col_name, col_value) "
+                    "VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+                pqxx::params{txn_, new_id(), opId, c.tableName, c.idValue, c.toDelete, direction, colName, colValue});
     };
-    for (const RowChange &c : userChanges)
+
+    for (const RowChange &c : userChanges) {
       saveRowChange(c, "Forward");
-    for (const RowChange &c : undoChanges)
+    }
+    for (const RowChange &c : undoChanges) {
       saveRowChange(c, "ForUndo");
+    }
 
     // 6. Применить пользовательские изменения к реальным таблицам данных.
-    for (const RowChange &c : userChanges)
+    for (const RowChange &c : userChanges) {
       applyRowChange(txn_, pg_, schema_, c);
+    }
 
     // 7. Сделать новую операцию активной в буфере.
-    txn_.exec_params("UPDATE " + sq + ".undo_buffer SET order_index = $1, updated_at = now() WHERE id = $2", opOrderIndex, bufferId);
+    txn_.exec("UPDATE " + sq + ".undo_buffer SET order_index = $1, updated_at = now() WHERE id = $2", pqxx::params{txn_, opOrderIndex, bufferId});
   }
 } // namespace back

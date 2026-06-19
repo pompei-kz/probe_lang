@@ -247,8 +247,8 @@ TEST_F(ChangeSystemTest, UpdateUndoCapturesOldTimestampWithSubsecondPrecision)
   EXPECT_EQ(*undo[0].value, original);
 
   // Round-trip: applying the captured value restores the exact same instant.
-  txn.exec_params("UPDATE " + qual("t") + " SET ts = '2030-01-01 00:00:00' WHERE id = 'r1'");
-  txn.exec_params("UPDATE " + qual("t") + " SET ts = $1 WHERE id = 'r1'", *undo[0].value);
+  txn.exec("UPDATE " + qual("t") + " SET ts = '2030-01-01 00:00:00' WHERE id = 'r1'");
+  txn.exec("UPDATE " + qual("t") + " SET ts = $1 WHERE id = 'r1'", pqxx::params{txn, *undo[0].value});
   const std::string restored = txn.exec("SELECT ts FROM " + qual("t") + " WHERE id = 'r1'")[0][0].c_str();
   EXPECT_EQ(restored, original);
 }
@@ -302,7 +302,7 @@ TEST_F(ChangeSystemTest, ApplyUpdatesDataRow)
   pqxx::work   txn(*pg);
   ChangeSystem svc(txn, *pg, schema);
 
-  //std::vector userChanges {RowChange{"t", "r1", false, "val", "new"}};
+  // std::vector userChanges {RowChange{"t", "r1", false, "val", "new"}};
 
   //
   //
@@ -329,7 +329,7 @@ TEST_F(ChangeSystemTest, ApplyCreatesUndoBufferForTarget)
   //
   //
 
-  pqxx::row buf = txn.exec_params1("SELECT target_id, target_type FROM " + qual("undo_buffer"));
+  pqxx::row buf = txn.exec("SELECT target_id, target_type FROM " + qual("undo_buffer")).one_row();
   EXPECT_EQ(buf[0].c_str(), std::string("u1"));
   EXPECT_EQ(buf[1].c_str(), std::string("Unit"));
 }
@@ -373,7 +373,7 @@ TEST_F(ChangeSystemTest, ApplyStoresOperationMetadata)
   //
   //
 
-  pqxx::row op = txn.exec_params1("SELECT name, group_name, undone FROM " + qual("undo_op"));
+  pqxx::row op = txn.exec("SELECT name, group_name, undone FROM " + qual("undo_op")).one_row();
   EXPECT_EQ(op[0].c_str(), std::string("rename"));
   EXPECT_EQ(op[1].c_str(), std::string("edit-block"));
   EXPECT_FALSE(op[2].as<bool>()); // a freshly applied op is not undone
@@ -395,15 +395,16 @@ TEST_F(ChangeSystemTest, ApplyStoresForwardAndForUndoChanges)
   //
 
   // Forward = what the user did; ForUndo = what reverts it (the old value).
-  pqxx::row fwd = txn.exec_params1("SELECT table_name, id_value, to_delete, col_name, col_value FROM " + qual("undo_row_change") +
-                                   " WHERE direction = 'Forward'");
+  pqxx::row fwd =
+      txn.exec("SELECT table_name, id_value, to_delete, col_name, col_value FROM " + qual("undo_row_change") + " WHERE direction = 'Forward'")
+          .one_row();
   EXPECT_EQ(fwd[0].c_str(), std::string("t"));
   EXPECT_EQ(fwd[1].c_str(), std::string("r1"));
   EXPECT_FALSE(fwd[2].as<bool>());
   EXPECT_EQ(fwd[3].c_str(), std::string("val"));
   EXPECT_EQ(fwd[4].c_str(), std::string("new"));
 
-  pqxx::row undo = txn.exec_params1("SELECT col_name, col_value FROM " + qual("undo_row_change") + " WHERE direction = 'ForUndo'");
+  pqxx::row undo = txn.exec("SELECT col_name, col_value FROM " + qual("undo_row_change") + " WHERE direction = 'ForUndo'").one_row();
   EXPECT_EQ(undo[0].c_str(), std::string("val"));
   EXPECT_EQ(undo[1].c_str(), std::string("old")); // captured before the update
 }
@@ -479,7 +480,7 @@ TEST_F(ChangeSystemTest, ApplyCreatesRowViaUpsert)
   EXPECT_EQ(row[0][0].c_str(), std::string("created"));
 
   // ...and undoing a creation is a deletion.
-  pqxx::row undo = txn.exec_params1("SELECT to_delete FROM " + qual("undo_row_change") + " WHERE direction = 'ForUndo'");
+  pqxx::row undo = txn.exec("SELECT to_delete FROM " + qual("undo_row_change") + " WHERE direction = 'ForUndo'").one_row();
   EXPECT_TRUE(undo[0].as<bool>());
 }
 

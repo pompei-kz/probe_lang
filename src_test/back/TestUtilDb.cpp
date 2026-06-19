@@ -55,11 +55,9 @@ protected:
   bool column_exists(const std::string &table, const std::string &col)
   {
     pqxx::work txn(*pg);
-    auto       r = txn.exec_params("SELECT 1 FROM information_schema.columns "
-                                   "WHERE table_schema=$1 AND table_name=$2 AND column_name=$3",
-                                   schema,
-                                   table,
-                                   col);
+    auto       r = txn.exec("SELECT 1 FROM information_schema.columns "
+                            "WHERE table_schema=$1 AND table_name=$2 AND column_name=$3",
+                            pqxx::params{txn, schema, table, col});
     return !r.empty();
   }
 };
@@ -100,9 +98,9 @@ TEST_F(UtilDbTest, EnsureCreatedAtIsTimestampWithNowDefault)
   }
 
   pqxx::work txn(*pg);
-  auto       r = txn.exec_params("SELECT data_type, column_default FROM information_schema.columns "
-                                 "WHERE table_schema=$1 AND table_name='t' AND column_name='created_at'",
-                                 schema);
+  auto       r = txn.exec("SELECT data_type, column_default FROM information_schema.columns "
+                          "WHERE table_schema=$1 AND table_name='t' AND column_name='created_at'",
+                          pqxx::params{txn, schema});
   ASSERT_EQ(r.size(), 1u);
   EXPECT_EQ(r[0]["data_type"].as<std::string>(), "timestamp without time zone");
   ASSERT_FALSE(r[0]["column_default"].is_null());
@@ -151,9 +149,9 @@ TEST_F(UtilDbTest, EnsureCreatedAtIsIdempotent)
   }
 
   pqxx::work txn(*pg);
-  auto       r = txn.exec_params("SELECT count(*) FROM information_schema.columns "
-                                 "WHERE table_schema=$1 AND table_name='t' AND column_name='created_at'",
-                                 schema);
+  auto       r = txn.exec("SELECT count(*) FROM information_schema.columns "
+                          "WHERE table_schema=$1 AND table_name='t' AND column_name='created_at'",
+                          pqxx::params{txn, schema});
   EXPECT_EQ(r[0][0].as<int>(), 1);
 }
 
@@ -301,10 +299,10 @@ TEST_F(UtilDbTest, EnsureLastModifiedAtIsIdempotent)
 
   // Exactly one trigger remains on the table.
   pqxx::work txn(*pg);
-  const auto r = txn.exec_params("SELECT count(*) FROM information_schema.triggers "
-                                 "WHERE trigger_schema=$1 AND event_object_table='t' "
-                                 "AND trigger_name='set_last_modified_at'",
-                                 schema);
+  const auto r = txn.exec("SELECT count(*) FROM information_schema.triggers "
+                          "WHERE trigger_schema=$1 AND event_object_table='t' "
+                          "AND trigger_name='set_last_modified_at'",
+                          pqxx::params{txn, schema});
   EXPECT_EQ(r[0][0].as<int>(), 1);
 }
 

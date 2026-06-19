@@ -15,7 +15,7 @@ protected:
   std::string detail_name(const std::string &table, const std::string &id)
   {
     pqxx::work txn(*pg);
-    auto       r = txn.exec_params("SELECT name FROM " + qual(table) + " WHERE id = $1", id);
+    auto       r = txn.exec("SELECT name FROM " + qual(table) + " WHERE id = $1", pqxx::params{txn, id});
     return r.empty() ? "" : r[0][0].c_str();
   }
 
@@ -155,8 +155,12 @@ TEST_F(BlockServiceTest, LoadReturnsBothMethodAndFieldNames)
   ASSERT_EQ(blocks.size(), 2u);
   bool sawMethod = false, sawField = false;
   for (const auto &s : blocks) {
-    if (s.type == BlockType::Method) { sawMethod = (s.name == "doWork"); }
-    if (s.type == BlockType::Field) { sawField = (s.name == "count"); }
+    if (s.type == BlockType::Method) {
+      sawMethod = (s.name == "doWork");
+    }
+    if (s.type == BlockType::Field) {
+      sawField = (s.name == "count");
+    }
   }
   EXPECT_TRUE(sawMethod);
   EXPECT_TRUE(sawField);

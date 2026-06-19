@@ -14,7 +14,7 @@ protected:
   std::string folder_id(const std::string &name)
   {
     pqxx::work txn(*pg);
-    auto       r = txn.exec_params("SELECT id FROM " + qual("folder") + " WHERE name=$1", name);
+    auto       r = txn.exec("SELECT id FROM " + qual("folder") + " WHERE name=$1", pqxx::params{txn, name});
     return r.empty() ? "" : r[0][0].as<std::string>();
   }
 
