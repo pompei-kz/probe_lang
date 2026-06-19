@@ -1,5 +1,6 @@
 #include "DbTestBase.h"
 #include "back/ChangeSystem.h"
+#include "back/InitDb.h"
 #include <gtest/gtest.h>
 #include <map>
 
@@ -16,6 +17,22 @@ protected:
     txn.exec(sql);
     txn.commit();
   }
+
+  // Create the change-system tables (undo_buffer / undo_op / undo_row_change).
+  void make_change_system()
+  {
+    pqxx::work txn(*pg);
+    InitDb(txn, *pg, schema).init_change_system_tables();
+    txn.commit();
+  }
+
+  // Apply a set of changes in its own committed transaction (test setup helper).
+  void apply_committed(std::vector<RowChange> changes, const ChangeOp &op, const ChangeSysTarget &target)
+  {
+    pqxx::work txn(*pg);
+    ChangeSystem(txn, *pg, schema).apply(std::move(changes), op, target);
+    txn.commit();
+  }
 };
 
 TEST_F(ChangeSystemTest, UpdateUndoCapturesOldColumnValue)
@@ -26,7 +43,7 @@ TEST_F(ChangeSystemTest, UpdateUndoCapturesOldColumnValue)
 
   RowChange change{"t", "r1", false, "val", "new"};
 
-  pqxx::work  txn(*pg);
+  pqxx::work   txn(*pg);
   ChangeSystem svc(txn, *pg, schema);
   //
   //
@@ -51,7 +68,7 @@ TEST_F(ChangeSystemTest, UpdateUndoOfNullOldValueIsNullopt)
 
   RowChange change{"t", "r2", false, "val", "x"};
 
-  pqxx::work  txn(*pg);
+  pqxx::work   txn(*pg);
   ChangeSystem svc(txn, *pg, schema);
   //
   //
@@ -72,7 +89,7 @@ TEST_F(ChangeSystemTest, ChangesAreUndoneInReverseOrder)
   RowChange first{"t", "a", false, "val", "A"};
   RowChange second{"t", "b", false, "val", "B"};
 
-  pqxx::work  txn(*pg);
+  pqxx::work   txn(*pg);
   ChangeSystem svc(txn, *pg, schema);
   //
   //
@@ -97,7 +114,7 @@ TEST_F(ChangeSystemTest, UpdateOnMissingRowIsUndoneByDelete)
   // должна удалить эту строку.
   RowChange change{"t", "missing", false, "val", "x"};
 
-  pqxx::work  txn(*pg);
+  pqxx::work   txn(*pg);
   ChangeSystem svc(txn, *pg, schema);
   //
   //
@@ -119,7 +136,7 @@ TEST_F(ChangeSystemTest, DeleteIsUndoneByPerColumnChanges)
 
   RowChange change{"t", "r1", true, "", std::nullopt};
 
-  pqxx::work  txn(*pg);
+  pqxx::work   txn(*pg);
   ChangeSystem svc(txn, *pg, schema);
 
   //
@@ -151,7 +168,7 @@ TEST_F(ChangeSystemTest, DeleteOfMissingRowGivesNoUndo)
 
   RowChange change{"t", "missing", true, "", std::nullopt};
 
-  pqxx::work  txn(*pg);
+  pqxx::work   txn(*pg);
   ChangeSystem svc(txn, *pg, schema);
   //
   //
@@ -173,7 +190,7 @@ TEST_F(ChangeSystemTest, UpdatesAcrossThreeColumnsCaptureEachOldValue)
   RowChange cb{"t", "r1", false, "b", "42"};
   RowChange cc{"t", "r1", false, "c", "false"};
 
-  pqxx::work  txn(*pg);
+  pqxx::work   txn(*pg);
   ChangeSystem svc(txn, *pg, schema);
   //
   //
@@ -214,7 +231,7 @@ TEST_F(ChangeSystemTest, UpdateUndoCapturesOldTimestampWithSubsecondPrecision)
 
   RowChange change{"t", "r1", false, "ts", "2030-01-01 00:00:00"};
 
-  pqxx::work  txn(*pg);
+  pqxx::work   txn(*pg);
   ChangeSystem svc(txn, *pg, schema);
   //
   //
@@ -244,7 +261,7 @@ TEST_F(ChangeSystemTest, DeleteIsUndoneByThreeColumnChanges)
 
   RowChange change{"t", "r1", true, "", std::nullopt};
 
-  pqxx::work  txn(*pg);
+  pqxx::work   txn(*pg);
   ChangeSystem svc(txn, *pg, schema);
 
   //
@@ -269,4 +286,223 @@ TEST_F(ChangeSystemTest, DeleteIsUndoneByThreeColumnChanges)
   EXPECT_EQ(*byCol["b"], "5");
   ASSERT_TRUE(byCol.count("c") && byCol["c"].has_value());
   EXPECT_EQ(*byCol["c"], "t"); // PostgreSQL bool text form
+}
+
+// ---------------------------------------------------------------------------
+// ChangeSystem::apply
+// ---------------------------------------------------------------------------
+
+TEST_F(ChangeSystemTest, ApplyUpdatesDataRow)
+{
+  make_schema();
+  make_change_system();
+  setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
+  setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r1', 'old')");
+
+  pqxx::work   txn(*pg);
+  ChangeSystem svc(txn, *pg, schema);
+
+  //std::vector userChanges {RowChange{"t", "r1", false, "val", "new"}};
+
+  //
+  //
+  svc.apply({RowChange{"t", "r1", false, "val", "new"}}, ChangeOp{"set-val", "g1"}, ChangeSysTarget{"u1", "Unit"});
+  //
+  //
+
+  const std::string val = txn.exec("SELECT val FROM " + qual("t") + " WHERE id = 'r1'")[0][0].c_str();
+  EXPECT_EQ(val, "new");
+}
+
+TEST_F(ChangeSystemTest, ApplyCreatesUndoBufferForTarget)
+{
+  make_schema();
+  make_change_system();
+  setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
+  setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r1', 'old')");
+
+  pqxx::work   txn(*pg);
+  ChangeSystem svc(txn, *pg, schema);
+  //
+  //
+  svc.apply({RowChange{"t", "r1", false, "val", "new"}}, ChangeOp{"set-val", "g1"}, ChangeSysTarget{"u1", "Unit"});
+  //
+  //
+
+  pqxx::row buf = txn.exec_params1("SELECT target_id, target_type FROM " + qual("undo_buffer"));
+  EXPECT_EQ(buf[0].c_str(), std::string("u1"));
+  EXPECT_EQ(buf[1].c_str(), std::string("Unit"));
+}
+
+TEST_F(ChangeSystemTest, ApplyReusesBufferAndAppendsOp)
+{
+  make_schema();
+  make_change_system();
+  setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
+  setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r1', 'a')");
+
+  // First operation for the target — its buffer must be reused by the second.
+  apply_committed({RowChange{"t", "r1", false, "val", "b"}}, ChangeOp{"op1", "g"}, ChangeSysTarget{"u1", "Unit"});
+
+  pqxx::work   txn(*pg);
+  ChangeSystem svc(txn, *pg, schema);
+  //
+  //
+  svc.apply({RowChange{"t", "r1", false, "val", "c"}}, ChangeOp{"op2", "g"}, ChangeSysTarget{"u1", "Unit"});
+  //
+  //
+
+  const long buffers = txn.exec("SELECT count(*) FROM " + qual("undo_buffer"))[0][0].as<long>();
+  const long ops     = txn.exec("SELECT count(*) FROM " + qual("undo_op"))[0][0].as<long>();
+  EXPECT_EQ(buffers, 1); // same target → single buffer
+  EXPECT_EQ(ops, 2);     // two operations appended to it
+}
+
+TEST_F(ChangeSystemTest, ApplyStoresOperationMetadata)
+{
+  make_schema();
+  make_change_system();
+  setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
+  setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r1', 'old')");
+
+  pqxx::work   txn(*pg);
+  ChangeSystem svc(txn, *pg, schema);
+  //
+  //
+  svc.apply({RowChange{"t", "r1", false, "val", "new"}}, ChangeOp{"rename", "edit-block"}, ChangeSysTarget{"u1", "Unit"});
+  //
+  //
+
+  pqxx::row op = txn.exec_params1("SELECT name, group_name, undone FROM " + qual("undo_op"));
+  EXPECT_EQ(op[0].c_str(), std::string("rename"));
+  EXPECT_EQ(op[1].c_str(), std::string("edit-block"));
+  EXPECT_FALSE(op[2].as<bool>()); // a freshly applied op is not undone
+}
+
+TEST_F(ChangeSystemTest, ApplyStoresForwardAndForUndoChanges)
+{
+  make_schema();
+  make_change_system();
+  setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
+  setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r1', 'old')");
+
+  pqxx::work   txn(*pg);
+  ChangeSystem svc(txn, *pg, schema);
+  //
+  //
+  svc.apply({RowChange{"t", "r1", false, "val", "new"}}, ChangeOp{"set-val", "g1"}, ChangeSysTarget{"u1", "Unit"});
+  //
+  //
+
+  // Forward = what the user did; ForUndo = what reverts it (the old value).
+  pqxx::row fwd = txn.exec_params1("SELECT table_name, id_value, to_delete, col_name, col_value FROM " + qual("undo_row_change") +
+                                   " WHERE direction = 'Forward'");
+  EXPECT_EQ(fwd[0].c_str(), std::string("t"));
+  EXPECT_EQ(fwd[1].c_str(), std::string("r1"));
+  EXPECT_FALSE(fwd[2].as<bool>());
+  EXPECT_EQ(fwd[3].c_str(), std::string("val"));
+  EXPECT_EQ(fwd[4].c_str(), std::string("new"));
+
+  pqxx::row undo = txn.exec_params1("SELECT col_name, col_value FROM " + qual("undo_row_change") + " WHERE direction = 'ForUndo'");
+  EXPECT_EQ(undo[0].c_str(), std::string("val"));
+  EXPECT_EQ(undo[1].c_str(), std::string("old")); // captured before the update
+}
+
+TEST_F(ChangeSystemTest, ApplyBufferPointsAtNewOp)
+{
+  make_schema();
+  make_change_system();
+  setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
+  setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r1', 'old')");
+
+  pqxx::work   txn(*pg);
+  ChangeSystem svc(txn, *pg, schema);
+  //
+  //
+  svc.apply({RowChange{"t", "r1", false, "val", "new"}}, ChangeOp{"set-val", "g1"}, ChangeSysTarget{"u1", "Unit"});
+  //
+  //
+
+  const std::string bufIndex = txn.exec("SELECT order_index FROM " + qual("undo_buffer"))[0][0].c_str();
+  const std::string opIndex  = txn.exec("SELECT order_index FROM " + qual("undo_op"))[0][0].c_str();
+  EXPECT_EQ(bufIndex, opIndex); // the active operation is the one just applied
+}
+
+TEST_F(ChangeSystemTest, ApplyWipesRedo)
+{
+  make_schema();
+  make_change_system();
+  setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
+  setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r1', 'a')");
+
+  // A previously-undone operation (redo candidate) must be discarded by a new apply.
+  apply_committed({RowChange{"t", "r1", false, "val", "b"}}, ChangeOp{"op1", "g"}, ChangeSysTarget{"u1", "Unit"});
+  setup_sql("UPDATE " + qual("undo_op") + " SET undone = TRUE");
+
+  pqxx::work   txn(*pg);
+  ChangeSystem svc(txn, *pg, schema);
+  //
+  //
+  svc.apply({RowChange{"t", "r1", false, "val", "c"}}, ChangeOp{"op2", "g"}, ChangeSysTarget{"u1", "Unit"});
+  //
+  //
+
+  const long ops    = txn.exec("SELECT count(*) FROM " + qual("undo_op"))[0][0].as<long>();
+  const long undone = txn.exec("SELECT count(*) FROM " + qual("undo_op") + " WHERE undone = TRUE")[0][0].as<long>();
+  const long orphan = txn.exec("SELECT count(*) FROM " + qual("undo_row_change") +
+                               " rc "
+                               "LEFT JOIN " +
+                               qual("undo_op") + " op ON op.id = rc.undo_op_id WHERE op.id IS NULL")[0][0]
+                          .as<long>();
+  EXPECT_EQ(ops, 1);    // only the newly applied op remains
+  EXPECT_EQ(undone, 0); // the redo candidate is gone
+  EXPECT_EQ(orphan, 0); // its row changes were removed too
+}
+
+TEST_F(ChangeSystemTest, ApplyCreatesRowViaUpsert)
+{
+  make_schema();
+  make_change_system();
+  setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
+
+  pqxx::work   txn(*pg);
+  ChangeSystem svc(txn, *pg, schema);
+  //
+  //
+  svc.apply({RowChange{"t", "r2", false, "val", "created"}}, ChangeOp{"create", "g"}, ChangeSysTarget{"u1", "Unit"});
+  //
+  //
+
+  // The row is created in the data table...
+  pqxx::result row = txn.exec("SELECT val FROM " + qual("t") + " WHERE id = 'r2'");
+  ASSERT_EQ(row.size(), 1u);
+  EXPECT_EQ(row[0][0].c_str(), std::string("created"));
+
+  // ...and undoing a creation is a deletion.
+  pqxx::row undo = txn.exec_params1("SELECT to_delete FROM " + qual("undo_row_change") + " WHERE direction = 'ForUndo'");
+  EXPECT_TRUE(undo[0].as<bool>());
+}
+
+TEST_F(ChangeSystemTest, ApplyDeletesRow)
+{
+  make_schema();
+  make_change_system();
+  setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, a text, b int4)");
+  setup_sql("INSERT INTO " + qual("t") + " (id, a, b) VALUES ('r1', 'hello', 5)");
+
+  pqxx::work   txn(*pg);
+  ChangeSystem svc(txn, *pg, schema);
+  //
+  //
+  svc.apply({RowChange{"t", "r1", true, "", std::nullopt}}, ChangeOp{"delete", "g"}, ChangeSysTarget{"u1", "Unit"});
+  //
+  //
+
+  // The row is removed from the data table...
+  EXPECT_TRUE(txn.exec("SELECT * FROM " + qual("t") + " WHERE id = 'r1'").empty());
+
+  // ...and the deletion is undone by one set-column change per non-id column.
+  const long forUndo =
+      txn.exec("SELECT count(*) FROM " + qual("undo_row_change") + " WHERE direction = 'ForUndo' AND to_delete = FALSE")[0][0].as<long>();
+  EXPECT_EQ(forUndo, 2); // columns a and b
 }

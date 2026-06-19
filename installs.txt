@@ -2,5 +2,6 @@ Prerequire:
 
 
 sudo apt install libicu-dev
-sudo apt install libpq-dev libpqxx-dev
+sudo apt install libpq-dev
+# sudo apt install libpqxx-dev - эту пришлось собирать вручную с помощью clang++-23.
 sudo apt install libgtest-dev

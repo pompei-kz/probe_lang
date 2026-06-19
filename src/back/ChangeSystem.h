@@ -59,7 +59,7 @@ namespace back {
      * @param operation Имя операции для сохранения в системе изменений
      * @param target К чему относятся эти изменения
      */
-    void apply(std::vector<model::RowChange> userChanges, const model::ChangeOp &operation, const model::ChangeSysTarget &target) const;
+    void apply(const std::vector<model::RowChange> &userChanges, const model::ChangeOp &operation, const model::ChangeSysTarget &target) const;
   };
 
 } // namespace back
