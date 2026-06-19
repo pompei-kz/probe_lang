@@ -8,13 +8,14 @@
 #include <chrono>
 #include <memory>
 #include <string>
+#include <vector>
 
 // Base fixture for DB-backed backend tests.
 //
 // Every test gets its own schema named "<TestName>_<microsecond-timestamp>".
-// The schema is deliberately NOT dropped afterwards so the resulting state can
-// be inspected when investigating a failure. The timestamp keeps each run
-// unique, so repeated runs never collide.
+// On success the schema is dropped in TearDown so the shared test DB doesn't
+// grow without bound; on failure it is kept so the resulting state can be
+// inspected. The timestamp keeps each run unique, so repeated runs never collide.
 //
 // The schema is NOT created automatically — call make_schema() when a test
 // needs an empty schema up front (some code under test creates it itself).
@@ -24,9 +25,10 @@ protected:
   // The per-test connection is taken from the shared connection pool (PoolService),
   // the same path the services use. `pg` points at the pooled connection; the
   // handle returns it to the pool when the fixture is torn down.
-  back::pool::Connection poolConn;
-  pqxx::connection      *pg = nullptr;
-  std::string            schema;
+  back::pool::Connection   poolConn;
+  pqxx::connection        *pg = nullptr;
+  std::string              schema;  // primary per-test schema name
+  std::vector<std::string> schemas; // every schema this test creates; dropped in TearDown
 
   void SetUp() override
   {
@@ -38,8 +40,34 @@ protected:
     }
 
     const ::testing::TestInfo *info = ::testing::UnitTest::GetInstance()->current_test_info();
-    const auto us = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+    const long us = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
     schema        = std::string(info ? info->name() : "unknown") + "_" + std::to_string(us);
+    schemas.push_back(schema); // track the primary schema for cleanup
+  }
+
+  // Record an additional schema the test creates (e.g. a second or renamed
+  // schema) so TearDown drops it too. Returns the name for convenience.
+  std::string track_schema(const std::string &name)
+  {
+    schemas.push_back(name);
+    return name;
+  }
+
+  void TearDown() override
+  {
+    // Drop every schema this test created on success, so the shared test DB
+    // doesn't grow without bound; keep them on failure for inspection.
+    if (pg && !::testing::Test::HasFailure()) {
+      for (const std::string &s : schemas) {
+        try {
+          pqxx::work txn(*pg);
+          txn.exec("DROP SCHEMA IF EXISTS " + txn.quote_name(s) + " CASCADE");
+          txn.commit();
+        } catch (const std::exception &) {
+          // best-effort cleanup — never fail a passing test on teardown
+        }
+      }
+    }
   }
 
   // The test database as a back::model::Conn (for service-level APIs).

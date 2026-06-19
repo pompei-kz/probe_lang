@@ -79,7 +79,7 @@ TEST_F(RepoServiceRWTest, EditRepositoryRenamesValueOnly)
 TEST_F(RepoServiceRWTest, EditRepositoryRenamesSchema)
 {
   ASSERT_TRUE(back::create_repository(conn(), schema, "R").first);
-  const std::string new_schema = schema + "_renamed";
+  const std::string new_schema = track_schema(schema + "_renamed"); // edit_repository renames into it
 
   //
   //

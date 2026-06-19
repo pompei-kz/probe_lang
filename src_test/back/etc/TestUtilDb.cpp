@@ -8,21 +8,23 @@
 #include <memory>
 #include <string>
 #include <thread>
+#include <vector>
 
 // ---------------------------------------------------------------------------
 // Fixture: each test runs in its own schema named "<TestName>_<timestamp>".
-// The schema is deliberately left in place after the test (no cleanup) so the
-// resulting DB state can be inspected afterwards. The timestamp suffix keeps
-// every run unique, so repeated runs never collide.
+// Every schema the test creates is recorded in `schemas` and dropped in
+// TearDown on success (kept on failure for inspection). The timestamp suffix
+// keeps every run unique, so repeated runs never collide.
 // ---------------------------------------------------------------------------
 
 class UtilDbTest : public testing::Test
 {
 protected:
   // Connection comes from the shared pool (PoolService); `pg` points at it.
-  back::pool::Connection poolConn;
-  pqxx::connection      *pg = nullptr;
-  std::string            schema;
+  back::pool::Connection   poolConn;
+  pqxx::connection        *pg = nullptr;
+  std::string              schema;  // primary per-test schema name
+  std::vector<std::string> schemas; // every schema this test creates; dropped in TearDown
 
   void SetUp() override
   {
@@ -34,14 +36,38 @@ protected:
     }
 
     // Schema starts with the test name (for easy correlation) plus a unique,
-    // sortable microsecond timestamp. Not dropped afterwards by design.
+    // sortable microsecond timestamp. Dropped in TearDown on success (kept on
+    // failure for inspection).
     const ::testing::TestInfo *info = ::testing::UnitTest::GetInstance()->current_test_info();
     const auto us = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
     schema        = std::string(info ? info->name() : "unknown") + "_" + std::to_string(us);
+    schemas.push_back(schema);
 
     pqxx::work txn(*pg);
     txn.exec("CREATE SCHEMA " + txn.quote_name(schema));
     txn.commit();
+  }
+
+  // Record an additional schema the test creates so TearDown drops it too.
+  std::string track_schema(const std::string &name)
+  {
+    schemas.push_back(name);
+    return name;
+  }
+
+  void TearDown() override
+  {
+    if (pg && !::testing::Test::HasFailure()) {
+      for (const std::string &s : schemas) {
+        try {
+          pqxx::work txn(*pg);
+          txn.exec("DROP SCHEMA IF EXISTS " + txn.quote_name(s) + " CASCADE");
+          txn.commit();
+        } catch (const std::exception &) {
+          // best-effort cleanup
+        }
+      }
+    }
   }
 
   // Fully-qualified, quoted "schema"."table".
