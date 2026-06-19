@@ -1,4 +1,5 @@
 #include "back/service/FolderServiceR.h"
+#include "back/pool/PoolService.h"
 #include "back/service/RepoServiceR.h"
 #include <tuple>
 
@@ -41,8 +42,9 @@ namespace back {
   {
     root_folders.clear();
     try {
-      pqxx::connection pg(make_cs(c));
-      pqxx::work       txn(pg);
+      pool::Connection  pgPool = pool::acquire(c);
+      pqxx::connection &pg     = *pgPool;
+      pqxx::work        txn(pg);
       root_folders = load_folders_for_schema(txn, pg, schema);
       txn.commit();
       return {true, ""};

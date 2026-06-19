@@ -1,5 +1,6 @@
 #include "back/service/BlockServiceR.h"
-#include "back/etc/UtilDb.h"           // hasTable
+#include "back/etc/UtilDb.h" // hasTable
+#include "back/pool/PoolService.h"
 #include "back/service/RepoServiceR.h" // make_cs, sql_err_msg
 
 namespace back {
@@ -8,8 +9,9 @@ namespace back {
       const model::Conn &c, const std::string &schema, const std::string &unit_id, float min_x, float min_y, float max_x, float max_y)
   {
     try {
-      pqxx::connection pg(make_cs(c));
-      pqxx::work       txn(pg);
+      pool::Connection  pgPool = pool::acquire(c);
+      pqxx::connection &pg     = *pgPool;
+      pqxx::work        txn(pg);
 
       if (!hasTable(txn, schema, "unit_b")) return {{}, ""};
 
@@ -139,8 +141,9 @@ namespace back {
   std::pair<std::optional<model::BBox>, std::string> block_bbox_for_unit(const model::Conn &c, const std::string &schema, const std::string &unit_id)
   {
     try {
-      pqxx::connection pg(make_cs(c));
-      pqxx::work       txn(pg);
+      pool::Connection  pgPool = pool::acquire(c);
+      pqxx::connection &pg     = *pgPool;
+      pqxx::work        txn(pg);
 
       if (!hasTable(txn, schema, "unit_b")) return {std::nullopt, ""};
 

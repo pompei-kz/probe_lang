@@ -19,7 +19,7 @@ namespace back {
   std::vector<model::ConnStore> load_all()
   {
     std::vector<model::ConnStore> v;
-    std::filesystem::path d = ws_dir();
+    std::filesystem::path         d = ws_dir();
 
     if (!fs::exists(d)) {
       return v;

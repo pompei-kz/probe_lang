@@ -1,4 +1,5 @@
 #include "back/service/RepoServiceR.h"
+#include "back/pool/PoolService.h"
 #include "back/service/FolderServiceR.h"
 #include "back/service/UnitServiceR.h"
 
@@ -75,8 +76,9 @@ namespace back {
   {
     repos.clear();
     try {
-      pqxx::connection pg(make_cs(c));
-      pqxx::work       txn(pg);
+      pool::Connection  pgPool = pool::acquire(c);
+      pqxx::connection &pg     = *pgPool;
+      pqxx::work        txn(pg);
 
       auto schema_rows = txn.exec("SELECT table_schema FROM information_schema.tables "
                                   "WHERE table_name = 'lang_setting' "
@@ -109,8 +111,9 @@ namespace back {
     repo.folders.clear();
     repo.units.clear();
     try {
-      pqxx::connection pg(make_cs(c));
-      pqxx::work       txn(pg);
+      pool::Connection  pgPool = pool::acquire(c);
+      pqxx::connection &pg     = *pgPool;
+      pqxx::work        txn(pg);
       load_tree(txn, pg, schema, repo.folders, repo.units);
       txn.commit();
       return {true, ""};

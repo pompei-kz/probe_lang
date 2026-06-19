@@ -1,4 +1,5 @@
 #include "back/service/UnitServiceR.h"
+#include "back/pool/PoolService.h"
 #include "back/service/RepoServiceR.h" // make_cs, sql_err_msg
 #include <algorithm>
 
@@ -33,8 +34,9 @@ namespace back {
       const model::Conn &c, const std::string &schema, const std::string &filter, int offset, int limit)
   {
     try {
-      pqxx::connection pg(make_cs(c));
-      pqxx::work       txn(pg);
+      pool::Connection  pgPool = pool::acquire(c);
+      pqxx::connection &pg     = *pgPool;
+      pqxx::work        txn(pg);
 
       pqxx::result check = txn.exec("SELECT 1 FROM information_schema.tables "
                                     "WHERE table_schema = $1 AND table_name = 'unit' LIMIT 1",

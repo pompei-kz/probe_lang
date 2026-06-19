@@ -1,6 +1,7 @@
 #include "back/service/ExprServiceRW.h"
 #include "back/etc/CustomId.h"
 #include "back/etc/InitDb.h"
+#include "back/pool/PoolService.h"
 #include "back/service/RepoServiceR.h" // make_cs, sql_err_msg
 
 namespace back {
@@ -47,8 +48,9 @@ namespace back {
                                                         model::ExprType    type)
   {
     try {
-      pqxx::connection pg(make_cs(c));
-      pqxx::work       txn(pg);
+      pool::Connection  pgPool = pool::acquire(c);
+      pqxx::connection &pg     = *pgPool;
+      pqxx::work        txn(pg);
       InitDb(txn, pg, schema).init_unit_e_tables();
 
       ensure_field_expr(txn, pg.quote_name(schema), field_id, type);
@@ -68,7 +70,8 @@ namespace back {
                                                    const std::string &unit_id)
   {
     try {
-      pqxx::connection  pg(make_cs(c));
+      pool::Connection  pgPool = pool::acquire(c);
+      pqxx::connection &pg     = *pgPool;
       pqxx::work        txn(pg);
       const std::string qs = pg.quote_name(schema);
       InitDb(txn, pg, schema).init_unit_e_tables();
@@ -94,7 +97,8 @@ namespace back {
       const model::Conn &c, const std::string &schema, const std::string &field_id, float ex, float ey, float ew, float eh)
   {
     try {
-      pqxx::connection  pg(make_cs(c));
+      pool::Connection  pgPool = pool::acquire(c);
+      pqxx::connection &pg     = *pgPool;
       pqxx::work        txn(pg);
       const std::string qs = pg.quote_name(schema);
 

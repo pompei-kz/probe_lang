@@ -1,6 +1,7 @@
 #include "back/service/FolderServiceRW.h"
 #include "back/etc/CustomId.h"
 #include "back/etc/InitDb.h"
+#include "back/pool/PoolService.h"
 #include "back/service/RepoServiceR.h"
 
 namespace back {
@@ -8,9 +9,10 @@ namespace back {
   std::pair<bool, std::string> create_folder(const model::Conn &c, const std::string &schema, const std::string &parent_id, const std::string &name)
   {
     try {
-      pqxx::connection pg(make_cs(c));
-      pqxx::work       txn(pg);
-      std::string      qsch = pg.quote_name(schema);
+      pool::Connection  pgPool = pool::acquire(c);
+      pqxx::connection &pg     = *pgPool;
+      pqxx::work        txn(pg);
+      std::string       qsch = pg.quote_name(schema);
 
       // Create table in case repo was added before folder feature was introduced
       InitDb(txn, pg, schema).init_folder_table();
@@ -33,8 +35,9 @@ namespace back {
   std::pair<bool, std::string> rename_folder(const model::Conn &c, const std::string &schema, const std::string &id, const std::string &new_name)
   {
     try {
-      pqxx::connection pg(make_cs(c));
-      pqxx::work       txn(pg);
+      pool::Connection  pgPool = pool::acquire(c);
+      pqxx::connection &pg     = *pgPool;
+      pqxx::work        txn(pg);
       txn.exec("UPDATE " + pg.quote_name(schema) + ".folder SET name = $1 WHERE id = $2", pqxx::params{txn, new_name, id});
       txn.commit();
       return {true, ""};
@@ -48,9 +51,10 @@ namespace back {
   std::pair<bool, std::string> delete_folder_recursive(const model::Conn &c, const std::string &schema, const std::string &id)
   {
     try {
-      pqxx::connection pg(make_cs(c));
-      pqxx::work       txn(pg);
-      std::string      qsch = pg.quote_name(schema);
+      pool::Connection  pgPool = pool::acquire(c);
+      pqxx::connection &pg     = *pgPool;
+      pqxx::work        txn(pg);
+      std::string       qsch = pg.quote_name(schema);
 
       txn.exec("WITH RECURSIVE descendants AS ("
                "  SELECT id FROM " +

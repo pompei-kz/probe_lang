@@ -1,6 +1,7 @@
 #include "back/service/UnitServiceRW.h"
 #include "back/etc/CustomId.h"
 #include "back/etc/InitDb.h"
+#include "back/pool/PoolService.h"
 #include "back/service/RepoServiceR.h" // make_cs, sql_err_msg
 
 namespace back {
@@ -9,9 +10,10 @@ namespace back {
       const model::Conn &c, const std::string &schema, const std::string &parent_folder_id, const std::string &name, model::UnitType type)
   {
     try {
-      pqxx::connection pg(make_cs(c));
-      pqxx::work       txn(pg);
-      std::string      schemaQuote = pg.quote_name(schema);
+      pool::Connection  pgPool = pool::acquire(c);
+      pqxx::connection &pg     = *pgPool;
+      pqxx::work        txn(pg);
+      std::string       schemaQuote = pg.quote_name(schema);
 
       // Create table in case repo predates the unit feature.
       InitDb(txn, pg, schema).init_unit_table();
@@ -37,7 +39,8 @@ namespace back {
       const model::Conn &c, const std::string &schema, const std::string &id, const std::string &name, model::UnitType type)
   {
     try {
-      pqxx::connection  pg(make_cs(c));
+      pool::Connection  pgPool = pool::acquire(c);
+      pqxx::connection &pg     = *pgPool;
       pqxx::work        txn(pg);
       const std::string type_str = model::to_string(type);
       txn.exec("UPDATE " + pg.quote_name(schema) + ".unit SET name = $1, type = $2 WHERE id = $3", pqxx::params{txn, name, type_str, id});
@@ -53,8 +56,9 @@ namespace back {
   std::pair<bool, std::string> delete_unit(const model::Conn &c, const std::string &schema, const std::string &id)
   {
     try {
-      pqxx::connection pg(make_cs(c));
-      pqxx::work       txn(pg);
+      pool::Connection  pgPool = pool::acquire(c);
+      pqxx::connection &pg     = *pgPool;
+      pqxx::work        txn(pg);
       txn.exec("DELETE FROM " + pg.quote_name(schema) + ".unit WHERE id = $1", pqxx::params{txn, id});
       txn.commit();
       return {true, ""};
@@ -68,8 +72,9 @@ namespace back {
   std::pair<bool, std::string> ensure_unit_tables(const model::Conn &c)
   {
     try {
-      pqxx::connection pg(make_cs(c));
-      pqxx::work       txn(pg);
+      pool::Connection  pgPool = pool::acquire(c);
+      pqxx::connection &pg     = *pgPool;
+      pqxx::work        txn(pg);
 
       pqxx::result schema_rows = txn.exec("SELECT table_schema FROM information_schema.tables "
                                           "WHERE table_name = 'lang_setting' "

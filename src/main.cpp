@@ -9,6 +9,7 @@
 #include "front/render_helpers.h"
 
 #include "back/model/SchemaNode.h"
+#include "back/pool/PoolService.h"
 #include "back/service/ConnServiceRW.h"
 #include "back/service/FolderServiceRW.h"
 #include "back/service/RepoServiceR.h"
@@ -444,6 +445,7 @@ int main(int /*argc*/, char * /*argv*/[])
           // ReSharper disable once CppTooWideScopeInitStatement
           int idx = app.pending_delete_idx;
           if (idx < static_cast<int>(app.conns.size())) {
+            back::pool::closeConnectionPool(app.conns[idx].conn.conn()); // drop the pooled connections for the removed connection
             back::delete_conn(app.conns[idx].conn.name);
             app.reload_conns();
           }
@@ -507,6 +509,8 @@ int main(int /*argc*/, char * /*argv*/[])
     SDL_RenderPresent(app.ren);
     SDL_Delay(16);
   }
+
+  back::pool::closeAllConnectionPools(); // close every pooled DB connection before shutting down
 
   SDL_DestroyRenderer(app.ren);
   SDL_DestroyWindow(app.win);

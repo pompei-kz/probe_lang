@@ -74,6 +74,8 @@ add_executable(probe_lang
         src/back/pool/Pool.h
         src/back/pool/PoolManager.cpp
         src/back/pool/PoolManager.h
+        src/back/pool/PoolService.cpp
+        src/back/pool/PoolService.h
 )
 target_include_directories(probe_lang PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_include_directories(probe_lang PRIVATE ${stb_SOURCE_DIR})
@@ -110,6 +112,10 @@ add_executable(probe_lang_tests
         src_test/back/service/TestExprServiceRW.cpp
         src_test/back/etc/TestChangeSystem.cpp
         src_test/back/etc/TestUnitEditorState.cpp
+        src/back/pool/Connection.cpp
+        src/back/pool/Pool.cpp
+        src/back/pool/PoolManager.cpp
+        src/back/pool/PoolService.cpp
         src/back/etc/CustomId.cpp
         src/back/service/ConnServiceR.cpp
         src/back/service/ConnServiceRW.cpp

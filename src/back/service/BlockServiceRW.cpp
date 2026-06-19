@@ -1,7 +1,8 @@
 #include "back/service/BlockServiceRW.h"
 #include "back/etc/CustomId.h"
 #include "back/etc/InitDb.h"
-#include "back/etc/UtilDb.h"           // hasTable
+#include "back/etc/UtilDb.h" // hasTable
+#include "back/pool/PoolService.h"
 #include "back/service/RepoServiceR.h" // make_cs, sql_err_msg
 
 namespace back {
@@ -17,8 +18,9 @@ namespace back {
                                                    const std::string &name)
   {
     try {
-      pqxx::connection pg(make_cs(c));
-      pqxx::work       txn(pg);
+      pool::Connection  pgPool = pool::acquire(c);
+      pqxx::connection &pg     = *pgPool;
+      pqxx::work        txn(pg);
 
       // Create the unit_b tables in case the repo predates this feature.
       InitDb(txn, pg, schema).init_unit_b_tables();
@@ -48,8 +50,9 @@ namespace back {
       const model::Conn &c, const std::string &schema, const std::string &owner_method_id, double order_index, const std::string &name)
   {
     try {
-      pqxx::connection pg(make_cs(c));
-      pqxx::work       txn(pg);
+      pool::Connection  pgPool = pool::acquire(c);
+      pqxx::connection &pg     = *pgPool;
+      pqxx::work        txn(pg);
 
       // Create the unit_b tables in case the repo predates this feature.
       InitDb(txn, pg, schema).init_unit_b_tables();
@@ -72,8 +75,9 @@ namespace back {
                                                         const std::string &name)
   {
     try {
-      pqxx::connection pg(make_cs(c));
-      pqxx::work       txn(pg);
+      pool::Connection  pgPool = pool::acquire(c);
+      pqxx::connection &pg     = *pgPool;
+      pqxx::work        txn(pg);
 
       // Create the unit_b tables in case the repo predates this feature.
       InitDb(txn, pg, schema).init_unit_b_tables();
@@ -99,8 +103,9 @@ namespace back {
   std::pair<bool, std::string> update_method_arg_name(const model::Conn &c, const std::string &schema, const std::string &id, const std::string &name)
   {
     try {
-      pqxx::connection pg(make_cs(c));
-      pqxx::work       txn(pg);
+      pool::Connection  pgPool = pool::acquire(c);
+      pqxx::connection &pg     = *pgPool;
+      pqxx::work        txn(pg);
       txn.exec("UPDATE " + pg.quote_name(schema) + ".unit_b_method_arg SET name = $1 WHERE id = $2", pqxx::params{txn, name, id});
       txn.commit();
       return {true, ""};
@@ -114,8 +119,9 @@ namespace back {
   std::pair<bool, std::string> delete_method_arg(const model::Conn &c, const std::string &schema, const std::string &id)
   {
     try {
-      pqxx::connection pg(make_cs(c));
-      pqxx::work       txn(pg);
+      pool::Connection  pgPool = pool::acquire(c);
+      pqxx::connection &pg     = *pgPool;
+      pqxx::work        txn(pg);
       txn.exec("DELETE FROM " + pg.quote_name(schema) + ".unit_b_method_arg WHERE id = $1", pqxx::params{txn, id});
       txn.commit();
       return {true, ""};
@@ -132,8 +138,9 @@ namespace back {
                                                    const std::vector<std::string> &ordered_ids)
   {
     try {
-      pqxx::connection pg(make_cs(c));
-      pqxx::work       txn(pg);
+      pool::Connection  pgPool = pool::acquire(c);
+      pqxx::connection &pg     = *pgPool;
+      pqxx::work        txn(pg);
       // Rewrite order_index to match the given sequence (0..n-1), all in one
       // transaction. The owner_method_id guard keeps it scoped to this method.
       const std::string q = "UPDATE " + pg.quote_name(schema) + ".unit_b_method_arg SET order_index = $1 WHERE id = $2 AND owner_method_id = $3";
@@ -153,8 +160,9 @@ namespace back {
       const model::Conn &c, const std::string &schema, const std::string &id, const std::string &column, const std::string &value)
   {
     try {
-      pqxx::connection pg(make_cs(c));
-      pqxx::work       txn(pg);
+      pool::Connection  pgPool = pool::acquire(c);
+      pqxx::connection &pg     = *pgPool;
+      pqxx::work        txn(pg);
       // `column` is a fixed internal literal, never user input.
       txn.exec("UPDATE " + pg.quote_name(schema) + ".unit_b_method SET " + column + " = $1 WHERE id = $2", pqxx::params{txn, value, id});
       txn.commit();
@@ -169,7 +177,8 @@ namespace back {
   std::pair<bool, std::string> update_block_disabled(const model::Conn &c, const std::string &schema, const std::string &id, bool disabled)
   {
     try {
-      pqxx::connection  pg(make_cs(c));
+      pool::Connection  pgPool = pool::acquire(c);
+      pqxx::connection &pg     = *pgPool;
       pqxx::work        txn(pg);
       const std::string value = disabled ? "true" : "false";
       txn.exec("UPDATE " + pg.quote_name(schema) + ".unit_b SET disabled = $1 WHERE id = $2", pqxx::params{txn, value, id});
@@ -200,8 +209,9 @@ namespace back {
       const model::Conn &c, const std::string &schema, const std::string &id, const std::string &column, const std::string &value)
   {
     try {
-      pqxx::connection pg(make_cs(c));
-      pqxx::work       txn(pg);
+      pool::Connection  pgPool = pool::acquire(c);
+      pqxx::connection &pg     = *pgPool;
+      pqxx::work        txn(pg);
       // `column` is a fixed internal literal, never user input.
       txn.exec("UPDATE " + pg.quote_name(schema) + ".unit_b_field SET " + column + " = $1 WHERE id = $2", pqxx::params{txn, value, id});
       txn.commit();
@@ -232,7 +242,8 @@ namespace back {
       const model::Conn &c, const std::string &schema, const std::string &id, model::BlockType type, const std::string &name)
   {
     try {
-      pqxx::connection  pg(make_cs(c));
+      pool::Connection  pgPool = pool::acquire(c);
+      pqxx::connection &pg     = *pgPool;
       pqxx::work        txn(pg);
       const std::string detail = type == model::BlockType::Field ? ".unit_b_field" : ".unit_b_method";
       txn.exec("UPDATE " + pg.quote_name(schema) + detail + " SET name = $1 WHERE id = $2", pqxx::params{txn, name, id});
@@ -248,7 +259,8 @@ namespace back {
   std::pair<bool, std::string> delete_block(const model::Conn &c, const std::string &schema, const std::string &id, model::BlockType type)
   {
     try {
-      pqxx::connection  pg(make_cs(c));
+      pool::Connection  pgPool = pool::acquire(c);
+      pqxx::connection &pg     = *pgPool;
       pqxx::work        txn(pg);
       const std::string qs     = pg.quote_name(schema);
       const std::string detail = type == model::BlockType::Field ? ".unit_b_field" : ".unit_b_method";
@@ -267,8 +279,9 @@ namespace back {
   std::pair<bool, std::string> update_block_size(const model::Conn &c, const std::string &schema, const std::string &id, float width, float height)
   {
     try {
-      pqxx::connection pg(make_cs(c));
-      pqxx::work       txn(pg);
+      pool::Connection  pgPool = pool::acquire(c);
+      pqxx::connection &pg     = *pgPool;
+      pqxx::work        txn(pg);
       txn.exec("UPDATE " + pg.quote_name(schema) + ".unit_b SET width = $1, height = $2 WHERE id = $3", pqxx::params{txn, width, height, id});
       txn.commit();
       return {true, ""};
@@ -282,7 +295,8 @@ namespace back {
   std::pair<bool, std::string> update_block_position(const model::Conn &c, const std::string &schema, const std::string &id, float x, float y)
   {
     try {
-      pqxx::connection  pg(make_cs(c));
+      pool::Connection  pgPool = pool::acquire(c);
+      pqxx::connection &pg     = *pgPool;
       pqxx::work        txn(pg);
       const std::string qs = pg.quote_name(schema);
       txn.exec("UPDATE " + qs + ".unit_b SET x = $1, y = $2 WHERE id = $3", pqxx::params{txn, x, y, id});

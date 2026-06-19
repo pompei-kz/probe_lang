@@ -1,5 +1,6 @@
 #include "back/service/RepoServiceRW.h"
 #include "back/etc/InitDb.h"
+#include "back/pool/PoolService.h"
 #include "back/service/RepoServiceR.h"
 
 namespace back {
@@ -7,9 +8,10 @@ namespace back {
   std::pair<bool, std::string> create_repository(const model::Conn &c, const std::string &schema, const std::string &repo_name)
   {
     try {
-      pqxx::connection pg(make_cs(c));
-      pqxx::work       txn(pg);
-      std::string      qsch = pg.quote_name(schema);
+      pool::Connection  pgPool = pool::acquire(c);
+      pqxx::connection &pg     = *pgPool;
+      pqxx::work        txn(pg);
+      std::string       qsch = pg.quote_name(schema);
 
       InitDb(txn, pg, schema).init_repo_schema();
       txn.exec("INSERT INTO " + qsch +
@@ -32,8 +34,9 @@ namespace back {
                                                const std::string &new_repo_name)
   {
     try {
-      pqxx::connection pg(make_cs(c));
-      pqxx::work       txn(pg);
+      pool::Connection  pgPool = pool::acquire(c);
+      pqxx::connection &pg     = *pgPool;
+      pqxx::work        txn(pg);
 
       if (old_schema != new_schema) {
         txn.exec("ALTER SCHEMA " + pg.quote_name(old_schema) + " RENAME TO " + pg.quote_name(new_schema));
@@ -51,8 +54,9 @@ namespace back {
   std::pair<bool, std::string> ensure_repo_schema(const model::Conn &c, const std::string &schema)
   {
     try {
-      pqxx::connection pg(make_cs(c));
-      pqxx::work       txn(pg);
+      pool::Connection  pgPool = pool::acquire(c);
+      pqxx::connection &pg     = *pgPool;
+      pqxx::work        txn(pg);
       InitDb(txn, pg, schema).init_repo_schema();
       txn.commit();
       return {true, ""};

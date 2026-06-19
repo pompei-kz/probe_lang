@@ -4,6 +4,7 @@
 #include "PanelMenu.h"
 #include "SchemaMenu.h"
 #include "back/model/ConnNode.h"
+#include "back/pool/PoolService.h"
 #include "back/service/ConnServiceRW.h"
 #include "back/service/ProjectTreeServiceR.h"
 #include "back/service/ProjectTreeServiceRW.h"
@@ -526,6 +527,7 @@ namespace front {
         node.conn.connected = false;
         node.open           = false;
         node.repos.clear();
+        back::pool::closeConnectionPool(node.conn.conn()); // закрыть пул соединений этого подключения
         back::save_conn(node.conn);
         back::close_tree_node({node.conn.name});
       } else {
