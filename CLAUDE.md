@@ -83,7 +83,7 @@ Two namespaces, cleanly separated — `back` (logic + persistence) never include
 
 ### `src/back` — services & model
 
-`back/` itself contains **only three subfolders** — `model/`, `service/`, `etc/`:
+`back/` itself contains **only subfolders** — `model/`, `service/`, `etc/`, `pool/`:
 
 - `model/` holds plain structs (`ConnStore`, `Conn`, `RepoNode`, `FolderNode`, `Unit`, `Block`,
   `BBox`, …) plus free `to_string` / `*_from_string` enum converters. Two connection structs, easy to
@@ -100,7 +100,10 @@ Two namespaces, cleanly separated — `back` (logic + persistence) never include
   convention: operations return `std::pair<bool, std::string>` = `{ok, error_message}`, or
   `std::pair<T, std::string>` where an empty/`nullopt` first element signals failure. Callers surface
   the error string in a `MsgDlg`.
-  - The pure helpers `make_cs` (`ConnStore` → libpq connection string) and `sql_err_msg` (format a
+  - Each DB operation acquires its `pqxx::connection` from the **connection pool** (see below), not a
+    fresh connect — `pool::Connection pgPool = pool::acquire(c); pqxx::connection &pg = *pgPool;` — so
+    the connection returns to the pool when the function exits.
+  - The pure helpers `make_cs` (`Conn` → libpq connection string) and `sql_err_msg` (format a
     `pqxx::sql_error`) live in **`RepoServiceR`**; every service `.cpp` that needs them includes
     `back/service/RepoServiceR.h`. `RepoServiceR` also owns the cross-service readers `load_tree` /
     `load_folders_for_schema` / `load_units_for_schema` it composes from `FolderServiceR` /
@@ -113,9 +116,31 @@ Two namespaces, cleanly separated — `back` (logic + persistence) never include
   get it on next open. When adding a table/column, extend the relevant `ensure_*` path rather than
   assuming it exists.
 - `CustomId` (`back/etc/`) generates time+random IDs (base-64 alphabet, no DB sequences).
+- `pool/` holds the DB **connection pool** (`back::pool`, see below).
 
 Include paths are root-relative from `src/`: back headers are included as `back/service/Foo.h`,
 `back/etc/Foo.h`, or `back/model/Foo.h` (everywhere, including from within `back` itself).
+
+#### Connection pool (`back::pool`)
+
+Postgres connection setup is ~15 ms (TCP + backend fork + SCRAM auth), so DB connections are **pooled
+and reused** instead of opened per call. Keyed by `model::Conn` (connection identity) via `ConnHash`:
+
+- **`Pool`** — one per `Conn`. `acquire()` hands out an idle `pqxx::connection` (or opens one, up to a
+  max, blocking on a `condition_variable` when the cap is reached); validates `is_open()` and discards
+  stale ones. **`Connection`** is the RAII handle returned by `acquire()` — on destruction it returns
+  the underlying connection to its pool (`release()`), or drops it if broken. Use `*conn` / `conn->` to
+  reach the `pqxx::connection`.
+- **`PoolManager`** — owns the `Conn → shared_ptr<Pool>` map. Outstanding `Connection`s keep their
+  `Pool` alive (shared_ptr) even after the manager drops it, so in-flight work always finishes cleanly.
+- **`PoolService`** (`back::pool::{manager, acquire, closeConnectionPool, closeAllConnectionPools}`) —
+  the single process-wide `PoolManager` (a Meyers singleton). **Services call `pool::acquire(key)`**;
+  `make_cs` is invoked *inside* the pool, not by callers. (`test_connection` is the one exception — it
+  connects directly to validate not-yet-saved credentials.)
+
+Lifecycle is driven from the **front**: `main.cpp` calls `pool::closeAllConnectionPools()` on shutdown;
+disconnecting or deleting a connection in the project tree calls `pool::closeConnectionPool(conn.conn())`
+to drop that pool.
 
 ### `src/front` — SDL UI
 
