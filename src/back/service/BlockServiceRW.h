@@ -1,6 +1,6 @@
 #pragma once
 #include "back/model/Block.h"
-#include "back/model/ConnStore.h"
+#include "back/model/Conn.h"
 #include <string>
 #include <utility>
 #include <vector>
@@ -9,7 +9,7 @@ namespace back {
 
   // Create a block: a unit_b row plus its unit_b_method / unit_b_field
   // detail row. Returns the new id on success (first element empty on failure).
-  std::pair<std::string, std::string> create_block(const model::ConnStore &c,
+  std::pair<std::string, std::string> create_block(const model::Conn &c,
                                                    const std::string &schema,
                                                    const std::string &unit_id,
                                                    model::BlockType   type,
@@ -21,69 +21,69 @@ namespace back {
 
   // Update a block's name in its detail table (chosen by `type`).
   std::pair<bool, std::string> update_block_name(
-      const model::ConnStore &c, const std::string &schema, const std::string &id, model::BlockType type, const std::string &name);
+      const model::Conn &c, const std::string &schema, const std::string &id, model::BlockType type, const std::string &name);
 
   // Create one argument of a method block (a unit_b_method_arg row).
   // Returns the new id on success (first element empty on failure).
   std::pair<std::string, std::string> create_method_arg(
-      const model::ConnStore &c, const std::string &schema, const std::string &owner_method_id, double order_index, const std::string &name);
+      const model::Conn &c, const std::string &schema, const std::string &owner_method_id, double order_index, const std::string &name);
 
   // Create one argument and append it at the end of the method: its order_index
   // is max(order_index in this method) + 1, computed atomically so a prior
   // delete can't make it land in the middle. Returns the new id (empty on error).
-  std::pair<std::string, std::string> append_method_arg(const model::ConnStore &c,
+  std::pair<std::string, std::string> append_method_arg(const model::Conn &c,
                                                         const std::string &schema,
                                                         const std::string &owner_method_id,
                                                         const std::string &name);
 
   // Update a method argument's name (unit_b_method_arg.name).
-  std::pair<bool, std::string> update_method_arg_name(const model::ConnStore &c,
+  std::pair<bool, std::string> update_method_arg_name(const model::Conn &c,
                                                       const std::string &schema,
                                                       const std::string &id,
                                                       const std::string &name);
 
   // Delete one method argument (unit_b_method_arg row) by id.
-  std::pair<bool, std::string> delete_method_arg(const model::ConnStore &c, const std::string &schema, const std::string &id);
+  std::pair<bool, std::string> delete_method_arg(const model::Conn &c, const std::string &schema, const std::string &id);
 
   // Rewrite the order of a method's arguments: order_index becomes each id's
   // position in `ordered_ids` (0..n-1). Used by drag-to-reorder.
-  std::pair<bool, std::string> reorder_method_args(const model::ConnStore              &c,
+  std::pair<bool, std::string> reorder_method_args(const model::Conn              &c,
                                                    const std::string              &schema,
                                                    const std::string              &owner_method_id,
                                                    const std::vector<std::string> &ordered_ids);
 
   // Update a block's disabled flag (unit_b.disabled — common to methods and fields).
-  std::pair<bool, std::string> update_block_disabled(const model::ConnStore &c, const std::string &schema, const std::string &id, bool disabled);
+  std::pair<bool, std::string> update_block_disabled(const model::Conn &c, const std::string &schema, const std::string &id, bool disabled);
 
   // Update method-only attributes (unit_b_method.type / access).
-  std::pair<bool, std::string> update_method_type(const model::ConnStore &c, const std::string &schema, const std::string &id, model::MethodType type);
-  std::pair<bool, std::string> update_method_access(const model::ConnStore  &c,
+  std::pair<bool, std::string> update_method_type(const model::Conn &c, const std::string &schema, const std::string &id, model::MethodType type);
+  std::pair<bool, std::string> update_method_access(const model::Conn  &c,
                                                     const std::string  &schema,
                                                     const std::string  &id,
                                                     model::MethodAccess access);
 
   // Update field attributes (unit_b_field.access).
-  std::pair<bool, std::string> update_field_access(const model::ConnStore  &c,
+  std::pair<bool, std::string> update_field_access(const model::Conn  &c,
                                                    const std::string  &schema,
                                                    const std::string  &id,
                                                    model::MethodAccess access);
 
   // Toggle whether a field's type comes from its expression (unit_b_field.expr_id_used).
-  std::pair<bool, std::string> update_field_expr_id_used(const model::ConnStore &c, const std::string &schema, const std::string &id, bool expr_id_used);
+  std::pair<bool, std::string> update_field_expr_id_used(const model::Conn &c, const std::string &schema, const std::string &id, bool expr_id_used);
 
   // Set a field's explicit byte size (unit_b_field.size_bytes).
-  std::pair<bool, std::string> update_field_size_bytes(const model::ConnStore &c, const std::string &schema, const std::string &id, int size_bytes);
+  std::pair<bool, std::string> update_field_size_bytes(const model::Conn &c, const std::string &schema, const std::string &id, int size_bytes);
 
   // Delete a block: its unit_b row, its detail row (unit_b_method /
   // unit_b_field per `type`) and, for methods, all of its arguments.
-  std::pair<bool, std::string> delete_block(const model::ConnStore &c, const std::string &schema, const std::string &id, model::BlockType type);
+  std::pair<bool, std::string> delete_block(const model::Conn &c, const std::string &schema, const std::string &id, model::BlockType type);
 
   // Update a block's box size (unit_b.width / height). The geom column is
   // regenerated automatically.
-  std::pair<bool, std::string> update_block_size(const model::ConnStore &c, const std::string &schema, const std::string &id, float width, float height);
+  std::pair<bool, std::string> update_block_size(const model::Conn &c, const std::string &schema, const std::string &id, float width, float height);
 
   // Update a block's top-left position (unit_b.x / y). The geom column is
   // regenerated automatically.
-  std::pair<bool, std::string> update_block_position(const model::ConnStore &c, const std::string &schema, const std::string &id, float x, float y);
+  std::pair<bool, std::string> update_block_position(const model::Conn &c, const std::string &schema, const std::string &id, float x, float y);
 
 } // namespace back

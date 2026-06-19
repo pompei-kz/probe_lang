@@ -113,7 +113,8 @@ namespace front {
         err_view.set("Repository name is required");
         return 0;
       }
-      auto [ok, msg] = editing ? back::edit_repository(conn, original_schema, schema, reponame) : back::create_repository(conn, schema, reponame);
+      auto [ok, msg] =
+          editing ? back::edit_repository(conn.conn(), original_schema, schema, reponame) : back::create_repository(conn.conn(), schema, reponame);
       if (ok) return 1;
       err_view.set(msg);
     }

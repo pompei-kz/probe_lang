@@ -437,7 +437,7 @@ namespace front {
           back::close_tree_node({node.conn.name});
         } else {
           std::vector<back::model::RepoNode> repos;
-          auto [ok, err] = back::connect_and_load(node.conn, repos);
+          auto [ok, err] = back::connect_and_load(node.conn.conn(), repos);
           if (ok) {
             node.open  = true;
             node.repos = std::move(repos);
@@ -488,7 +488,7 @@ namespace front {
             repo.open = !repo.open;
             if (repo.open) {
               // Ensure the schema and all of its tables exist (idempotent).
-              if (auto [ok, err] = back::ensure_repo_schema(node.conn, repo.schema_name); !ok) app.msg_dlg = {true, "Ошибка", std::move(err)};
+              if (auto [ok, err] = back::ensure_repo_schema(node.conn.conn(), repo.schema_name); !ok) app.msg_dlg = {true, "Ошибка", std::move(err)};
               back::open_tree_node({node.conn.name, repo.schema_name});
               restore_repo_folders_open(node.conn.name, repo); // reopen persisted folders from disk
             } else {
@@ -534,7 +534,7 @@ namespace front {
         if (ok) {
           node.conn.connected = true;
           back::save_conn(node.conn);
-          back::ensure_unit_tables(node.conn); // create the unit table in every repo schema
+          back::ensure_unit_tables(node.conn.conn()); // create the unit table in every repo schema
         } else {
           app.msg_dlg = {true, "Connection failed", std::move(err)};
         }
@@ -663,7 +663,7 @@ namespace front {
       if (!back::is_tree_node_open({node.conn.name})) continue;
 
       std::vector<back::model::RepoNode> repos;
-      auto [ok, err] = back::connect_and_load(node.conn, repos);
+      auto [ok, err] = back::connect_and_load(node.conn.conn(), repos);
       if (!ok) continue;
       node.open  = true;
       node.repos = std::move(repos);
@@ -818,7 +818,7 @@ namespace front {
       back::model::ConnNode &node = app.conns[n.conn_idx];
       if (want && !node.open) {
         std::vector<back::model::RepoNode> repos;
-        auto [ok, err] = back::connect_and_load(node.conn, repos);
+        auto [ok, err] = back::connect_and_load(node.conn.conn(), repos);
         if (ok) {
           node.open  = true;
           node.repos = std::move(repos);

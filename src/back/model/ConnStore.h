@@ -10,7 +10,7 @@ namespace back::model {
     std::string name, host, port, user, pass, dbname;
     bool        connected = false;
 
-    Conn conn() const { return {.host = host, .port = port, .user = user, .pass = dbname}; }
+    Conn conn() const { return {.host = host, .port = port, .user = user, .pass = pass, .dbname = dbname}; }
   };
 
 } // namespace back::model

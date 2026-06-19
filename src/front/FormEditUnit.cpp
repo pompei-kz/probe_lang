@@ -32,8 +32,13 @@ namespace front {
     activate = false;
   }
 
-  void FormEditUnit::open_edit(
-      int ci, int ri, const back::model::ConnStore &c, const std::string &schema, const std::string &uid, const std::string &uname, back::model::UnitType utype)
+  void FormEditUnit::open_edit(int                           ci,
+                               int                           ri,
+                               const back::model::ConnStore &c,
+                               const std::string            &schema,
+                               const std::string            &uid,
+                               const std::string            &uname,
+                               back::model::UnitType         utype)
   {
     open_add(ci, ri, c, schema, "");
     unit_id = uid;
@@ -101,7 +106,7 @@ namespace front {
     bool ate = false;
     if (type_dropdown_open) {
       const back::model::UnitType opts[3] = {back::model::UnitType::Class, back::model::UnitType::Interface, back::model::UnitType::Enum};
-      float          dd_x = dx + 16, dd_y = cby + FFH, dd_w = fw, dd_h = 3 * DD_IH;
+      float                       dd_x = dx + 16, dd_y = cby + FFH, dd_w = fw, dd_h = 3 * DD_IH;
       fill(ren, C_DLGBG, dd_x, dd_y, dd_w, dd_h);
       rect(ren, C_BORDER, dd_x, dd_y, dd_w, dd_h);
       for (int i = 0; i < 3; i++) {
@@ -146,7 +151,8 @@ namespace front {
         err_view.set("Имя юнита обязательно");
         return 0;
       }
-      auto [ok, msg] = editing ? back::edit_unit(conn, schema_name, unit_id, name, type) : back::create_unit(conn, schema_name, parent_folder_id, name, type);
+      auto [ok, msg] = editing ? back::edit_unit(conn.conn(), schema_name, unit_id, name, type)
+                               : back::create_unit(conn.conn(), schema_name, parent_folder_id, name, type);
       if (ok) return 1;
       err_view.set(msg);
     }

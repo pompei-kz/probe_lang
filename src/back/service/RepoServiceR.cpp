@@ -31,7 +31,7 @@ namespace back {
     }
   }
 
-  std::string make_cs(const model::ConnStore &c)
+  std::string make_cs(const model::Conn &c)
   {
     std::string cs = "host=" + c.host;
     cs += " port=" + (c.port.empty() ? "5432" : c.port);
@@ -58,7 +58,7 @@ namespace back {
       const std::string &host, const std::string &port, const std::string &dbname, const std::string &user, const std::string &pass)
   {
     try {
-      model::ConnStore tmp;
+      model::Conn tmp;
       tmp.host   = host;
       tmp.port   = port;
       tmp.dbname = dbname;
@@ -71,7 +71,7 @@ namespace back {
     }
   }
 
-  std::pair<bool, std::string> connect_and_load(const model::ConnStore &c, std::vector<model::RepoNode> &repos)
+  std::pair<bool, std::string> connect_and_load(const model::Conn &c, std::vector<model::RepoNode> &repos)
   {
     repos.clear();
     try {
@@ -104,7 +104,7 @@ namespace back {
     }
   }
 
-  std::pair<bool, std::string> load_repo_tree(const model::ConnStore &c, const std::string &schema, model::RepoNode &repo)
+  std::pair<bool, std::string> load_repo_tree(const model::Conn &c, const std::string &schema, model::RepoNode &repo)
   {
     repo.folders.clear();
     repo.units.clear();

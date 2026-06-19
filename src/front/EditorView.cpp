@@ -202,9 +202,9 @@ namespace front {
   // Unscaled width of a field's expression content, drawn right of the divider.
   static float expr_content_width(const back::model::Block &s)
   {
-    if (!s.expr_present) return expr_square_side();                                                    // cube square
+    if (!s.expr_present) return expr_square_side();                                                                 // cube square
     if (s.expr_type == back::model::ExprType::Unit) return expr_square_side() + GAP + text_w(expr_text(s).c_str()); // diamond + text
-    return text_w(expr_text(s).c_str());                                                               // "self" text
+    return text_w(expr_text(s).c_str());                                                                            // "self" text
   }
 
   // Unscaled (world-unit) box width needed to fit `name`: matches box_geo's
@@ -410,16 +410,16 @@ namespace front {
   // `skip_arg_id`, when non-empty, is the argument being edited inline (drawn as
   // the input field instead). hov_name / hov_arg / hov_plus / hov_minus pick
   // which element is highlighted.
-  static void draw_block(SDL_Renderer      *ren,
-                         const BoxGeo      &g,
-                         const back::model::Block       &s,
-                         char               letter,
-                         bool               blank_name,
-                         const std::string &skip_arg_id,
-                         bool               hov_name,
-                         int                hov_arg,
-                         bool               hov_plus,
-                         int                hov_minus)
+  static void draw_block(SDL_Renderer             *ren,
+                         const BoxGeo             &g,
+                         const back::model::Block &s,
+                         char                      letter,
+                         bool                      blank_name,
+                         const std::string        &skip_arg_id,
+                         bool                      hov_name,
+                         int                       hov_arg,
+                         bool                      hov_plus,
+                         int                       hov_minus)
   {
     const float z       = g.z;
     // A deactivated block renders dim and monochrome.
@@ -479,7 +479,8 @@ namespace front {
   }
 
   // ── lifecycle ────────────────────────────────────────────────────────────────
-  void EditorView::open_for(const back::model::ConnStore &c, const std::string &schema_, const std::string &uid, const std::string &uname, back::model::UnitType utype)
+  void EditorView::open_for(
+      const back::model::ConnStore &c, const std::string &schema_, const std::string &uid, const std::string &uname, back::model::UnitType utype)
   {
     for (int i = 0; i < static_cast<int>(tabs.size()); i++) {
       if (tabs[i].unit_id == uid && tabs[i].schema == schema_ && tabs[i].conn.name == c.name) {
@@ -555,7 +556,7 @@ namespace front {
       t->cam_y = saved->cam_y;
     } else {
       t->zoom         = 1.0;
-      auto [box, err] = back::block_bbox_for_unit(t->conn, t->schema, t->unit_id);
+      auto [box, err] = back::block_bbox_for_unit(t->conn.conn(), t->schema, t->unit_id);
       if (box) {
         const double mx = (box->min_x + box->max_x) * .5;
         const double my = (box->min_y + box->max_y) * .5;
@@ -586,10 +587,10 @@ namespace front {
     const float miny   = static_cast<float>(t->cam_y);
     const float maxx   = static_cast<float>(t->cam_x + cw / t->zoom);
     const float maxy   = static_cast<float>(t->cam_y + ch / t->zoom);
-    auto [rows, err]   = back::load_blocks_in_view(t->conn, t->schema, t->unit_id, minx, miny, maxx, maxy);
+    auto [rows, err]   = back::load_blocks_in_view(t->conn.conn(), t->schema, t->unit_id, minx, miny, maxx, maxy);
     t->blocks          = std::move(rows);
     // Expressions are queried independently against the same viewport.
-    auto [exprs, eerr] = back::load_exprs_in_view(t->conn, t->schema, t->unit_id, minx, miny, maxx, maxy);
+    auto [exprs, eerr] = back::load_exprs_in_view(t->conn.conn(), t->schema, t->unit_id, minx, miny, maxx, maxy);
     t->exprs           = std::move(exprs);
   }
 
@@ -600,7 +601,7 @@ namespace front {
     if (!t) return;
     float ex, ey, ew, eh;
     compute_field_expr_slot(b, ex, ey, ew, eh);
-    back::update_field_expr_rect(t->conn, t->schema, b.id, ex, ey, ew, eh);
+    back::update_field_expr_rect(t->conn.conn(), t->schema, b.id, ex, ey, ew, eh);
   }
 
   void EditorView::refit_field(const std::string &id)
@@ -610,7 +611,7 @@ namespace front {
     reload(); // pull current content (name, size, expression) before measuring
     for (back::model::Block &b : t->blocks)
       if (b.id == id) {
-        back::update_block_size(t->conn, t->schema, b.id, block_fit_width(b), box_height(b));
+        back::update_block_size(t->conn.conn(), t->schema, b.id, block_fit_width(b), box_height(b));
         sync_field_expr_rect(b); // the slot moves with the name width / content
         break;
       }
@@ -672,12 +673,12 @@ namespace front {
   {
     EditorTab *t = cur();
     if (!t) return;
-    auto [id, err] = back::append_method_arg(t->conn, t->schema, m.id, "Новый Аргумент");
+    auto [id, err] = back::append_method_arg(t->conn.conn(), t->schema, m.id, "Новый Аргумент");
     if (id.empty()) return;
     // Resize the box for the extra row and persist before reloading.
     const float w = std::max(block_fit_width(m), fit_width("Новый Аргумент"));
     const float h = method_height_for(static_cast<int>(m.args.size()) + 1);
-    back::update_block_size(t->conn, t->schema, m.id, w, h);
+    back::update_block_size(t->conn.conn(), t->schema, m.id, w, h);
     reload();
   }
 
@@ -685,7 +686,7 @@ namespace front {
   {
     EditorTab *t = cur();
     if (!t) return;
-    auto [ok, err] = back::delete_method_arg(t->conn, t->schema, arg_id);
+    auto [ok, err] = back::delete_method_arg(t->conn.conn(), t->schema, arg_id);
     if (!ok) return;
     // Recompute the box size from the remaining arguments and persist.
     float w         = fit_width(m.name);
@@ -695,7 +696,7 @@ namespace front {
       w = std::max(w, fit_width(a.name));
       remaining++;
     }
-    back::update_block_size(t->conn, t->schema, m.id, w, method_height_for(remaining));
+    back::update_block_size(t->conn.conn(), t->schema, m.id, w, method_height_for(remaining));
     reload();
   }
 
@@ -809,25 +810,25 @@ namespace front {
     // is method-only.
     auto set_access = [&](back::model::MethodAccess a) {
       if (is_method)
-        back::update_method_access(t->conn, t->schema, m->id, a);
+        back::update_method_access(t->conn.conn(), t->schema, m->id, a);
       else
-        back::update_field_access(t->conn, t->schema, m->id, a);
+        back::update_field_access(t->conn.conn(), t->schema, m->id, a);
     };
     switch (chosen) {
-      case ACT_TOGGLE: back::update_block_disabled(t->conn, t->schema, m->id, !m->disabled); break;
+      case ACT_TOGGLE: back::update_block_disabled(t->conn.conn(), t->schema, m->id, !m->disabled); break;
       case ACT_SET_TYPE: {
         const std::string id = m->id;
-        back::update_field_expr_id_used(t->conn, t->schema, id, !m->expr_id_used);
+        back::update_field_expr_id_used(t->conn.conn(), t->schema, id, !m->expr_id_used);
         // The size message / expression slot appears or disappears: resize the
         // box and (re)store the slot. (refit_field reloads, invalidating m.)
         refit_field(id);
         break;
       }
-      case ACT_DELETE: back::delete_block(t->conn, t->schema, m->id, m->type); break;
-      case ACT_INNER: back::update_method_type(t->conn, t->schema, m->id, back::model::MethodType::Inner); break;
-      case ACT_STATIC: back::update_method_type(t->conn, t->schema, m->id, back::model::MethodType::Static); break;
-      case ACT_CTOR: back::update_method_type(t->conn, t->schema, m->id, back::model::MethodType::Constructor); break;
-      case ACT_DTOR: back::update_method_type(t->conn, t->schema, m->id, back::model::MethodType::Destructor); break;
+      case ACT_DELETE: back::delete_block(t->conn.conn(), t->schema, m->id, m->type); break;
+      case ACT_INNER: back::update_method_type(t->conn.conn(), t->schema, m->id, back::model::MethodType::Inner); break;
+      case ACT_STATIC: back::update_method_type(t->conn.conn(), t->schema, m->id, back::model::MethodType::Static); break;
+      case ACT_CTOR: back::update_method_type(t->conn.conn(), t->schema, m->id, back::model::MethodType::Constructor); break;
+      case ACT_DTOR: back::update_method_type(t->conn.conn(), t->schema, m->id, back::model::MethodType::Destructor); break;
       case ACT_PRIVATE: set_access(back::model::MethodAccess::Private); break;
       case ACT_PROTECTED: set_access(back::model::MethodAccess::Protected); break;
       case ACT_PUBLIC: set_access(back::model::MethodAccess::Public); break;
@@ -848,12 +849,12 @@ namespace front {
         v = 0;
       }
       v = std::max(0, v);
-      back::update_field_size_bytes(t->conn, t->schema, edit_id, v);
+      back::update_field_size_bytes(t->conn.conn(), t->schema, edit_id, v);
       // Resize the box: the size message width depends on the value's digit count.
       for (back::model::Block &b : t->blocks) {
         if (b.id != edit_id) continue;
         b.size_bytes = v;
-        back::update_block_size(t->conn, t->schema, b.id, block_fit_width(b), box_height(b));
+        back::update_block_size(t->conn.conn(), t->schema, b.id, block_fit_width(b), box_height(b));
         break;
       }
       editing      = false;
@@ -864,9 +865,9 @@ namespace front {
     if (t) {
       const std::string name = edit_field.ed.buf;
       if (edit_is_arg)
-        back::update_method_arg_name(t->conn, t->schema, edit_arg_id, name);
+        back::update_method_arg_name(t->conn.conn(), t->schema, edit_arg_id, name);
       else
-        back::update_block_name(t->conn, t->schema, edit_id, edit_type, name);
+        back::update_block_name(t->conn.conn(), t->schema, edit_id, edit_type, name);
 
       // Recompute and persist the owning block's size from in-memory state with
       // the edit applied (the name just changed may be the widest entry).
@@ -881,7 +882,7 @@ namespace front {
         } else {
           b.name = name;
         }
-        back::update_block_size(t->conn, t->schema, b.id, block_fit_width(b), box_height(b));
+        back::update_block_size(t->conn.conn(), t->schema, b.id, block_fit_width(b), box_height(b));
         sync_field_expr_rect(b); // the slot starts right of the name → moves with it
         break;
       }
@@ -991,7 +992,7 @@ namespace front {
       if (t && drag_moved) {
         for (const back::model::Block &s : t->blocks)
           if (s.id == drag_id) {
-            back::update_block_position(t->conn, t->schema, s.id, s.x, s.y);
+            back::update_block_position(t->conn.conn(), t->schema, s.id, s.x, s.y);
             break;
           }
         reload();
@@ -1007,7 +1008,7 @@ namespace front {
             std::vector<std::string> ids;
             for (const back::model::MethodArg &a : s.args)
               ids.push_back(a.id);
-            back::reorder_method_args(t->conn, t->schema, s.id, ids);
+            back::reorder_method_args(t->conn.conn(), t->schema, s.id, ids);
             break;
           }
         reload();
@@ -1118,15 +1119,15 @@ namespace front {
 
     if (ldown) {
       if (hm) {
-        back::create_block(t->conn,
-                     t->schema,
-                     t->unit_id,
-                     back::model::BlockType::Method,
-                     e.chooser_wx,
-                     e.chooser_wy,
-                     fit_width("Новый Метод"),
-                     method_height_for(0),
-                     "Новый Метод");
+        back::create_block(t->conn.conn(),
+                           t->schema,
+                           t->unit_id,
+                           back::model::BlockType::Method,
+                           e.chooser_wx,
+                           e.chooser_wy,
+                           fit_width("Новый Метод"),
+                           method_height_for(0),
+                           "Новый Метод");
         e.chooser_open = false;
         e.reload();
       } else if (hf) {
@@ -1134,7 +1135,15 @@ namespace front {
         back::model::Block nf{};
         nf.type = back::model::BlockType::Field;
         nf.name = "Новое Поле";
-        back::create_block(t->conn, t->schema, t->unit_id, back::model::BlockType::Field, e.chooser_wx, e.chooser_wy, block_fit_width(nf), BOX_H, "Новое Поле");
+        back::create_block(t->conn.conn(),
+                           t->schema,
+                           t->unit_id,
+                           back::model::BlockType::Field,
+                           e.chooser_wx,
+                           e.chooser_wy,
+                           block_fit_width(nf),
+                           BOX_H,
+                           "Новое Поле");
         e.chooser_open = false;
         e.reload();
       } else {
@@ -1379,8 +1388,10 @@ namespace front {
       ContextMenuSelExpr::Action act = expr_menu.render(ren, mx, my, ldown && !tab_clicked);
       using A                        = ContextMenuSelExpr::Action;
       if (act == A::SetThisObject || act == A::SetThisUnit || act == A::SetThisMethod) {
-        const back::model::ExprType et = act == A::SetThisObject ? back::model::ExprType::ThisObject : act == A::SetThisUnit ? back::model::ExprType::ThisUnit : back::model::ExprType::ThisMethod;
-        back::set_field_expr_this_type(t->conn, t->schema, fid, et);
+        const back::model::ExprType et = act == A::SetThisObject ? back::model::ExprType::ThisObject
+                                         : act == A::SetThisUnit ? back::model::ExprType::ThisUnit
+                                                                 : back::model::ExprType::ThisMethod;
+        back::set_field_expr_this_type(t->conn.conn(), t->schema, fid, et);
         refit_field(fid); // the expression label is wider than the cube square
       } else if (act == A::OpenUnitForm) {
         want_sel_unit          = true;
@@ -1427,7 +1438,7 @@ namespace front {
     // empty canvas.
     if (dbl && hit(mx, my, cx, cy, cw, ch)) {
       const back::model::Block *target = nullptr;
-      BoxGeo       tgeo{};
+      BoxGeo                    tgeo{};
       for (const back::model::Block &s : t->blocks) {
         BoxGeo g = box_geo(*this, s);
         if (hit(mx, my, g.bx, g.by, g.bw, g.bh)) {
@@ -1480,7 +1491,7 @@ namespace front {
     // block begins dragging it (the canvas is panned with the middle button).
     if (ldown && hit(mx, my, cx, cy, cw, ch)) {
       const back::model::Block *target = nullptr;
-      BoxGeo       tgeo{};
+      BoxGeo                    tgeo{};
       for (const back::model::Block &s : t->blocks) {
         BoxGeo g = box_geo(*this, s);
         if (hit(mx, my, g.bx, g.by, g.bw, g.bh)) {

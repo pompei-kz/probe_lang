@@ -49,7 +49,7 @@ namespace front {
   void FormSelectUnit::load_next_page()
   {
     if (!has_more) return;
-    auto [page, err] = back::list_units_paginated(conn, schema, applied_filter, next_offset, PAGE);
+    auto [page, err] = back::list_units_paginated(conn.conn(), schema, applied_filter, next_offset, PAGE);
     next_offset += static_cast<int>(page.size());
     if (static_cast<int>(page.size()) < PAGE) has_more = false;
     for (back::model::Unit &u : page)
@@ -177,7 +177,7 @@ namespace front {
       return -1;
     }
     if (chosen >= 0) {
-      back::set_field_expr_unit(conn, schema, field_id, units[chosen].id);
+      back::set_field_expr_unit(conn.conn(), schema, field_id, units[chosen].id);
       close();
       return 1;
     }

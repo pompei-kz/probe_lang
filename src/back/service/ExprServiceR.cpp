@@ -5,7 +5,7 @@
 namespace back {
 
   std::pair<std::vector<model::Expr>, std::string> load_exprs_in_view(
-      const model::ConnStore &c, const std::string &schema, const std::string &unit_id, float min_x, float min_y, float max_x, float max_y)
+      const model::Conn &c, const std::string &schema, const std::string &unit_id, float min_x, float min_y, float max_x, float max_y)
   {
     try {
       pqxx::connection pg(make_cs(c));

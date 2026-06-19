@@ -248,9 +248,9 @@ int main(int /*argc*/, char * /*argv*/[])
               }
             }
           } else if (app.sel_unit_form.open) {
-            front::FormSelectUnit &d = app.sel_unit_form;
-            SDL_Keymod      mod      = ev.key.mod;
-            bool            consumed = d.focus == 0 && d.filter_field.handle_key(ev.key.key, mod);
+            front::FormSelectUnit &d        = app.sel_unit_form;
+            SDL_Keymod             mod      = ev.key.mod;
+            bool                   consumed = d.focus == 0 && d.filter_field.handle_key(ev.key.key, mod);
             if (!consumed && !form_nav(d.focus, d.activate, d.FOCUS_COUNT, d.FIRST_BUTTON, ev.key.key, mod) && ev.key.key == SDLK_ESCAPE) {
               d.close();
               SDL_StopTextInput(app.win);
@@ -343,7 +343,7 @@ int main(int /*argc*/, char * /*argv*/[])
             if (node.open) {
               std::vector<back::model::RepoNode> repos;
               // ReSharper disable once CppTooWideScopeInitStatement
-              auto [ok, err] = back::connect_and_load(node.conn, repos);
+              auto [ok, err] = back::connect_and_load(node.conn.conn(), repos);
               if (ok) {
                 node.repos = std::move(repos);
                 front::restore_open_repos_and_folders(node); // keep already-open repos/folders open
@@ -375,7 +375,7 @@ int main(int /*argc*/, char * /*argv*/[])
           const bool        editing   = app.folder_dlg.editing;
           const std::string parent_id = app.folder_dlg.parent_folder_id;
 
-          auto [ok, err] = back::load_repo_tree(node.conn, repo.schema_name, repo);
+          auto [ok, err] = back::load_repo_tree(node.conn.conn(), repo.schema_name, repo);
           if (!ok) {
             app.msg_dlg = {true, "Ошибка", std::move(err)};
           } else {
@@ -406,7 +406,7 @@ int main(int /*argc*/, char * /*argv*/[])
           const bool             editing   = app.unit_dlg.editing;
           const std::string      parent_id = app.unit_dlg.parent_folder_id;
 
-          auto [ok, err] = back::load_repo_tree(node.conn, repo.schema_name, repo);
+          auto [ok, err] = back::load_repo_tree(node.conn.conn(), repo.schema_name, repo);
           if (!ok) {
             app.msg_dlg = {true, "Ошибка", std::move(err)};
           } else {
@@ -455,10 +455,10 @@ int main(int /*argc*/, char * /*argv*/[])
           if (fci >= 0 && fci < static_cast<int>(app.conns.size()) && fri >= 0 && fri < static_cast<int>(app.conns[fci].repos.size())) {
             auto &repo     = app.conns[fci].repos[fri];
             // ReSharper disable once CppTooWideScopeInitStatement
-            auto [ok, err] = back::delete_folder_recursive(app.conns[fci].conn, repo.schema_name, app.pending_delete_folder_id);
+            auto [ok, err] = back::delete_folder_recursive(app.conns[fci].conn.conn(), repo.schema_name, app.pending_delete_folder_id);
             if (ok) {
               // ReSharper disable once CppTooWideScopeInitStatement
-              auto [ok2, err2] = back::load_repo_tree(app.conns[fci].conn, repo.schema_name, repo);
+              auto [ok2, err2] = back::load_repo_tree(app.conns[fci].conn.conn(), repo.schema_name, repo);
               if (!ok2)
                 app.msg_dlg = {true, "Ошибка", std::move(err2)};
               else
@@ -477,10 +477,10 @@ int main(int /*argc*/, char * /*argv*/[])
           if (uci >= 0 && uci < static_cast<int>(app.conns.size()) && uri >= 0 && uri < static_cast<int>(app.conns[uci].repos.size())) {
             auto &repo     = app.conns[uci].repos[uri];
             // ReSharper disable once CppTooWideScopeInitStatement
-            auto [ok, err] = back::delete_unit(app.conns[uci].conn, repo.schema_name, app.pending_delete_unit_id);
+            auto [ok, err] = back::delete_unit(app.conns[uci].conn.conn(), repo.schema_name, app.pending_delete_unit_id);
             if (ok) {
               // ReSharper disable once CppTooWideScopeInitStatement
-              auto [ok2, err2] = back::load_repo_tree(app.conns[uci].conn, repo.schema_name, repo);
+              auto [ok2, err2] = back::load_repo_tree(app.conns[uci].conn.conn(), repo.schema_name, repo);
               if (!ok2)
                 app.msg_dlg = {true, "Ошибка", std::move(err2)};
               else

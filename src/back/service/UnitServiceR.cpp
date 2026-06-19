@@ -30,7 +30,7 @@ namespace back {
   }
 
   std::pair<std::vector<model::Unit>, std::string> list_units_paginated(
-      const model::ConnStore &c, const std::string &schema, const std::string &filter, int offset, int limit)
+      const model::Conn &c, const std::string &schema, const std::string &filter, int offset, int limit)
   {
     try {
       pqxx::connection pg(make_cs(c));

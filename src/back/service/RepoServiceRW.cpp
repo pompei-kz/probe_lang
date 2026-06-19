@@ -4,7 +4,7 @@
 
 namespace back {
 
-  std::pair<bool, std::string> create_repository(const model::ConnStore &c, const std::string &schema, const std::string &repo_name)
+  std::pair<bool, std::string> create_repository(const model::Conn &c, const std::string &schema, const std::string &repo_name)
   {
     try {
       pqxx::connection pg(make_cs(c));
@@ -26,7 +26,7 @@ namespace back {
     }
   }
 
-  std::pair<bool, std::string> edit_repository(const model::ConnStore &c,
+  std::pair<bool, std::string> edit_repository(const model::Conn &c,
                                                const std::string &old_schema,
                                                const std::string &new_schema,
                                                const std::string &new_repo_name)
@@ -48,7 +48,7 @@ namespace back {
     }
   }
 
-  std::pair<bool, std::string> ensure_repo_schema(const model::ConnStore &c, const std::string &schema)
+  std::pair<bool, std::string> ensure_repo_schema(const model::Conn &c, const std::string &schema)
   {
     try {
       pqxx::connection pg(make_cs(c));

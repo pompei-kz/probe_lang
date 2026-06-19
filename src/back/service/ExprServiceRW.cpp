@@ -41,7 +41,10 @@ namespace back {
     return eid;
   }
 
-  std::pair<bool, std::string> set_field_expr_this_type(const model::ConnStore &c, const std::string &schema, const std::string &field_id, model::ExprType type)
+  std::pair<bool, std::string> set_field_expr_this_type(const model::Conn &c,
+                                                        const std::string &schema,
+                                                        const std::string &field_id,
+                                                        model::ExprType    type)
   {
     try {
       pqxx::connection pg(make_cs(c));
@@ -59,7 +62,10 @@ namespace back {
     }
   }
 
-  std::pair<bool, std::string> set_field_expr_unit(const model::ConnStore &c, const std::string &schema, const std::string &field_id, const std::string &unit_id)
+  std::pair<bool, std::string> set_field_expr_unit(const model::Conn &c,
+                                                   const std::string &schema,
+                                                   const std::string &field_id,
+                                                   const std::string &unit_id)
   {
     try {
       pqxx::connection  pg(make_cs(c));
@@ -85,7 +91,7 @@ namespace back {
   }
 
   std::pair<bool, std::string> update_field_expr_rect(
-      const model::ConnStore &c, const std::string &schema, const std::string &field_id, float ex, float ey, float ew, float eh)
+      const model::Conn &c, const std::string &schema, const std::string &field_id, float ex, float ey, float ew, float eh)
   {
     try {
       pqxx::connection  pg(make_cs(c));

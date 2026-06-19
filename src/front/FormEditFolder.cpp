@@ -29,7 +29,8 @@ namespace front {
     activate = false;
   }
 
-  void FormEditFolder::open_edit(int ci, int ri, const back::model::ConnStore &c, const std::string &schema, const std::string &fid, const std::string &fname)
+  void FormEditFolder::open_edit(
+      int ci, int ri, const back::model::ConnStore &c, const std::string &schema, const std::string &fid, const std::string &fname)
   {
     open_add(ci, ri, c, schema, "");
     folder_id = fid;
@@ -93,7 +94,8 @@ namespace front {
         err_view.set("Имя папки обязательно");
         return 0;
       }
-      auto [ok, msg] = editing ? back::rename_folder(conn, schema_name, folder_id, name) : back::create_folder(conn, schema_name, parent_folder_id, name);
+      auto [ok, msg] = editing ? back::rename_folder(conn.conn(), schema_name, folder_id, name)
+                               : back::create_folder(conn.conn(), schema_name, parent_folder_id, name);
       if (ok) return 1;
       err_view.set(msg);
     }

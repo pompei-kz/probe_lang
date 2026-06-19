@@ -1,5 +1,5 @@
 #pragma once
-#include "back/model/ConnStore.h"
+#include "back/model/Conn.h"
 #include <cstdlib>
 #include <string>
 
@@ -23,9 +23,9 @@ namespace test_db {
   }
 
   // The same database as a back::model::Conn (for the service-level APIs).
-  inline back::model::ConnStore conn()
+  inline back::model::Conn conn()
   {
-    back::model::ConnStore c;
+    back::model::Conn c;
     c.host   = HOST;
     c.port   = PORT;
     c.dbname = DBNAME;

@@ -85,8 +85,13 @@ Two namespaces, cleanly separated — `back` (logic + persistence) never include
 
 `back/` itself contains **only three subfolders** — `model/`, `service/`, `etc/`:
 
-- `model/` holds plain structs (`Conn`, `RepoNode`, `FolderNode`, `Unit`, `Block`, `BBox`, …) plus
-  free `to_string` / `*_from_string` enum converters. No behavior.
+- `model/` holds plain structs (`ConnStore`, `Conn`, `RepoNode`, `FolderNode`, `Unit`, `Block`,
+  `BBox`, …) plus free `to_string` / `*_from_string` enum converters. Two connection structs, easy to
+  mix up: **`ConnStore`** is a *saved* database connection — `name` + host/port/user/pass/dbname + a
+  `connected` flag — persisted as files (see "Persistence outside the DB") and passed to the service
+  functions; **`Conn`** is just the minimal subset needed to *open* a connection
+  (host/port/user/pass/dbname), produced by `ConnStore::conn()`. `Conn` has value identity
+  (defaulted `operator<=>` + a `ConnHash` functor) so it can key a connection lookup.
 - `service/` holds the services as **free functions** (no service classes). Each service is **split by
   read vs write**: `Foo` has a read-only `FooServiceR.{h,cpp}` (only reads the DB / filesystem) and a
   read-write `FooServiceRW.{h,cpp}` (creates / updates / deletes). The seven services are `Block`,
@@ -95,7 +100,7 @@ Two namespaces, cleanly separated — `back` (logic + persistence) never include
   convention: operations return `std::pair<bool, std::string>` = `{ok, error_message}`, or
   `std::pair<T, std::string>` where an empty/`nullopt` first element signals failure. Callers surface
   the error string in a `MsgDlg`.
-  - The pure helpers `make_cs` (Conn → libpq connection string) and `sql_err_msg` (format a
+  - The pure helpers `make_cs` (`ConnStore` → libpq connection string) and `sql_err_msg` (format a
     `pqxx::sql_error`) live in **`RepoServiceR`**; every service `.cpp` that needs them includes
     `back/service/RepoServiceR.h`. `RepoServiceR` also owns the cross-service readers `load_tree` /
     `load_folders_for_schema` / `load_units_for_schema` it composes from `FolderServiceR` /
@@ -162,7 +167,8 @@ on the cube square, used to choose what an expression is. It will keep growing; 
 
 ### Persistence outside the DB
 
-- **Connections** are stored as files under a workspace dir (`back::ws_dir()`), not in Postgres.
+- **Connections** (`ConnStore` records) are stored as files under a workspace dir (`back::ws_dir()`),
+  not in Postgres.
 - **Tree open/closed state**: empty marker files in `~/.config/probe_lang/project_tree_open_nodes/`,
   named by the `#`-joined branch-id path (`ProjectTreeService`).
 - **Per-unit editor camera** (zoom/offset): one `key=value` file per unit id under
