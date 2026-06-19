@@ -23,11 +23,9 @@ namespace back::pool {
     std::unordered_map<model::Conn, std::shared_ptr<Pool>, model::ConnHash> pools_;
 
   public:
-    PoolManager()
-        : maxConnections_(10) {};
+    PoolManager();
 
-    explicit PoolManager(std::size_t maxConnections)
-        : maxConnections_(maxConnections) {};
+    explicit PoolManager(std::size_t maxConnections);
 
     Connection acquire(const model::Conn &key);
 

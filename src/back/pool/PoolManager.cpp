@@ -8,6 +8,14 @@
 
 namespace back::pool {
 
+  PoolManager::PoolManager()
+      : maxConnections_(10)
+  {}
+
+  PoolManager::PoolManager(std::size_t maxConnections)
+      : maxConnections_(maxConnections)
+  {}
+
   Connection PoolManager::acquire(const model::Conn &key)
   {
     std::shared_ptr<Pool> pool;
