@@ -866,3 +866,41 @@ TEST_F(ChangeSystemTest, ApplyAfterUndoWipesRedo)
   EXPECT_FALSE(changed); // op1's undone entry was wiped by the new apply
   EXPECT_EQ(read_val(txn, "r1"), "c");
 }
+
+TEST_F(ChangeSystemTest, RedoFailsAfterNewApplyWipesUndoneOps)
+{
+  make_schema();
+  make_change_system();
+  setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
+  setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r1', 'a')");
+
+  // Three operations, then roll the last two back (they become redo candidates).
+  apply_committed({RowChange{"t", "r1", false, "val", "b"}}, ChangeOp{"op1", "g"}, ChangeSysTarget{"u1", "Unit"});
+  apply_committed({RowChange{"t", "r1", false, "val", "c"}}, ChangeOp{"op2", "g"}, ChangeSysTarget{"u1", "Unit"});
+  apply_committed({RowChange{"t", "r1", false, "val", "d"}}, ChangeOp{"op3", "g"}, ChangeSysTarget{"u1", "Unit"});
+
+  {
+    pqxx::work   t0(*pg);
+    ChangeSystem cs(t0, *pg, schema);
+    EXPECT_TRUE(cs.undo("u1", false)); // op3 undone
+    EXPECT_TRUE(cs.undo("u1", false)); // op2 undone
+    t0.commit();
+  }
+  // A fourth operation must discard the two undone ops (op2, op3).
+  apply_committed({RowChange{"t", "r1", false, "val", "e"}}, ChangeOp{"op4", "g"}, ChangeSysTarget{"u1", "Unit"});
+
+  pqxx::work   txn(*pg);
+  ChangeSystem svc(txn, *pg, schema);
+  //
+  //
+  const bool changed = svc.redo("u1", false);
+  //
+  //
+
+  EXPECT_FALSE(changed);               // nothing to redo: op2/op3 were wiped
+  EXPECT_EQ(read_val(txn, "r1"), "e"); // value left as the fourth op set it
+  const long ops = txn.exec("SELECT count(*) FROM " + qual("undo_op"))[0][0].as<long>();
+  EXPECT_EQ(ops, 2); // only op1 and op4 remain
+  const long undone = txn.exec("SELECT count(*) FROM " + qual("undo_op") + " WHERE undone = TRUE")[0][0].as<long>();
+  EXPECT_EQ(undone, 0); // no redo candidates left
+}
