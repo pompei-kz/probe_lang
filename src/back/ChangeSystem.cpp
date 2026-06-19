@@ -110,7 +110,7 @@ namespace back {
                                  pqxx::params{txn_, target.targetId, target.targetType});
       if (r.empty()) {
         bufferId = new_id();
-        txn_.exec("INSERT INTO " + sq + ".undo_buffer (id, target_id, target_type, order_index) VALUES ($1, $2, $3, 0)",
+        txn_.exec("INSERT INTO " + sq + ".undo_buffer (id, target_id, target_type) VALUES ($1, $2, $3)",
                   pqxx::params{txn_, bufferId, target.targetId, target.targetType});
       } else {
         bufferId = r[0][0].c_str();
@@ -130,15 +130,14 @@ namespace back {
     //    текущее (старое) состояние строк из БД.
     std::vector<RowChange> undoChanges = collectUndoChanges(userChanges);
 
-    // 4. Создать новую операцию в буфере (order_index выдаётся последовательностью).
-    const std::string opId  = new_id();
-    pqxx::result      opRes = txn_.exec("INSERT INTO " + sq +
-                                       ".undo_op (id, undo_buffer_id, undone, group_name, name)"
-                                            " VALUES ($1, $2, FALSE, $3, $4)"
-                                            " RETURNING order_index",
-                                   pqxx::params{txn_, opId, bufferId, operation.group, operation.operation});
-
-    const std::string opOrderIndex = opRes[0][0].c_str();
+    // 4. Создать новую операцию в буфере. Её order_index выдаётся
+    //    последовательностью, а undone = FALSE делает её активной операцией
+    //    буфера (последняя с undone = FALSE — та, которую можно отменить).
+    const std::string opId = new_id();
+    txn_.exec("INSERT INTO " + sq +
+                  ".undo_op (id, undo_buffer_id, undone, group_name, name)"
+                  " VALUES ($1, $2, FALSE, $3, $4)",
+              pqxx::params{txn_, opId, bufferId, operation.group, operation.operation});
 
     // 5. Сохранить изменения операции: Forward — что сделал пользователь,
     //    ForUndo — что полностью отменяет действия пользователя.
@@ -163,7 +162,11 @@ namespace back {
       applyRowChange(txn_, pg_, schema_, c);
     }
 
-    // 7. Сделать новую операцию активной в буфере.
-    txn_.exec("UPDATE " + sq + ".undo_buffer SET order_index = $1, updated_at = now() WHERE id = $2", pqxx::params{txn_, opOrderIndex, bufferId});
+    // 7. Отметить, что в буфере произошло изменение.
+    txn_.exec("UPDATE " + sq + ".undo_buffer SET updated_at = now() WHERE id = $1", pqxx::params{txn_, bufferId});
   }
+  bool ChangeSystem::undo(const std::string &targetId, bool grouped) const
+  {}
+  bool ChangeSystem::redo(const std::string &targetId, bool grouped) const
+  {}
 } // namespace back

@@ -254,7 +254,6 @@ namespace back {
                   "  id          VARCHAR(32)  primary key,"
                   "  target_id   VARCHAR(32)  not null,"
                   "  target_type VARCHAR(150) not null,"
-                  "  order_index BIGINT       not null,"
                   "  updated_at  TIMESTAMP    DEFAULT now()"
                   ")");
 
@@ -262,7 +261,6 @@ namespace back {
         txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".undo_buffer.id          IS 'Идентификатор буфера отмены'");
         txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".undo_buffer.target_id   IS 'Ссылается на объект, для которого делается буфер'");
         txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".undo_buffer.target_type IS 'Тип цели. Один из: Unit (пока только один)'");
-        txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".undo_buffer.order_index IS 'Индекс активной операции'");
         txn_.exec("COMMENT ON COLUMN " + schemaQuoted + ".undo_buffer.updated_at  IS 'Показывает когда что-то изменилось в этом буфере'");
       }
 

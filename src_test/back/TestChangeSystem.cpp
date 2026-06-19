@@ -409,24 +409,28 @@ TEST_F(ChangeSystemTest, ApplyStoresForwardAndForUndoChanges)
   EXPECT_EQ(undo[1].c_str(), std::string("old")); // captured before the update
 }
 
-TEST_F(ChangeSystemTest, ApplyBufferPointsAtNewOp)
+TEST_F(ChangeSystemTest, ApplyMakesNewOpTheActiveOne)
 {
   make_schema();
   make_change_system();
   setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
-  setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r1', 'old')");
+  setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r1', 'a')");
+
+  // A first operation already exists for the target.
+  apply_committed({RowChange{"t", "r1", false, "val", "b"}}, ChangeOp{"op1", "g"}, ChangeSysTarget{"u1", "Unit"});
 
   pqxx::work   txn(*pg);
   ChangeSystem svc(txn, *pg, schema);
   //
   //
-  svc.apply({RowChange{"t", "r1", false, "val", "new"}}, ChangeOp{"set-val", "g1"}, ChangeSysTarget{"u1", "Unit"});
+  svc.apply({RowChange{"t", "r1", false, "val", "c"}}, ChangeOp{"op2", "g"}, ChangeSysTarget{"u1", "Unit"});
   //
   //
 
-  const std::string bufIndex = txn.exec("SELECT order_index FROM " + qual("undo_buffer"))[0][0].c_str();
-  const std::string opIndex  = txn.exec("SELECT order_index FROM " + qual("undo_op"))[0][0].c_str();
-  EXPECT_EQ(bufIndex, opIndex); // the active operation is the one just applied
+  // The active operation is the last one with undone = FALSE — i.e. the one just applied.
+  const std::string active =
+      txn.exec("SELECT name FROM " + qual("undo_op") + " WHERE undone = FALSE ORDER BY order_index DESC LIMIT 1")[0][0].c_str();
+  EXPECT_EQ(active, "op2");
 }
 
 TEST_F(ChangeSystemTest, ApplyWipesRedo)
