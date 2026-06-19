@@ -10,7 +10,6 @@
 #include <vector>
 
 namespace fs = std::filesystem;
-using namespace back;
 
 // ---------------------------------------------------------------------------
 // Fixture
@@ -63,7 +62,7 @@ TEST_F(ProjectTreeServiceRTest, DirIsUnderHome)
 {
   //
   //
-  const fs::path dir = project_tree_open_nodes_dir();
+  const fs::path dir = back::project_tree_open_nodes_dir();
   //
   //
 
@@ -78,7 +77,7 @@ TEST_F(ProjectTreeServiceRTest, IsOpenFalseWhenAbsent)
 {
   //
   //
-  const bool open = is_tree_node_open({"conn"});
+  const bool open = back::is_tree_node_open({"conn"});
   //
   //
 
@@ -87,11 +86,11 @@ TEST_F(ProjectTreeServiceRTest, IsOpenFalseWhenAbsent)
 
 TEST_F(ProjectTreeServiceRTest, IsOpenTrueAfterOpen)
 {
-  open_tree_node({"conn", "public", "abc"});
+  back::open_tree_node({"conn", "public", "abc"});
 
   //
   //
-  const bool open = is_tree_node_open({"conn", "public", "abc"});
+  const bool open = back::is_tree_node_open({"conn", "public", "abc"});
   //
   //
 
@@ -100,12 +99,12 @@ TEST_F(ProjectTreeServiceRTest, IsOpenTrueAfterOpen)
 
 TEST_F(ProjectTreeServiceRTest, IsOpenFalseAfterClose)
 {
-  open_tree_node({"conn"});
-  close_tree_node({"conn"});
+  back::open_tree_node({"conn"});
+  back::close_tree_node({"conn"});
 
   //
   //
-  const bool open = is_tree_node_open({"conn"});
+  const bool open = back::is_tree_node_open({"conn"});
   //
   //
 
@@ -114,14 +113,14 @@ TEST_F(ProjectTreeServiceRTest, IsOpenFalseAfterClose)
 
 TEST_F(ProjectTreeServiceRTest, DistinctPathsAreIndependent)
 {
-  open_tree_node({"conn", "public"});
+  back::open_tree_node({"conn", "public"});
 
   //
   //
-  const bool other = is_tree_node_open({"conn", "private"});
+  const bool other = back::is_tree_node_open({"conn", "private"});
   //
   //
 
   EXPECT_FALSE(other);
-  EXPECT_TRUE(is_tree_node_open({"conn", "public"}));
+  EXPECT_TRUE(back::is_tree_node_open({"conn", "public"}));
 }

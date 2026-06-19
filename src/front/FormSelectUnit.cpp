@@ -10,9 +10,6 @@
 
 namespace front {
 
-  using namespace back;
-  using namespace back::model;
-
   namespace {
     constexpr float FDW = 420.f, FDH = 480.f;
     constexpr float FFH   = 28.f; // filter field height
@@ -21,7 +18,7 @@ namespace front {
     constexpr int   PAGE  = 40; // units fetched per page
   } // namespace
 
-  void FormSelectUnit::open_for(const Conn &c, const std::string &sch, const std::string &fid)
+  void FormSelectUnit::open_for(const back::model::Conn &c, const std::string &sch, const std::string &fid)
   {
     open         = true;
     conn         = c;
@@ -52,10 +49,10 @@ namespace front {
   void FormSelectUnit::load_next_page()
   {
     if (!has_more) return;
-    auto [page, err] = list_units_paginated(conn, schema, applied_filter, next_offset, PAGE);
+    auto [page, err] = back::list_units_paginated(conn, schema, applied_filter, next_offset, PAGE);
     next_offset += static_cast<int>(page.size());
     if (static_cast<int>(page.size()) < PAGE) has_more = false;
-    for (Unit &u : page)
+    for (back::model::Unit &u : page)
       units.push_back(std::move(u));
   }
 
@@ -180,7 +177,7 @@ namespace front {
       return -1;
     }
     if (chosen >= 0) {
-      set_field_expr_unit(conn, schema, field_id, units[chosen].id);
+      back::set_field_expr_unit(conn, schema, field_id, units[chosen].id);
       close();
       return 1;
     }

@@ -7,17 +7,13 @@
 #include <string>
 #include <vector>
 
-using namespace back;
-using model::Unit;
-using model::UnitType;
-
 class UnitServiceRWTest : public DbTest
 {
 protected:
-  std::vector<Unit> load_units()
+  std::vector<back::model::Unit> load_units()
   {
     pqxx::work txn(*pg);
-    auto       u = load_units_for_schema(txn, *pg, schema);
+    auto       u = back::load_units_for_schema(txn, *pg, schema);
     txn.commit();
     return u;
   }
@@ -34,7 +30,7 @@ TEST_F(UnitServiceRWTest, CreateUnitCreatesTableIfMissing)
 
   //
   //
-  auto [ok, msg] = create_unit(conn(), schema, "", "MyClass", UnitType::Class);
+  auto [ok, msg] = back::create_unit(conn(), schema, "", "MyClass", back::model::UnitType::Class);
   //
   //
 
@@ -48,7 +44,7 @@ TEST_F(UnitServiceRWTest, CreateRootUnit)
 
   //
   //
-  auto [ok, msg] = create_unit(conn(), schema, "", "Root", UnitType::Class);
+  auto [ok, msg] = back::create_unit(conn(), schema, "", "Root", back::model::UnitType::Class);
   //
   //
 
@@ -57,7 +53,7 @@ TEST_F(UnitServiceRWTest, CreateRootUnit)
   ASSERT_EQ(units.size(), 1u);
   EXPECT_EQ(units[0].name, "Root");
   EXPECT_TRUE(units[0].parent_folder_id.empty());
-  EXPECT_EQ(units[0].type, UnitType::Class);
+  EXPECT_EQ(units[0].type, back::model::UnitType::Class);
 }
 
 TEST_F(UnitServiceRWTest, CreateUnitUnderFolder)
@@ -66,7 +62,7 @@ TEST_F(UnitServiceRWTest, CreateUnitUnderFolder)
 
   //
   //
-  auto [ok, msg] = create_unit(conn(), schema, "folder123", "Child", UnitType::Interface);
+  auto [ok, msg] = back::create_unit(conn(), schema, "folder123", "Child", back::model::UnitType::Interface);
   //
   //
 
@@ -74,7 +70,7 @@ TEST_F(UnitServiceRWTest, CreateUnitUnderFolder)
   auto units = load_units();
   ASSERT_EQ(units.size(), 1u);
   EXPECT_EQ(units[0].parent_folder_id, "folder123");
-  EXPECT_EQ(units[0].type, UnitType::Interface);
+  EXPECT_EQ(units[0].type, back::model::UnitType::Interface);
 }
 
 TEST_F(UnitServiceRWTest, CreateUnitStoresEnumType)
@@ -83,14 +79,14 @@ TEST_F(UnitServiceRWTest, CreateUnitStoresEnumType)
 
   //
   //
-  auto [ok, msg] = create_unit(conn(), schema, "", "Color", UnitType::Enum);
+  auto [ok, msg] = back::create_unit(conn(), schema, "", "Color", back::model::UnitType::Enum);
   //
   //
 
   ASSERT_TRUE(ok) << msg;
   auto units = load_units();
   ASSERT_EQ(units.size(), 1u);
-  EXPECT_EQ(units[0].type, UnitType::Enum);
+  EXPECT_EQ(units[0].type, back::model::UnitType::Enum);
 }
 
 // ---------------------------------------------------------------------------
@@ -100,12 +96,12 @@ TEST_F(UnitServiceRWTest, CreateUnitStoresEnumType)
 TEST_F(UnitServiceRWTest, EditUnitChangesNameAndType)
 {
   make_schema();
-  ASSERT_TRUE(create_unit(conn(), schema, "", "Before", UnitType::Class).first);
+  ASSERT_TRUE(back::create_unit(conn(), schema, "", "Before", back::model::UnitType::Class).first);
   const std::string id = load_units().at(0).id;
 
   //
   //
-  auto [ok, msg] = edit_unit(conn(), schema, id, "After", UnitType::Enum);
+  auto [ok, msg] = back::edit_unit(conn(), schema, id, "After", back::model::UnitType::Enum);
   //
   //
 
@@ -113,7 +109,7 @@ TEST_F(UnitServiceRWTest, EditUnitChangesNameAndType)
   auto units = load_units();
   ASSERT_EQ(units.size(), 1u);
   EXPECT_EQ(units[0].name, "After");
-  EXPECT_EQ(units[0].type, UnitType::Enum);
+  EXPECT_EQ(units[0].type, back::model::UnitType::Enum);
 }
 
 // ---------------------------------------------------------------------------
@@ -123,13 +119,13 @@ TEST_F(UnitServiceRWTest, EditUnitChangesNameAndType)
 TEST_F(UnitServiceRWTest, DeleteUnitRemovesIt)
 {
   make_schema();
-  ASSERT_TRUE(create_unit(conn(), schema, "", "Doomed", UnitType::Class).first);
-  ASSERT_TRUE(create_unit(conn(), schema, "", "Survivor", UnitType::Class).first);
+  ASSERT_TRUE(back::create_unit(conn(), schema, "", "Doomed", back::model::UnitType::Class).first);
+  ASSERT_TRUE(back::create_unit(conn(), schema, "", "Survivor", back::model::UnitType::Class).first);
   const std::string id = load_units().at(0).id; // "Doomed" sorts before "Survivor"
 
   //
   //
-  auto [ok, msg] = delete_unit(conn(), schema, id);
+  auto [ok, msg] = back::delete_unit(conn(), schema, id);
   //
   //
 
@@ -157,7 +153,7 @@ TEST_F(UnitServiceRWTest, EnsureUnitTablesCreatesMissingTable)
 
   //
   //
-  auto [ok, msg] = ensure_unit_tables(conn());
+  auto [ok, msg] = back::ensure_unit_tables(conn());
   //
   //
 

@@ -5,9 +5,7 @@
 
 namespace back {
 
-  using namespace model;
-
-  std::pair<bool, std::string> create_folder(const Conn &c, const std::string &schema, const std::string &parent_id, const std::string &name)
+  std::pair<bool, std::string> create_folder(const model::Conn &c, const std::string &schema, const std::string &parent_id, const std::string &name)
   {
     try {
       pqxx::connection pg(make_cs(c));
@@ -32,7 +30,7 @@ namespace back {
     }
   }
 
-  std::pair<bool, std::string> rename_folder(const Conn &c, const std::string &schema, const std::string &id, const std::string &new_name)
+  std::pair<bool, std::string> rename_folder(const model::Conn &c, const std::string &schema, const std::string &id, const std::string &new_name)
   {
     try {
       pqxx::connection pg(make_cs(c));
@@ -47,7 +45,7 @@ namespace back {
     }
   }
 
-  std::pair<bool, std::string> delete_folder_recursive(const Conn &c, const std::string &schema, const std::string &id)
+  std::pair<bool, std::string> delete_folder_recursive(const model::Conn &c, const std::string &schema, const std::string &id)
   {
     try {
       pqxx::connection pg(make_cs(c));

@@ -8,16 +8,13 @@
 
 namespace front {
 
-  using namespace back;
-  using namespace back::model;
-
   static constexpr float FDW   = 380.f;
   static constexpr float FDH   = 290.f;
   static constexpr float FFH   = 28.f;
   static constexpr float ERR_H = 60.f;
   static constexpr float DD_IH = 26.f; // type dropdown item height
 
-  void FormEditUnit::open_add(int ci, int ri, const Conn &c, const std::string &schema, const std::string &parent_id)
+  void FormEditUnit::open_add(int ci, int ri, const back::model::Conn &c, const std::string &schema, const std::string &parent_id)
   {
     conn_idx            = ci;
     repo_idx            = ri;
@@ -26,7 +23,7 @@ namespace front {
     parent_folder_id    = parent_id;
     editing             = false;
     unit_id             = "";
-    type                = UnitType::Class;
+    type                = back::model::UnitType::Class;
     type_dropdown_open  = false;
     name_field.ed       = TextEditor{};
     name_field.ctx.open = false;
@@ -36,7 +33,7 @@ namespace front {
   }
 
   void FormEditUnit::open_edit(
-      int ci, int ri, const Conn &c, const std::string &schema, const std::string &uid, const std::string &uname, UnitType utype)
+      int ci, int ri, const back::model::Conn &c, const std::string &schema, const std::string &uid, const std::string &uname, back::model::UnitType utype)
   {
     open_add(ci, ri, c, schema, "");
     unit_id = uid;
@@ -103,7 +100,7 @@ namespace front {
     // ── Type dropdown (rendered on top) ────────────────────────────────────
     bool ate = false;
     if (type_dropdown_open) {
-      const UnitType opts[3] = {UnitType::Class, UnitType::Interface, UnitType::Enum};
+      const back::model::UnitType opts[3] = {back::model::UnitType::Class, back::model::UnitType::Interface, back::model::UnitType::Enum};
       float          dd_x = dx + 16, dd_y = cby + FFH, dd_w = fw, dd_h = 3 * DD_IH;
       fill(ren, C_DLGBG, dd_x, dd_y, dd_w, dd_h);
       rect(ren, C_BORDER, dd_x, dd_y, dd_w, dd_h);
@@ -149,7 +146,7 @@ namespace front {
         err_view.set("Имя юнита обязательно");
         return 0;
       }
-      auto [ok, msg] = editing ? edit_unit(conn, schema_name, unit_id, name, type) : create_unit(conn, schema_name, parent_folder_id, name, type);
+      auto [ok, msg] = editing ? back::edit_unit(conn, schema_name, unit_id, name, type) : back::create_unit(conn, schema_name, parent_folder_id, name, type);
       if (ok) return 1;
       err_view.set(msg);
     }

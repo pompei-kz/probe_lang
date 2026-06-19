@@ -7,15 +7,13 @@
 #include <string>
 #include <vector>
 
-using namespace back;
-
 // ---------------------------------------------------------------------------
 // make_cs — pure, no DB needed
 // ---------------------------------------------------------------------------
 
 TEST(RepoServiceMakeCs, IncludesProvidedFields)
 {
-  model::Conn c;
+  back::model::Conn c;
   c.host   = "myhost";
   c.port   = "1234";
   c.dbname = "mydb";
@@ -24,7 +22,7 @@ TEST(RepoServiceMakeCs, IncludesProvidedFields)
 
   //
   //
-  const std::string cs = make_cs(c);
+  const std::string cs = back::make_cs(c);
   //
   //
 
@@ -37,12 +35,12 @@ TEST(RepoServiceMakeCs, IncludesProvidedFields)
 
 TEST(RepoServiceMakeCs, AppliesDefaultsAndOmitsEmptyCredentials)
 {
-  model::Conn c;
+  back::model::Conn c;
   c.host = "h"; // port, dbname, user, pass left empty
 
   //
   //
-  const std::string cs = make_cs(c);
+  const std::string cs = back::make_cs(c);
   //
   //
 
@@ -71,7 +69,7 @@ TEST_F(RepoServiceRTest, TestConnectionSucceedsWithValidCreds)
 {
   //
   //
-  auto [ok, msg] = test_connection(test_db::HOST, test_db::PORT, test_db::DBNAME, test_db::USER, test_db::PASS);
+  auto [ok, msg] = back::test_connection(test_db::HOST, test_db::PORT, test_db::DBNAME, test_db::USER, test_db::PASS);
   //
   //
 
@@ -82,7 +80,7 @@ TEST_F(RepoServiceRTest, TestConnectionFailsWithBadPassword)
 {
   //
   //
-  auto [ok, msg] = test_connection(test_db::HOST, test_db::PORT, test_db::DBNAME, test_db::USER, "definitely-wrong");
+  auto [ok, msg] = back::test_connection(test_db::HOST, test_db::PORT, test_db::DBNAME, test_db::USER, "definitely-wrong");
   //
   //
 
@@ -92,12 +90,12 @@ TEST_F(RepoServiceRTest, TestConnectionFailsWithBadPassword)
 
 TEST_F(RepoServiceRTest, ConnectAndLoadReturnsCreatedRepo)
 {
-  ASSERT_TRUE(create_repository(conn(), schema, "Visible Repo").first);
+  ASSERT_TRUE(back::create_repository(conn(), schema, "Visible Repo").first);
 
-  std::vector<model::RepoNode> repos;
+  std::vector<back::model::RepoNode> repos;
   //
   //
-  auto [ok, msg] = connect_and_load(conn(), repos);
+  auto [ok, msg] = back::connect_and_load(conn(), repos);
   //
   //
 
@@ -113,13 +111,13 @@ TEST_F(RepoServiceRTest, ConnectAndLoadReturnsCreatedRepo)
 
 TEST_F(RepoServiceRTest, ConnectAndLoadIncludesFolders)
 {
-  ASSERT_TRUE(create_repository(conn(), schema, "R").first);
-  ASSERT_TRUE(create_folder(conn(), schema, "", "Docs").first);
+  ASSERT_TRUE(back::create_repository(conn(), schema, "R").first);
+  ASSERT_TRUE(back::create_folder(conn(), schema, "", "Docs").first);
 
-  std::vector<model::RepoNode> repos;
+  std::vector<back::model::RepoNode> repos;
   //
   //
-  auto [ok, msg] = connect_and_load(conn(), repos);
+  auto [ok, msg] = back::connect_and_load(conn(), repos);
   //
   //
 

@@ -4,9 +4,6 @@
 #include <gtest/gtest.h>
 #include <map>
 
-using namespace back;
-using namespace back::model;
-
 class ChangeSystemTest : public DbTest
 {
 protected:
@@ -22,15 +19,15 @@ protected:
   void make_change_system()
   {
     pqxx::work txn(*pg);
-    InitDb(txn, *pg, schema).init_change_system_tables();
+    back::InitDb(txn, *pg, schema).init_change_system_tables();
     txn.commit();
   }
 
   // Apply a set of changes in its own committed transaction (test setup helper).
-  void apply_committed(std::vector<RowChange> changes, const ChangeOp &op, const ChangeSysTarget &target) const
+  void apply_committed(std::vector<back::model::RowChange> changes, const back::model::ChangeOp &op, const back::model::ChangeSysTarget &target) const
   {
     pqxx::work txn(*pg);
-    ChangeSystem(txn, *pg, schema).apply(std::move(changes), op, target);
+    back::ChangeSystem(txn, *pg, schema).apply(std::move(changes), op, target);
     txn.commit();
   }
 
@@ -49,13 +46,13 @@ TEST_F(ChangeSystemTest, UpdateUndoCapturesOldColumnValue)
   setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
   setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r1', 'old')");
 
-  RowChange change{"t", "r1", false, "val", "new"};
+  back::model::RowChange change{"t", "r1", false, "val", "new"};
 
   pqxx::work   txn(*pg);
-  ChangeSystem svc(txn, *pg, schema);
+  back::ChangeSystem svc(txn, *pg, schema);
   //
   //
-  std::vector<RowChange> undo = svc.collectUndoChanges({change});
+  std::vector<back::model::RowChange> undo = svc.collectUndoChanges({change});
   //
   //
 
@@ -74,13 +71,13 @@ TEST_F(ChangeSystemTest, UpdateUndoOfNullOldValueIsNullopt)
   setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
   setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r2', NULL)");
 
-  RowChange change{"t", "r2", false, "val", "x"};
+  back::model::RowChange change{"t", "r2", false, "val", "x"};
 
   pqxx::work   txn(*pg);
-  ChangeSystem svc(txn, *pg, schema);
+  back::ChangeSystem svc(txn, *pg, schema);
   //
   //
-  std::vector<RowChange> undo = svc.collectUndoChanges({change});
+  std::vector<back::model::RowChange> undo = svc.collectUndoChanges({change});
   //
   //
 
@@ -94,14 +91,14 @@ TEST_F(ChangeSystemTest, ChangesAreUndoneInReverseOrder)
   setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
   setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('a', '1'), ('b', '2')");
 
-  RowChange first{"t", "a", false, "val", "A"};
-  RowChange second{"t", "b", false, "val", "B"};
+  back::model::RowChange first{"t", "a", false, "val", "A"};
+  back::model::RowChange second{"t", "b", false, "val", "B"};
 
   pqxx::work   txn(*pg);
-  ChangeSystem svc(txn, *pg, schema);
+  back::ChangeSystem svc(txn, *pg, schema);
   //
   //
-  std::vector<RowChange> undo = svc.collectUndoChanges({first, second});
+  std::vector<back::model::RowChange> undo = svc.collectUndoChanges({first, second});
   //
   //
 
@@ -120,13 +117,13 @@ TEST_F(ChangeSystemTest, UpdateOnMissingRowIsUndoneByDelete)
 
   // Строки 'missing' ещё нет: применение изменения её создаст, поэтому отмена
   // должна удалить эту строку.
-  RowChange change{"t", "missing", false, "val", "x"};
+  back::model::RowChange change{"t", "missing", false, "val", "x"};
 
   pqxx::work   txn(*pg);
-  ChangeSystem svc(txn, *pg, schema);
+  back::ChangeSystem svc(txn, *pg, schema);
   //
   //
-  std::vector<RowChange> undo = svc.collectUndoChanges({change});
+  std::vector<back::model::RowChange> undo = svc.collectUndoChanges({change});
   //
   //
 
@@ -142,21 +139,21 @@ TEST_F(ChangeSystemTest, DeleteIsUndoneByPerColumnChanges)
   setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, a text, b int4)");
   setup_sql("INSERT INTO " + qual("t") + " (id, a, b) VALUES ('r1', 'hello', 5)");
 
-  RowChange change{"t", "r1", true, "", std::nullopt};
+  back::model::RowChange change{"t", "r1", true, "", std::nullopt};
 
   pqxx::work   txn(*pg);
-  ChangeSystem svc(txn, *pg, schema);
+  back::ChangeSystem svc(txn, *pg, schema);
 
   //
   //
-  std::vector<RowChange> undo = svc.collectUndoChanges({change});
+  std::vector<back::model::RowChange> undo = svc.collectUndoChanges({change});
   //
   //
 
   // One set-column change per non-id column of the deleted row, recreating it.
   ASSERT_EQ(undo.size(), 2u);
   std::map<std::string, std::optional<std::string>> byCol;
-  for (const RowChange &u : undo) {
+  for (const back::model::RowChange &u : undo) {
     EXPECT_EQ(u.tableName, "t");
     EXPECT_EQ(u.idValue, "r1");
     EXPECT_FALSE(u.toDelete);
@@ -174,13 +171,13 @@ TEST_F(ChangeSystemTest, DeleteOfMissingRowGivesNoUndo)
   make_schema();
   setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
 
-  RowChange change{"t", "missing", true, "", std::nullopt};
+  back::model::RowChange change{"t", "missing", true, "", std::nullopt};
 
   pqxx::work   txn(*pg);
-  ChangeSystem svc(txn, *pg, schema);
+  back::ChangeSystem svc(txn, *pg, schema);
   //
   //
-  std::vector<RowChange> undo = svc.collectUndoChanges({change});
+  std::vector<back::model::RowChange> undo = svc.collectUndoChanges({change});
   //
   //
 
@@ -194,15 +191,15 @@ TEST_F(ChangeSystemTest, UpdatesAcrossThreeColumnsCaptureEachOldValue)
   setup_sql("INSERT INTO " + qual("t") + " (id, a, b, c) VALUES ('r1', 'old_a', 7, true)");
 
   // Three changes to the same row, one per non-id column.
-  RowChange ca{"t", "r1", false, "a", "new_a"};
-  RowChange cb{"t", "r1", false, "b", "42"};
-  RowChange cc{"t", "r1", false, "c", "false"};
+  back::model::RowChange ca{"t", "r1", false, "a", "new_a"};
+  back::model::RowChange cb{"t", "r1", false, "b", "42"};
+  back::model::RowChange cc{"t", "r1", false, "c", "false"};
 
   pqxx::work   txn(*pg);
-  ChangeSystem svc(txn, *pg, schema);
+  back::ChangeSystem svc(txn, *pg, schema);
   //
   //
-  std::vector<RowChange> undo = svc.collectUndoChanges({ca, cb, cc});
+  std::vector<back::model::RowChange> undo = svc.collectUndoChanges({ca, cb, cc});
   //
   //
 
@@ -221,7 +218,7 @@ TEST_F(ChangeSystemTest, UpdatesAcrossThreeColumnsCaptureEachOldValue)
   ASSERT_TRUE(undo[2].value.has_value());
   EXPECT_EQ(*undo[2].value, "old_a");
 
-  for (const RowChange &u : undo) {
+  for (const back::model::RowChange &u : undo) {
     EXPECT_EQ(u.tableName, "t");
     EXPECT_EQ(u.idValue, "r1");
     EXPECT_FALSE(u.toDelete);
@@ -237,13 +234,13 @@ TEST_F(ChangeSystemTest, UpdateUndoCapturesOldTimestampWithSubsecondPrecision)
   setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, ts timestamp)");
   setup_sql("INSERT INTO " + qual("t") + " (id, ts) VALUES ('r1', '" + original + "')");
 
-  RowChange change{"t", "r1", false, "ts", "2030-01-01 00:00:00"};
+  back::model::RowChange change{"t", "r1", false, "ts", "2030-01-01 00:00:00"};
 
   pqxx::work   txn(*pg);
-  ChangeSystem svc(txn, *pg, schema);
+  back::ChangeSystem svc(txn, *pg, schema);
   //
   //
-  std::vector<RowChange> undo = svc.collectUndoChanges({change});
+  std::vector<back::model::RowChange> undo = svc.collectUndoChanges({change});
   //
   //
 
@@ -267,21 +264,21 @@ TEST_F(ChangeSystemTest, DeleteIsUndoneByThreeColumnChanges)
   setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, a text, b int4, c bool)");
   setup_sql("INSERT INTO " + qual("t") + " (id, a, b, c) VALUES ('r1', 'hello', 5, true)");
 
-  RowChange change{"t", "r1", true, "", std::nullopt};
+  back::model::RowChange change{"t", "r1", true, "", std::nullopt};
 
   pqxx::work   txn(*pg);
-  ChangeSystem svc(txn, *pg, schema);
+  back::ChangeSystem svc(txn, *pg, schema);
 
   //
   //
-  std::vector<RowChange> undo = svc.collectUndoChanges({change});
+  std::vector<back::model::RowChange> undo = svc.collectUndoChanges({change});
   //
   //
 
   // One set-column change per non-id column (three of them), recreating the row.
   ASSERT_EQ(undo.size(), 3u);
   std::map<std::string, std::optional<std::string>> byCol;
-  for (const RowChange &u : undo) {
+  for (const back::model::RowChange &u : undo) {
     EXPECT_EQ(u.tableName, "t");
     EXPECT_EQ(u.idValue, "r1");
     EXPECT_FALSE(u.toDelete);
@@ -308,13 +305,13 @@ TEST_F(ChangeSystemTest, ApplyUpdatesDataRow)
   setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r1', 'old')");
 
   pqxx::work   txn(*pg);
-  ChangeSystem svc(txn, *pg, schema);
+  back::ChangeSystem svc(txn, *pg, schema);
 
-  // std::vector userChanges {RowChange{"t", "r1", false, "val", "new"}};
+  // std::vector userChanges {back::model::RowChange{"t", "r1", false, "val", "new"}};
 
   //
   //
-  svc.apply({RowChange{"t", "r1", false, "val", "new"}}, ChangeOp{"set-val", "g1"}, ChangeSysTarget{"u1", "Unit"});
+  svc.apply({back::model::RowChange{"t", "r1", false, "val", "new"}}, back::model::ChangeOp{"set-val", "g1"}, back::model::ChangeSysTarget{"u1", "Unit"});
   //
   //
 
@@ -330,10 +327,10 @@ TEST_F(ChangeSystemTest, ApplyCreatesUndoBufferForTarget)
   setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r1', 'old')");
 
   pqxx::work   txn(*pg);
-  ChangeSystem svc(txn, *pg, schema);
+  back::ChangeSystem svc(txn, *pg, schema);
   //
   //
-  svc.apply({RowChange{"t", "r1", false, "val", "new"}}, ChangeOp{"set-val", "g1"}, ChangeSysTarget{"u1", "Unit"});
+  svc.apply({back::model::RowChange{"t", "r1", false, "val", "new"}}, back::model::ChangeOp{"set-val", "g1"}, back::model::ChangeSysTarget{"u1", "Unit"});
   //
   //
 
@@ -350,13 +347,13 @@ TEST_F(ChangeSystemTest, ApplyReusesBufferAndAppendsOp)
   setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r1', 'a')");
 
   // First operation for the target — its buffer must be reused by the second.
-  apply_committed({RowChange{"t", "r1", false, "val", "b"}}, ChangeOp{"op1", "g"}, ChangeSysTarget{"u1", "Unit"});
+  apply_committed({back::model::RowChange{"t", "r1", false, "val", "b"}}, back::model::ChangeOp{"op1", "g"}, back::model::ChangeSysTarget{"u1", "Unit"});
 
   pqxx::work   txn(*pg);
-  ChangeSystem svc(txn, *pg, schema);
+  back::ChangeSystem svc(txn, *pg, schema);
   //
   //
-  svc.apply({RowChange{"t", "r1", false, "val", "c"}}, ChangeOp{"op2", "g"}, ChangeSysTarget{"u1", "Unit"});
+  svc.apply({back::model::RowChange{"t", "r1", false, "val", "c"}}, back::model::ChangeOp{"op2", "g"}, back::model::ChangeSysTarget{"u1", "Unit"});
   //
   //
 
@@ -374,10 +371,10 @@ TEST_F(ChangeSystemTest, ApplyStoresOperationMetadata)
   setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r1', 'old')");
 
   pqxx::work   txn(*pg);
-  ChangeSystem svc(txn, *pg, schema);
+  back::ChangeSystem svc(txn, *pg, schema);
   //
   //
-  svc.apply({RowChange{"t", "r1", false, "val", "new"}}, ChangeOp{"rename", "edit-block"}, ChangeSysTarget{"u1", "Unit"});
+  svc.apply({back::model::RowChange{"t", "r1", false, "val", "new"}}, back::model::ChangeOp{"rename", "edit-block"}, back::model::ChangeSysTarget{"u1", "Unit"});
   //
   //
 
@@ -395,10 +392,10 @@ TEST_F(ChangeSystemTest, ApplyStoresForwardAndForUndoChanges)
   setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r1', 'old')");
 
   pqxx::work   txn(*pg);
-  ChangeSystem svc(txn, *pg, schema);
+  back::ChangeSystem svc(txn, *pg, schema);
   //
   //
-  svc.apply({RowChange{"t", "r1", false, "val", "new"}}, ChangeOp{"set-val", "g1"}, ChangeSysTarget{"u1", "Unit"});
+  svc.apply({back::model::RowChange{"t", "r1", false, "val", "new"}}, back::model::ChangeOp{"set-val", "g1"}, back::model::ChangeSysTarget{"u1", "Unit"});
   //
   //
 
@@ -425,13 +422,13 @@ TEST_F(ChangeSystemTest, ApplyMakesNewOpTheActiveOne)
   setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r1', 'a')");
 
   // A first operation already exists for the target.
-  apply_committed({RowChange{"t", "r1", false, "val", "b"}}, ChangeOp{"op1", "g"}, ChangeSysTarget{"u1", "Unit"});
+  apply_committed({back::model::RowChange{"t", "r1", false, "val", "b"}}, back::model::ChangeOp{"op1", "g"}, back::model::ChangeSysTarget{"u1", "Unit"});
 
   pqxx::work   txn(*pg);
-  ChangeSystem svc(txn, *pg, schema);
+  back::ChangeSystem svc(txn, *pg, schema);
   //
   //
-  svc.apply({RowChange{"t", "r1", false, "val", "c"}}, ChangeOp{"op2", "g"}, ChangeSysTarget{"u1", "Unit"});
+  svc.apply({back::model::RowChange{"t", "r1", false, "val", "c"}}, back::model::ChangeOp{"op2", "g"}, back::model::ChangeSysTarget{"u1", "Unit"});
   //
   //
 
@@ -449,14 +446,14 @@ TEST_F(ChangeSystemTest, ApplyWipesRedo)
   setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r1', 'a')");
 
   // A previously-undone operation (redo candidate) must be discarded by a new apply.
-  apply_committed({RowChange{"t", "r1", false, "val", "b"}}, ChangeOp{"op1", "g"}, ChangeSysTarget{"u1", "Unit"});
+  apply_committed({back::model::RowChange{"t", "r1", false, "val", "b"}}, back::model::ChangeOp{"op1", "g"}, back::model::ChangeSysTarget{"u1", "Unit"});
   setup_sql("UPDATE " + qual("undo_op") + " SET undone = TRUE");
 
   pqxx::work   txn(*pg);
-  ChangeSystem svc(txn, *pg, schema);
+  back::ChangeSystem svc(txn, *pg, schema);
   //
   //
-  svc.apply({RowChange{"t", "r1", false, "val", "c"}}, ChangeOp{"op2", "g"}, ChangeSysTarget{"u1", "Unit"});
+  svc.apply({back::model::RowChange{"t", "r1", false, "val", "c"}}, back::model::ChangeOp{"op2", "g"}, back::model::ChangeSysTarget{"u1", "Unit"});
   //
   //
 
@@ -479,10 +476,10 @@ TEST_F(ChangeSystemTest, ApplyCreatesRowViaUpsert)
   setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
 
   pqxx::work   txn(*pg);
-  ChangeSystem svc(txn, *pg, schema);
+  back::ChangeSystem svc(txn, *pg, schema);
   //
   //
-  svc.apply({RowChange{"t", "r2", false, "val", "created"}}, ChangeOp{"create", "g"}, ChangeSysTarget{"u1", "Unit"});
+  svc.apply({back::model::RowChange{"t", "r2", false, "val", "created"}}, back::model::ChangeOp{"create", "g"}, back::model::ChangeSysTarget{"u1", "Unit"});
   //
   //
 
@@ -504,10 +501,10 @@ TEST_F(ChangeSystemTest, ApplyDeletesRow)
   setup_sql("INSERT INTO " + qual("t") + " (id, a, b) VALUES ('r1', 'hello', 5)");
 
   pqxx::work   txn(*pg);
-  ChangeSystem svc(txn, *pg, schema);
+  back::ChangeSystem svc(txn, *pg, schema);
   //
   //
-  svc.apply({RowChange{"t", "r1", true, "", std::nullopt}}, ChangeOp{"delete", "g"}, ChangeSysTarget{"u1", "Unit"});
+  svc.apply({back::model::RowChange{"t", "r1", true, "", std::nullopt}}, back::model::ChangeOp{"delete", "g"}, back::model::ChangeSysTarget{"u1", "Unit"});
   //
   //
 
@@ -531,10 +528,10 @@ TEST_F(ChangeSystemTest, UndoRevertsLastUpdate)
   setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
   setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r1', 'old')");
 
-  apply_committed({RowChange{"t", "r1", false, "val", "new"}}, ChangeOp{"set-val", "g"}, ChangeSysTarget{"u1", "Unit"});
+  apply_committed({back::model::RowChange{"t", "r1", false, "val", "new"}}, back::model::ChangeOp{"set-val", "g"}, back::model::ChangeSysTarget{"u1", "Unit"});
 
   pqxx::work   txn(*pg);
-  ChangeSystem svc(txn, *pg, schema);
+  back::ChangeSystem svc(txn, *pg, schema);
   //
   //
   const bool changed = svc.undo("u1", false);
@@ -554,7 +551,7 @@ TEST_F(ChangeSystemTest, UndoWithNothingToUndoReturnsFalse)
   setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
 
   pqxx::work   txn(*pg);
-  ChangeSystem svc(txn, *pg, schema);
+  back::ChangeSystem svc(txn, *pg, schema);
   //
   //
   const bool changed = svc.undo("absent-target", false);
@@ -570,11 +567,11 @@ TEST_F(ChangeSystemTest, UndoWalksBackThroughHistory)
   make_change_system();
   setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
   setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r1', 'a')");
-  apply_committed({RowChange{"t", "r1", false, "val", "b"}}, ChangeOp{"op1", "g1"}, ChangeSysTarget{"u1", "Unit"});
-  apply_committed({RowChange{"t", "r1", false, "val", "c"}}, ChangeOp{"op2", "g2"}, ChangeSysTarget{"u1", "Unit"});
+  apply_committed({back::model::RowChange{"t", "r1", false, "val", "b"}}, back::model::ChangeOp{"op1", "g1"}, back::model::ChangeSysTarget{"u1", "Unit"});
+  apply_committed({back::model::RowChange{"t", "r1", false, "val", "c"}}, back::model::ChangeOp{"op2", "g2"}, back::model::ChangeSysTarget{"u1", "Unit"});
 
   pqxx::work   txn(*pg);
-  ChangeSystem svc(txn, *pg, schema);
+  back::ChangeSystem svc(txn, *pg, schema);
   //
   //
   const bool first = svc.undo("u1", false);
@@ -596,11 +593,11 @@ TEST_F(ChangeSystemTest, UndoNonGroupedUndoesOnlyOneOfSameGroup)
   make_change_system();
   setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
   setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r1', 'a')");
-  apply_committed({RowChange{"t", "r1", false, "val", "b"}}, ChangeOp{"op1", "g"}, ChangeSysTarget{"u1", "Unit"});
-  apply_committed({RowChange{"t", "r1", false, "val", "c"}}, ChangeOp{"op2", "g"}, ChangeSysTarget{"u1", "Unit"});
+  apply_committed({back::model::RowChange{"t", "r1", false, "val", "b"}}, back::model::ChangeOp{"op1", "g"}, back::model::ChangeSysTarget{"u1", "Unit"});
+  apply_committed({back::model::RowChange{"t", "r1", false, "val", "c"}}, back::model::ChangeOp{"op2", "g"}, back::model::ChangeSysTarget{"u1", "Unit"});
 
   pqxx::work   txn(*pg);
-  ChangeSystem svc(txn, *pg, schema);
+  back::ChangeSystem svc(txn, *pg, schema);
   //
   //
   const bool changed = svc.undo("u1", false);
@@ -619,11 +616,11 @@ TEST_F(ChangeSystemTest, UndoGroupedUndoesWholeGroup)
   make_change_system();
   setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
   setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r1', 'a')");
-  apply_committed({RowChange{"t", "r1", false, "val", "b"}}, ChangeOp{"op1", "g"}, ChangeSysTarget{"u1", "Unit"});
-  apply_committed({RowChange{"t", "r1", false, "val", "c"}}, ChangeOp{"op2", "g"}, ChangeSysTarget{"u1", "Unit"});
+  apply_committed({back::model::RowChange{"t", "r1", false, "val", "b"}}, back::model::ChangeOp{"op1", "g"}, back::model::ChangeSysTarget{"u1", "Unit"});
+  apply_committed({back::model::RowChange{"t", "r1", false, "val", "c"}}, back::model::ChangeOp{"op2", "g"}, back::model::ChangeSysTarget{"u1", "Unit"});
 
   pqxx::work   txn(*pg);
-  ChangeSystem svc(txn, *pg, schema);
+  back::ChangeSystem svc(txn, *pg, schema);
   //
   //
   const bool changed = svc.undo("u1", true);
@@ -642,12 +639,12 @@ TEST_F(ChangeSystemTest, UndoGroupedStopsAtGroupBoundary)
   make_change_system();
   setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
   setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r1', 'a')");
-  apply_committed({RowChange{"t", "r1", false, "val", "b"}}, ChangeOp{"op1", "gA"}, ChangeSysTarget{"u1", "Unit"});
-  apply_committed({RowChange{"t", "r1", false, "val", "c"}}, ChangeOp{"op2", "gB"}, ChangeSysTarget{"u1", "Unit"});
-  apply_committed({RowChange{"t", "r1", false, "val", "d"}}, ChangeOp{"op3", "gB"}, ChangeSysTarget{"u1", "Unit"});
+  apply_committed({back::model::RowChange{"t", "r1", false, "val", "b"}}, back::model::ChangeOp{"op1", "gA"}, back::model::ChangeSysTarget{"u1", "Unit"});
+  apply_committed({back::model::RowChange{"t", "r1", false, "val", "c"}}, back::model::ChangeOp{"op2", "gB"}, back::model::ChangeSysTarget{"u1", "Unit"});
+  apply_committed({back::model::RowChange{"t", "r1", false, "val", "d"}}, back::model::ChangeOp{"op3", "gB"}, back::model::ChangeSysTarget{"u1", "Unit"});
 
   pqxx::work   txn(*pg);
-  ChangeSystem svc(txn, *pg, schema);
+  back::ChangeSystem svc(txn, *pg, schema);
   //
   //
   const bool changed = svc.undo("u1", true);
@@ -665,10 +662,10 @@ TEST_F(ChangeSystemTest, UndoOfCreateDeletesRow)
   make_schema();
   make_change_system();
   setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
-  apply_committed({RowChange{"t", "r2", false, "val", "created"}}, ChangeOp{"create", "g"}, ChangeSysTarget{"u1", "Unit"});
+  apply_committed({back::model::RowChange{"t", "r2", false, "val", "created"}}, back::model::ChangeOp{"create", "g"}, back::model::ChangeSysTarget{"u1", "Unit"});
 
   pqxx::work   txn(*pg);
-  ChangeSystem svc(txn, *pg, schema);
+  back::ChangeSystem svc(txn, *pg, schema);
 
   //
   //
@@ -686,10 +683,10 @@ TEST_F(ChangeSystemTest, UndoOfDeleteRecreatesRow)
   make_change_system();
   setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, a text, b int4)");
   setup_sql("INSERT INTO " + qual("t") + " (id, a, b) VALUES ('r1', 'hello', 5)");
-  apply_committed({RowChange{"t", "r1", true, "", std::nullopt}}, ChangeOp{"delete", "g"}, ChangeSysTarget{"u1", "Unit"});
+  apply_committed({back::model::RowChange{"t", "r1", true, "", std::nullopt}}, back::model::ChangeOp{"delete", "g"}, back::model::ChangeSysTarget{"u1", "Unit"});
 
   pqxx::work   txn(*pg);
-  ChangeSystem svc(txn, *pg, schema);
+  back::ChangeSystem svc(txn, *pg, schema);
 
   //
   //
@@ -709,10 +706,10 @@ TEST_F(ChangeSystemTest, RedoReappliesUndoneOperation)
   make_change_system();
   setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
   setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r1', 'old')");
-  apply_committed({RowChange{"t", "r1", false, "val", "new"}}, ChangeOp{"set-val", "g"}, ChangeSysTarget{"u1", "Unit"});
+  apply_committed({back::model::RowChange{"t", "r1", false, "val", "new"}}, back::model::ChangeOp{"set-val", "g"}, back::model::ChangeSysTarget{"u1", "Unit"});
 
   pqxx::work   txn(*pg);
-  ChangeSystem svc(txn, *pg, schema);
+  back::ChangeSystem svc(txn, *pg, schema);
   ASSERT_TRUE(svc.undo("u1", false));
   ASSERT_EQ(read_val(txn, "r1"), "old");
 
@@ -734,10 +731,10 @@ TEST_F(ChangeSystemTest, RedoWithNothingToRedoReturnsFalse)
   make_change_system();
   setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
   setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r1', 'old')");
-  apply_committed({RowChange{"t", "r1", false, "val", "new"}}, ChangeOp{"set-val", "g"}, ChangeSysTarget{"u1", "Unit"});
+  apply_committed({back::model::RowChange{"t", "r1", false, "val", "new"}}, back::model::ChangeOp{"set-val", "g"}, back::model::ChangeSysTarget{"u1", "Unit"});
 
   pqxx::work   txn(*pg);
-  ChangeSystem svc(txn, *pg, schema);
+  back::ChangeSystem svc(txn, *pg, schema);
 
   //
   //
@@ -755,11 +752,11 @@ TEST_F(ChangeSystemTest, RedoGroupedReappliesWholeGroup)
   make_change_system();
   setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
   setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r1', 'a')");
-  apply_committed({RowChange{"t", "r1", false, "val", "b"}}, ChangeOp{"op1", "g"}, ChangeSysTarget{"u1", "Unit"});
-  apply_committed({RowChange{"t", "r1", false, "val", "c"}}, ChangeOp{"op2", "g"}, ChangeSysTarget{"u1", "Unit"});
+  apply_committed({back::model::RowChange{"t", "r1", false, "val", "b"}}, back::model::ChangeOp{"op1", "g"}, back::model::ChangeSysTarget{"u1", "Unit"});
+  apply_committed({back::model::RowChange{"t", "r1", false, "val", "c"}}, back::model::ChangeOp{"op2", "g"}, back::model::ChangeSysTarget{"u1", "Unit"});
 
   pqxx::work   txn(*pg);
-  ChangeSystem svc(txn, *pg, schema);
+  back::ChangeSystem svc(txn, *pg, schema);
   ASSERT_TRUE(svc.undo("u1", true)); // both ops undone
   ASSERT_EQ(read_val(txn, "r1"), "a");
 
@@ -781,11 +778,11 @@ TEST_F(ChangeSystemTest, RedoNonGroupedReappliesOnlyOne)
   make_change_system();
   setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
   setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r1', 'a')");
-  apply_committed({RowChange{"t", "r1", false, "val", "b"}}, ChangeOp{"op1", "g"}, ChangeSysTarget{"u1", "Unit"});
-  apply_committed({RowChange{"t", "r1", false, "val", "c"}}, ChangeOp{"op2", "g"}, ChangeSysTarget{"u1", "Unit"});
+  apply_committed({back::model::RowChange{"t", "r1", false, "val", "b"}}, back::model::ChangeOp{"op1", "g"}, back::model::ChangeSysTarget{"u1", "Unit"});
+  apply_committed({back::model::RowChange{"t", "r1", false, "val", "c"}}, back::model::ChangeOp{"op2", "g"}, back::model::ChangeSysTarget{"u1", "Unit"});
 
   pqxx::work   txn(*pg);
-  ChangeSystem svc(txn, *pg, schema);
+  back::ChangeSystem svc(txn, *pg, schema);
   ASSERT_TRUE(svc.undo("u1", true)); // both ops undone, value back to 'a'
   ASSERT_EQ(read_val(txn, "r1"), "a");
 
@@ -807,14 +804,14 @@ TEST_F(ChangeSystemTest, RedoGroupedStopsAtGroupBoundary)
   make_change_system();
   setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
   setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r1', 'a')");
-  apply_committed({RowChange{"t", "r1", false, "val", "b"}}, ChangeOp{"op1", "gA"}, ChangeSysTarget{"u1", "Unit"});
-  apply_committed({RowChange{"t", "r1", false, "val", "c"}}, ChangeOp{"op2", "gA"}, ChangeSysTarget{"u1", "Unit"});
-  apply_committed({RowChange{"t", "r1", false, "val", "d"}}, ChangeOp{"op3", "gB"}, ChangeSysTarget{"u1", "Unit"});
+  apply_committed({back::model::RowChange{"t", "r1", false, "val", "b"}}, back::model::ChangeOp{"op1", "gA"}, back::model::ChangeSysTarget{"u1", "Unit"});
+  apply_committed({back::model::RowChange{"t", "r1", false, "val", "c"}}, back::model::ChangeOp{"op2", "gA"}, back::model::ChangeSysTarget{"u1", "Unit"});
+  apply_committed({back::model::RowChange{"t", "r1", false, "val", "d"}}, back::model::ChangeOp{"op3", "gB"}, back::model::ChangeSysTarget{"u1", "Unit"});
 
   // Undo everything: all three ops become redo candidates (value back to 'a').
   {
     pqxx::work   t0(*pg);
-    ChangeSystem cs(t0, *pg, schema);
+    back::ChangeSystem cs(t0, *pg, schema);
     EXPECT_TRUE(cs.undo("u1", false)); // op3
     EXPECT_TRUE(cs.undo("u1", false)); // op2
     EXPECT_TRUE(cs.undo("u1", false)); // op1
@@ -822,7 +819,7 @@ TEST_F(ChangeSystemTest, RedoGroupedStopsAtGroupBoundary)
   }
 
   pqxx::work   txn(*pg);
-  ChangeSystem svc(txn, *pg, schema);
+  back::ChangeSystem svc(txn, *pg, schema);
   ASSERT_EQ(read_val(txn, "r1"), "a");
 
   //
@@ -843,19 +840,19 @@ TEST_F(ChangeSystemTest, ApplyAfterUndoWipesRedo)
   make_change_system();
   setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
   setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r1', 'a')");
-  apply_committed({RowChange{"t", "r1", false, "val", "b"}}, ChangeOp{"op1", "g"}, ChangeSysTarget{"u1", "Unit"});
+  apply_committed({back::model::RowChange{"t", "r1", false, "val", "b"}}, back::model::ChangeOp{"op1", "g"}, back::model::ChangeSysTarget{"u1", "Unit"});
 
   // Undo op1, then apply a fresh op — the redo stack must be discarded.
   {
     pqxx::work t0(*pg);
-    EXPECT_TRUE(ChangeSystem(t0, *pg, schema).undo("u1", false));
+    EXPECT_TRUE(back::ChangeSystem(t0, *pg, schema).undo("u1", false));
     t0.commit();
   }
 
-  apply_committed({RowChange{"t", "r1", false, "val", "c"}}, ChangeOp{"op2", "g"}, ChangeSysTarget{"u1", "Unit"});
+  apply_committed({back::model::RowChange{"t", "r1", false, "val", "c"}}, back::model::ChangeOp{"op2", "g"}, back::model::ChangeSysTarget{"u1", "Unit"});
 
   pqxx::work   txn(*pg);
-  ChangeSystem svc(txn, *pg, schema);
+  back::ChangeSystem svc(txn, *pg, schema);
 
   //
   //
@@ -875,22 +872,22 @@ TEST_F(ChangeSystemTest, RedoFailsAfterNewApplyWipesUndoneOps)
   setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r1', 'a')");
 
   // Three operations, then roll the last two back (they become redo candidates).
-  apply_committed({RowChange{"t", "r1", false, "val", "b"}}, ChangeOp{"op1", "g"}, ChangeSysTarget{"u1", "Unit"});
-  apply_committed({RowChange{"t", "r1", false, "val", "c"}}, ChangeOp{"op2", "g"}, ChangeSysTarget{"u1", "Unit"});
-  apply_committed({RowChange{"t", "r1", false, "val", "d"}}, ChangeOp{"op3", "g"}, ChangeSysTarget{"u1", "Unit"});
+  apply_committed({back::model::RowChange{"t", "r1", false, "val", "b"}}, back::model::ChangeOp{"op1", "g"}, back::model::ChangeSysTarget{"u1", "Unit"});
+  apply_committed({back::model::RowChange{"t", "r1", false, "val", "c"}}, back::model::ChangeOp{"op2", "g"}, back::model::ChangeSysTarget{"u1", "Unit"});
+  apply_committed({back::model::RowChange{"t", "r1", false, "val", "d"}}, back::model::ChangeOp{"op3", "g"}, back::model::ChangeSysTarget{"u1", "Unit"});
 
   {
     pqxx::work   t0(*pg);
-    ChangeSystem cs(t0, *pg, schema);
+    back::ChangeSystem cs(t0, *pg, schema);
     EXPECT_TRUE(cs.undo("u1", false)); // op3 undone
     EXPECT_TRUE(cs.undo("u1", false)); // op2 undone
     t0.commit();
   }
   // A fourth operation must discard the two undone ops (op2, op3).
-  apply_committed({RowChange{"t", "r1", false, "val", "e"}}, ChangeOp{"op4", "g"}, ChangeSysTarget{"u1", "Unit"});
+  apply_committed({back::model::RowChange{"t", "r1", false, "val", "e"}}, back::model::ChangeOp{"op4", "g"}, back::model::ChangeSysTarget{"u1", "Unit"});
 
   pqxx::work   txn(*pg);
-  ChangeSystem svc(txn, *pg, schema);
+  back::ChangeSystem svc(txn, *pg, schema);
   //
   //
   const bool changed = svc.redo("u1", false);

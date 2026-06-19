@@ -4,14 +4,12 @@
 
 namespace back {
 
-  using namespace model;
-
   // Find a folder by id anywhere in the tree.
-  static FolderNode *find_folder(std::vector<FolderNode> &folders, const std::string &id)
+  static model::FolderNode *find_folder(std::vector<model::FolderNode> &folders, const std::string &id)
   {
     for (auto &f : folders) {
       if (f.id == id) return &f;
-      if (FolderNode *found = find_folder(f.children, id)) return found;
+      if (model::FolderNode *found = find_folder(f.children, id)) return found;
     }
     return nullptr;
   }
@@ -19,21 +17,21 @@ namespace back {
   // Load the folder tree + units for a schema, attaching each unit to its
   // parent folder (or to the repo root when parent_folder_id is empty).
   static void load_tree(
-      pqxx::work &txn, pqxx::connection &pg, const std::string &sch, std::vector<FolderNode> &folders, std::vector<Unit> &root_units)
+      pqxx::work &txn, pqxx::connection &pg, const std::string &sch, std::vector<model::FolderNode> &folders, std::vector<model::Unit> &root_units)
   {
     folders = load_folders_for_schema(txn, pg, sch);
     root_units.clear();
     for (auto &u : load_units_for_schema(txn, pg, sch)) {
       if (u.parent_folder_id.empty()) {
         root_units.push_back(std::move(u));
-      } else if (FolderNode *f = find_folder(folders, u.parent_folder_id)) {
+      } else if (model::FolderNode *f = find_folder(folders, u.parent_folder_id)) {
         f->units.push_back(std::move(u));
       }
       // units pointing at a missing folder are silently dropped
     }
   }
 
-  std::string make_cs(const Conn &c)
+  std::string make_cs(const model::Conn &c)
   {
     std::string cs = "host=" + c.host;
     cs += " port=" + (c.port.empty() ? "5432" : c.port);
@@ -60,7 +58,7 @@ namespace back {
       const std::string &host, const std::string &port, const std::string &dbname, const std::string &user, const std::string &pass)
   {
     try {
-      Conn tmp;
+      model::Conn tmp;
       tmp.host   = host;
       tmp.port   = port;
       tmp.dbname = dbname;
@@ -73,7 +71,7 @@ namespace back {
     }
   }
 
-  std::pair<bool, std::string> connect_and_load(const Conn &c, std::vector<RepoNode> &repos)
+  std::pair<bool, std::string> connect_and_load(const model::Conn &c, std::vector<model::RepoNode> &repos)
   {
     repos.clear();
     try {
@@ -90,7 +88,7 @@ namespace back {
         try {
           pqxx::result vr = txn.exec("SELECT value FROM " + pg.quote_name(sch) + ".lang_setting WHERE name = 'name' LIMIT 1");
           if (!vr.empty() && !vr[0][0].is_null()) {
-            RepoNode rn;
+            model::RepoNode rn;
             rn.schema_name = sch;
             rn.repo_name   = vr[0][0].c_str();
             load_tree(txn, pg, sch, rn.folders, rn.units);
@@ -106,7 +104,7 @@ namespace back {
     }
   }
 
-  std::pair<bool, std::string> load_repo_tree(const Conn &c, const std::string &schema, RepoNode &repo)
+  std::pair<bool, std::string> load_repo_tree(const model::Conn &c, const std::string &schema, model::RepoNode &repo)
   {
     repo.folders.clear();
     repo.units.clear();

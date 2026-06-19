@@ -5,8 +5,6 @@
 #include <utility>
 #include <vector>
 
-using namespace back;
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -34,7 +32,7 @@ TEST(EncodeIdBytesTest, EmptyInput)
 {
   //
   //
-  const std::string id = encode_id_bytes({});
+  const std::string id = back::encode_id_bytes({});
   //
   //
 
@@ -46,7 +44,7 @@ TEST(EncodeIdBytesTest, SingleZeroByte)
   // 0x00 = 00000000 → char0: 000000=0→'0', char1: 00+pad→0→'0'
   //
   //
-  const std::string id = encode_id_bytes({0x00});
+  const std::string id = back::encode_id_bytes({0x00});
   //
   //
 
@@ -58,7 +56,7 @@ TEST(EncodeIdBytesTest, SingleFFByte)
   // 0xFF = 11111111 → char0: 111111=63→'@', char1: 11+0000=48→'m'
   //
   //
-  const std::string id = encode_id_bytes({0xFF});
+  const std::string id = back::encode_id_bytes({0xFF});
   //
   //
 
@@ -70,7 +68,7 @@ TEST(EncodeIdBytesTest, Single0x80)
   // 0x80 = 10000000 → char0: 100000=32→'W', char1: 00+0000=0→'0'
   //
   //
-  const std::string id = encode_id_bytes({0x80});
+  const std::string id = back::encode_id_bytes({0x80});
   //
   //
 
@@ -82,7 +80,7 @@ TEST(EncodeIdBytesTest, Single0x01)
   // 0x01 = 00000001 → char0: 000000=0→'0', char1: 01+0000=16→'G'
   //
   //
-  const std::string id = encode_id_bytes({0x01});
+  const std::string id = back::encode_id_bytes({0x01});
   //
   //
 
@@ -94,7 +92,7 @@ TEST(EncodeIdBytesTest, ThreeZeroBytes)
   // 24 bits, exactly 4 groups of 6 — all zero → "0000"
   //
   //
-  const std::string id = encode_id_bytes({0x00, 0x00, 0x00});
+  const std::string id = back::encode_id_bytes({0x00, 0x00, 0x00});
   //
   //
 
@@ -106,7 +104,7 @@ TEST(EncodeIdBytesTest, ThreeFFBytes)
   // 24 bits, exactly 4 groups of 6 — all ones → "@@@@"
   //
   //
-  const std::string id = encode_id_bytes({0xFF, 0xFF, 0xFF});
+  const std::string id = back::encode_id_bytes({0xFF, 0xFF, 0xFF});
   //
   //
 
@@ -121,7 +119,7 @@ TEST(EncodeIdBytesTest, TwoBytes0xFC00)
   // char2: 0000(from 00)+00pad=0→'0'
   //
   //
-  const std::string id = encode_id_bytes({0xFC, 0x00});
+  const std::string id = back::encode_id_bytes({0xFC, 0x00});
   //
   //
 
@@ -136,7 +134,7 @@ TEST(EncodeIdBytesTest, TwoBytes0x0102)
   // char2: 0010(from 02)+00pad=001000=8→'8'
   //
   //
-  const std::string id = encode_id_bytes({0x01, 0x02});
+  const std::string id = back::encode_id_bytes({0x01, 0x02});
   //
   //
 
@@ -148,7 +146,7 @@ TEST(EncodeIdBytesTest, SixBytesAllZero)
   // 48 bits = exactly 8 chars, all '0'
   //
   //
-  const std::string id = encode_id_bytes({0, 0, 0, 0, 0, 0});
+  const std::string id = back::encode_id_bytes({0, 0, 0, 0, 0, 0});
   //
   //
 
@@ -160,7 +158,7 @@ TEST(EncodeIdBytesTest, SixBytesAllFF)
   // 48 bits = exactly 8 chars, all '@'
   //
   //
-  const std::string id = encode_id_bytes({0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF});
+  const std::string id = back::encode_id_bytes({0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF});
   //
   //
 
@@ -179,7 +177,7 @@ TEST(EncodeIdBytesTest, LengthFormula)
 
     //
     //
-    const std::string id = encode_id_bytes(v);
+    const std::string id = back::encode_id_bytes(v);
     //
     //
 
@@ -195,7 +193,7 @@ TEST(NewCustomIdTest, LengthZeroZero)
 {
   //
   //
-  const std::string id = new_custom_id(0, 0);
+  const std::string id = back::new_custom_id(0, 0);
   //
   //
 
@@ -206,7 +204,7 @@ TEST(NewCustomIdTest, LengthOneZero)
 {
   //
   //
-  const std::string id = new_custom_id(1, 0);
+  const std::string id = back::new_custom_id(1, 0);
   //
   //
 
@@ -217,7 +215,7 @@ TEST(NewCustomIdTest, LengthZeroOne)
 {
   //
   //
-  const std::string id = new_custom_id(0, 1);
+  const std::string id = back::new_custom_id(0, 1);
   //
   //
 
@@ -228,7 +226,7 @@ TEST(NewCustomIdTest, LengthThreeZero)
 {
   //
   //
-  const std::string id = new_custom_id(3, 0);
+  const std::string id = back::new_custom_id(3, 0);
   //
   //
 
@@ -239,7 +237,7 @@ TEST(NewCustomIdTest, LengthOneOne)
 {
   //
   //
-  const std::string id = new_custom_id(1, 1);
+  const std::string id = back::new_custom_id(1, 1);
   //
   //
 
@@ -250,7 +248,7 @@ TEST(NewCustomIdTest, LengthFiveFour)
 {
   //
   //
-  const std::string id = new_custom_id(5, 4);
+  const std::string id = back::new_custom_id(5, 4);
   //
   //
 
@@ -261,7 +259,7 @@ TEST(NewCustomIdTest, LengthEightEight)
 {
   //
   //
-  const std::string id = new_custom_id(8, 8);
+  const std::string id = back::new_custom_id(8, 8);
   //
   //
 
@@ -277,7 +275,7 @@ TEST(NewCustomIdTest, ValidChars)
   for (auto [t, r] : {std::pair{5, 4}, std::pair{1, 1}, std::pair{0, 8}, std::pair{8, 0}}) {
     //
     //
-    const std::string id = new_custom_id(t, r);
+    const std::string id = back::new_custom_id(t, r);
     //
     //
 
@@ -290,7 +288,7 @@ TEST(NewCustomIdTest, AllAlphabetCharsAreValid)
   for (int i = 0; i < 200; i++) {
     //
     //
-    const std::string id = new_id();
+    const std::string id = back::new_id();
     //
     //
 
@@ -308,7 +306,7 @@ TEST(NewCustomIdTest, Uniqueness100)
   for (int i = 0; i < 100; i++) {
     //
     //
-    const std::string id = new_id();
+    const std::string id = back::new_id();
     //
     //
 
@@ -324,7 +322,7 @@ TEST(NewCustomIdTest, RandomOnlyUniqueness)
   for (int i = 0; i < 50; i++) {
     //
     //
-    const std::string id = new_custom_id(0, 8);
+    const std::string id = back::new_custom_id(0, 8);
     //
     //
 
@@ -347,7 +345,7 @@ TEST(NewCustomIdTest, TimeOnlyNonDecreasing)
   for (int i = 0; i < N; i++) {
     //
     //
-    const std::string id = new_custom_id(5, 0);
+    const std::string id = back::new_custom_id(5, 0);
     //
     //
 
@@ -363,7 +361,7 @@ TEST(NewIdTest, Length)
 {
   //
   //
-  const std::string id = new_id();
+  const std::string id = back::new_id();
   //
   //
 
@@ -374,7 +372,7 @@ TEST(NewIdTest, ValidChars)
 {
   //
   //
-  const std::string id = new_id();
+  const std::string id = back::new_id();
   //
   //
 
@@ -385,11 +383,11 @@ TEST(NewIdTest, SameLengthAsCustomId54)
 {
   //
   //
-  const std::string id = new_id();
+  const std::string id = back::new_id();
   //
   //
 
-  EXPECT_EQ(id.size(), new_custom_id(5, 4).size());
+  EXPECT_EQ(id.size(), back::new_custom_id(5, 4).size());
 }
 
 TEST(NewIdTest, Unique)
@@ -398,7 +396,7 @@ TEST(NewIdTest, Unique)
   for (int i = 0; i < 50; i++) {
     //
     //
-    const std::string id = new_id();
+    const std::string id = back::new_id();
     //
     //
 

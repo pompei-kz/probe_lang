@@ -6,12 +6,10 @@
 
 namespace back {
 
-  using namespace model;
-
-  std::pair<std::string, std::string> create_block(const Conn        &c,
+  std::pair<std::string, std::string> create_block(const model::Conn &c,
                                                    const std::string &schema,
                                                    const std::string &unit_id,
-                                                   BlockType          type,
+                                                   model::BlockType   type,
                                                    float              x,
                                                    float              y,
                                                    float              width,
@@ -27,14 +25,14 @@ namespace back {
 
       const std::string qs       = pg.quote_name(schema);
       const std::string id       = new_id();
-      const std::string type_str = to_string(type);
+      const std::string type_str = model::to_string(type);
 
       txn.exec("INSERT INTO " + qs +
                    ".unit_b (id, unit_id, type, x, y, width, height) "
                    "VALUES ($1, $2, $3, $4, $5, $6, $7)",
                pqxx::params{txn, id, unit_id, type_str, x, y, width, height});
 
-      const std::string detail = type == BlockType::Field ? ".unit_b_field" : ".unit_b_method";
+      const std::string detail = type == model::BlockType::Field ? ".unit_b_field" : ".unit_b_method";
       txn.exec("INSERT INTO " + qs + detail + " (id, name) VALUES ($1, $2)", pqxx::params{txn, id, name});
 
       txn.commit();
@@ -47,7 +45,7 @@ namespace back {
   }
 
   std::pair<std::string, std::string> create_method_arg(
-      const Conn &c, const std::string &schema, const std::string &owner_method_id, double order_index, const std::string &name)
+      const model::Conn &c, const std::string &schema, const std::string &owner_method_id, double order_index, const std::string &name)
   {
     try {
       pqxx::connection pg(make_cs(c));
@@ -68,7 +66,7 @@ namespace back {
     }
   }
 
-  std::pair<std::string, std::string> append_method_arg(const Conn        &c,
+  std::pair<std::string, std::string> append_method_arg(const model::Conn &c,
                                                         const std::string &schema,
                                                         const std::string &owner_method_id,
                                                         const std::string &name)
@@ -98,7 +96,7 @@ namespace back {
     }
   }
 
-  std::pair<bool, std::string> update_method_arg_name(const Conn &c, const std::string &schema, const std::string &id, const std::string &name)
+  std::pair<bool, std::string> update_method_arg_name(const model::Conn &c, const std::string &schema, const std::string &id, const std::string &name)
   {
     try {
       pqxx::connection pg(make_cs(c));
@@ -113,7 +111,7 @@ namespace back {
     }
   }
 
-  std::pair<bool, std::string> delete_method_arg(const Conn &c, const std::string &schema, const std::string &id)
+  std::pair<bool, std::string> delete_method_arg(const model::Conn &c, const std::string &schema, const std::string &id)
   {
     try {
       pqxx::connection pg(make_cs(c));
@@ -128,7 +126,7 @@ namespace back {
     }
   }
 
-  std::pair<bool, std::string> reorder_method_args(const Conn                     &c,
+  std::pair<bool, std::string> reorder_method_args(const model::Conn              &c,
                                                    const std::string              &schema,
                                                    const std::string              &owner_method_id,
                                                    const std::vector<std::string> &ordered_ids)
@@ -152,7 +150,7 @@ namespace back {
 
   // Helper: UPDATE one unit_b_method column for a single method id.
   static std::pair<bool, std::string> update_method_column(
-      const Conn &c, const std::string &schema, const std::string &id, const std::string &column, const std::string &value)
+      const model::Conn &c, const std::string &schema, const std::string &id, const std::string &column, const std::string &value)
   {
     try {
       pqxx::connection pg(make_cs(c));
@@ -168,7 +166,7 @@ namespace back {
     }
   }
 
-  std::pair<bool, std::string> update_block_disabled(const Conn &c, const std::string &schema, const std::string &id, bool disabled)
+  std::pair<bool, std::string> update_block_disabled(const model::Conn &c, const std::string &schema, const std::string &id, bool disabled)
   {
     try {
       pqxx::connection  pg(make_cs(c));
@@ -184,19 +182,19 @@ namespace back {
     }
   }
 
-  std::pair<bool, std::string> update_method_type(const Conn &c, const std::string &schema, const std::string &id, MethodType type)
+  std::pair<bool, std::string> update_method_type(const model::Conn &c, const std::string &schema, const std::string &id, model::MethodType type)
   {
-    return update_method_column(c, schema, id, "type", to_string(type));
+    return update_method_column(c, schema, id, "type", model::to_string(type));
   }
 
-  std::pair<bool, std::string> update_method_access(const Conn &c, const std::string &schema, const std::string &id, MethodAccess access)
+  std::pair<bool, std::string> update_method_access(const model::Conn &c, const std::string &schema, const std::string &id, model::MethodAccess access)
   {
-    return update_method_column(c, schema, id, "access", to_string(access));
+    return update_method_column(c, schema, id, "access", model::to_string(access));
   }
 
   // Helper: UPDATE one unit_b_field column for a single field id.
   static std::pair<bool, std::string> update_field_column(
-      const Conn &c, const std::string &schema, const std::string &id, const std::string &column, const std::string &value)
+      const model::Conn &c, const std::string &schema, const std::string &id, const std::string &column, const std::string &value)
   {
     try {
       pqxx::connection pg(make_cs(c));
@@ -212,28 +210,28 @@ namespace back {
     }
   }
 
-  std::pair<bool, std::string> update_field_access(const Conn &c, const std::string &schema, const std::string &id, MethodAccess access)
+  std::pair<bool, std::string> update_field_access(const model::Conn &c, const std::string &schema, const std::string &id, model::MethodAccess access)
   {
-    return update_field_column(c, schema, id, "access", to_string(access));
+    return update_field_column(c, schema, id, "access", model::to_string(access));
   }
 
-  std::pair<bool, std::string> update_field_expr_id_used(const Conn &c, const std::string &schema, const std::string &id, bool expr_id_used)
+  std::pair<bool, std::string> update_field_expr_id_used(const model::Conn &c, const std::string &schema, const std::string &id, bool expr_id_used)
   {
     return update_field_column(c, schema, id, "expr_id_used", expr_id_used ? "true" : "false");
   }
 
-  std::pair<bool, std::string> update_field_size_bytes(const Conn &c, const std::string &schema, const std::string &id, int size_bytes)
+  std::pair<bool, std::string> update_field_size_bytes(const model::Conn &c, const std::string &schema, const std::string &id, int size_bytes)
   {
     return update_field_column(c, schema, id, "size_bytes", std::to_string(size_bytes));
   }
 
   std::pair<bool, std::string> update_block_name(
-      const Conn &c, const std::string &schema, const std::string &id, BlockType type, const std::string &name)
+      const model::Conn &c, const std::string &schema, const std::string &id, model::BlockType type, const std::string &name)
   {
     try {
       pqxx::connection  pg(make_cs(c));
       pqxx::work        txn(pg);
-      const std::string detail = type == BlockType::Field ? ".unit_b_field" : ".unit_b_method";
+      const std::string detail = type == model::BlockType::Field ? ".unit_b_field" : ".unit_b_method";
       txn.exec("UPDATE " + pg.quote_name(schema) + detail + " SET name = $1 WHERE id = $2", pqxx::params{txn, name, id});
       txn.commit();
       return {true, ""};
@@ -244,14 +242,14 @@ namespace back {
     }
   }
 
-  std::pair<bool, std::string> delete_block(const Conn &c, const std::string &schema, const std::string &id, BlockType type)
+  std::pair<bool, std::string> delete_block(const model::Conn &c, const std::string &schema, const std::string &id, model::BlockType type)
   {
     try {
       pqxx::connection  pg(make_cs(c));
       pqxx::work        txn(pg);
       const std::string qs     = pg.quote_name(schema);
-      const std::string detail = type == BlockType::Field ? ".unit_b_field" : ".unit_b_method";
-      if (type == BlockType::Method) txn.exec("DELETE FROM " + qs + ".unit_b_method_arg WHERE owner_method_id = $1", pqxx::params{txn, id});
+      const std::string detail = type == model::BlockType::Field ? ".unit_b_field" : ".unit_b_method";
+      if (type == model::BlockType::Method) txn.exec("DELETE FROM " + qs + ".unit_b_method_arg WHERE owner_method_id = $1", pqxx::params{txn, id});
       txn.exec("DELETE FROM " + qs + detail + " WHERE id = $1", pqxx::params{txn, id});
       txn.exec("DELETE FROM " + qs + ".unit_b WHERE id = $1", pqxx::params{txn, id});
       txn.commit();
@@ -263,7 +261,7 @@ namespace back {
     }
   }
 
-  std::pair<bool, std::string> update_block_size(const Conn &c, const std::string &schema, const std::string &id, float width, float height)
+  std::pair<bool, std::string> update_block_size(const model::Conn &c, const std::string &schema, const std::string &id, float width, float height)
   {
     try {
       pqxx::connection pg(make_cs(c));
@@ -278,7 +276,7 @@ namespace back {
     }
   }
 
-  std::pair<bool, std::string> update_block_position(const Conn &c, const std::string &schema, const std::string &id, float x, float y)
+  std::pair<bool, std::string> update_block_position(const model::Conn &c, const std::string &schema, const std::string &id, float x, float y)
   {
     try {
       pqxx::connection  pg(make_cs(c));

@@ -4,10 +4,8 @@
 
 namespace back {
 
-  using namespace model;
-
-  std::pair<std::vector<Expr>, std::string> load_exprs_in_view(
-      const Conn &c, const std::string &schema, const std::string &unit_id, float min_x, float min_y, float max_x, float max_y)
+  std::pair<std::vector<model::Expr>, std::string> load_exprs_in_view(
+      const model::Conn &c, const std::string &schema, const std::string &unit_id, float min_x, float min_y, float max_x, float max_y)
   {
     try {
       pqxx::connection pg(make_cs(c));
@@ -32,19 +30,19 @@ namespace back {
                        "  AND e.geom && ST_MakeEnvelope($2, $3, $4, $5, 0)",
                    pqxx::params{txn, unit_id, min_x, min_y, max_x, max_y});
 
-      std::vector<Expr> out;
+      std::vector<model::Expr> out;
       out.reserve(rows.size());
       for (const auto &row : rows) {
-        Expr e{};
+        model::Expr e{};
         e.id             = row[0].c_str();
-        e.type           = expr_type_from_string(row[1].c_str());
+        e.type           = model::expr_type_from_string(row[1].c_str());
         e.x              = row[2].as<float>();
         e.y              = row[3].as<float>();
         e.width          = row[4].as<float>();
         e.height         = row[5].as<float>();
         e.owner_block_id = row[6].c_str();
         // Resolve the unit name through the soft reference unit_e_unit.unit_id -> unit.id.
-        if (e.type == ExprType::Unit && has_unit && !row[7].is_null()) {
+        if (e.type == model::ExprType::Unit && has_unit && !row[7].is_null()) {
           const std::string uid = row[7].c_str();
           pqxx::result      ur  = txn.exec("SELECT name FROM " + qs + ".unit WHERE id = $1", pqxx::params{txn, uid});
           if (!ur.empty()) {

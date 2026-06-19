@@ -14,9 +14,6 @@
 
 namespace front {
 
-  using namespace back;
-  using namespace back::model;
-
   void draw_plus(SDL_Renderer *r, float cx, float cy, float sz, Clr c)
   {
     sc(r, c);
@@ -103,7 +100,7 @@ namespace front {
 
     if (m.ldown && h_test && !any_ctx) {
       d.err          = "";
-      auto [ok, msg] = test_connection(d.fields[1].ed.buf, d.fields[2].ed.buf, d.fields[3].ed.buf, d.fields[4].ed.buf, d.fields[5].ed.buf);
+      auto [ok, msg] = back::test_connection(d.fields[1].ed.buf, d.fields[2].ed.buf, d.fields[3].ed.buf, d.fields[4].ed.buf, d.fields[5].ed.buf);
       d.test_ok      = ok;
       d.test_msg     = msg;
       if (ok) {
@@ -143,7 +140,7 @@ namespace front {
     if (m.ldown && !any_ctx) {
       if (h_can) return -1;
       if (h_save && can_save) {
-        Conn c = d.to_conn();
+        back::model::Conn c = d.to_conn();
         if (c.name.empty()) {
           d.err = "Name is required";
           return 0;
@@ -159,7 +156,7 @@ namespace front {
   static constexpr float ICON_SZ = 8.f, EDIT_W = 30.f, CARET_W = 22.f;
 
   // Defined further down; reopens persisted descendants of a folder from disk.
-  static void restore_folder_open(std::vector<std::string> prefix, FolderNode &folder);
+  static void restore_folder_open(std::vector<std::string> prefix, back::model::FolderNode &folder);
 
   // ── selection node keys ─────────────────────────────────────────────────────
   // A unique in-memory key per tree node, used for the keyboard selection.
@@ -225,21 +222,21 @@ namespace front {
   }
 
   // Distinct glyph per unit type, drawn left-aligned and vertically centered at yc.
-  static void draw_unit_icon(SDL_Renderer *r, float x, float yc, UnitType t, Clr c)
+  static void draw_unit_icon(SDL_Renderer *r, float x, float yc, back::model::UnitType t, Clr c)
   {
     sc(r, c);
     switch (t) {
-      case UnitType::Class: {
+      case back::model::UnitType::Class: {
         SDL_FRect b{x, yc - 4.f, 9.f, 9.f}; // filled square
         SDL_RenderFillRect(r, &b);
         break;
       }
-      case UnitType::Interface: {
+      case back::model::UnitType::Interface: {
         SDL_FRect b{x, yc - 4.f, 9.f, 9.f}; // hollow square
         SDL_RenderRect(r, &b);
         break;
       }
-      case UnitType::Enum: {
+      case back::model::UnitType::Enum: {
         for (int i = 0; i < 3; i++) { // three stacked bars
           SDL_FRect bar{x, yc - 4.f + i * 3.5f, 9.f, 1.6f};
           SDL_RenderFillRect(r, &bar);
@@ -250,18 +247,18 @@ namespace front {
   }
 
   // Render a list of units (leaf rows, no caret) at the given indentation depth.
-  static void render_unit_list(SDL_Renderer      *ren,
-                               App               &app,
-                               std::vector<Unit> &units,
-                               int                ci,
-                               int                ri,
-                               int                depth,
-                               int               &row,
-                               float              pw,
-                               float              ph,
-                               bool               click,
-                               bool               rclick,
-                               bool               dblclick)
+  static void render_unit_list(SDL_Renderer                   *ren,
+                               App                            &app,
+                               std::vector<back::model::Unit> &units,
+                               int                             ci,
+                               int                             ri,
+                               int                             depth,
+                               int                            &row,
+                               float                           pw,
+                               float                           ph,
+                               bool                            click,
+                               bool                            rclick,
+                               bool                            dblclick)
   {
     static constexpr float STEP   = 14.f;
     const std::string     &conn   = app.conns[ci].conn.name;
@@ -296,19 +293,19 @@ namespace front {
     }
   }
 
-  static void render_folder_list(SDL_Renderer                   *ren,
-                                 App                            &app,
-                                 std::vector<FolderNode>        &folders,
-                                 int                             ci,
-                                 int                             ri,
-                                 const std::vector<std::string> &prefix,
-                                 int                             depth,
-                                 int                            &row,
-                                 float                           pw,
-                                 float                           ph,
-                                 bool                            click,
-                                 bool                            rclick,
-                                 bool                            dblclick)
+  static void render_folder_list(SDL_Renderer                         *ren,
+                                 App                                  &app,
+                                 std::vector<back::model::FolderNode> &folders,
+                                 int                                   ci,
+                                 int                                   ri,
+                                 const std::vector<std::string>       &prefix,
+                                 int                                   depth,
+                                 int                                  &row,
+                                 float                                 pw,
+                                 float                                 ph,
+                                 bool                                  click,
+                                 bool                                  rclick,
+                                 bool                                  dblclick)
   {
     static constexpr float STEP = 14.f;
     for (auto &folder : folders) {
@@ -340,13 +337,13 @@ namespace front {
       if (has_kids && ((click && h_caret) || (dblclick && h_row))) {
         folder.open = !folder.open;
         if (folder.open) {
-          open_tree_node(path);
+          back::open_tree_node(path);
           // Always consult disk for which children were left open.
-          for (FolderNode &child : folder.children) {
+          for (back::model::FolderNode &child : folder.children) {
             restore_folder_open(path, child);
           }
         } else {
-          close_tree_node(path);
+          back::close_tree_node(path);
         }
       }
 
@@ -396,9 +393,9 @@ namespace front {
     int row    = 0;
 
     for (int i = 0; i < static_cast<int>(app.conns.size()); i++) {
-      ConnNode  &node      = app.conns[i];
-      const bool connected = node.conn.connected;
-      float      iy        = HDR_H + row * ITEM_H;
+      back::model::ConnNode &node      = app.conns[i];
+      const bool             connected = node.conn.connected;
+      float                  iy        = HDR_H + row * ITEM_H;
 
       bool              h_caret = connected && hit(app.mx, app.my, 0, iy, PAD + CARET_W, ITEM_H);
       bool              h_row   = !h_caret && hit(app.mx, app.my, 0, iy, pw - EDIT_W, ITEM_H);
@@ -437,14 +434,14 @@ namespace front {
       auto toggle_open = [&]() {
         if (node.open) {
           node.open = false;
-          close_tree_node({node.conn.name});
+          back::close_tree_node({node.conn.name});
         } else {
-          std::vector<RepoNode> repos;
-          auto [ok, err] = connect_and_load(node.conn, repos);
+          std::vector<back::model::RepoNode> repos;
+          auto [ok, err] = back::connect_and_load(node.conn, repos);
           if (ok) {
             node.open  = true;
             node.repos = std::move(repos);
-            open_tree_node({node.conn.name});
+            back::open_tree_node({node.conn.name});
             restore_open_repos_and_folders(node); // reopen persisted repos/folders from disk
           } else {
             app.msg_dlg = {true, "Connection error", std::move(err)};
@@ -491,11 +488,11 @@ namespace front {
             repo.open = !repo.open;
             if (repo.open) {
               // Ensure the schema and all of its tables exist (idempotent).
-              if (auto [ok, err] = ensure_repo_schema(node.conn, repo.schema_name); !ok) app.msg_dlg = {true, "Ошибка", std::move(err)};
-              open_tree_node({node.conn.name, repo.schema_name});
+              if (auto [ok, err] = back::ensure_repo_schema(node.conn, repo.schema_name); !ok) app.msg_dlg = {true, "Ошибка", std::move(err)};
+              back::open_tree_node({node.conn.name, repo.schema_name});
               restore_repo_folders_open(node.conn.name, repo); // reopen persisted folders from disk
             } else {
-              close_tree_node({node.conn.name, repo.schema_name});
+              back::close_tree_node({node.conn.name, repo.schema_name});
             }
           }
           if (rclick && (h_caret1 || h_row1)) {
@@ -523,21 +520,21 @@ namespace front {
     bool valid_ci = ci >= 0 && ci < static_cast<int>(app.conns.size());
 
     if (act == 0 && valid_ci) {
-      ConnNode &node = app.conns[ci];
+      back::model::ConnNode &node = app.conns[ci];
       if (node.conn.connected) {
         // Отсоединиться
         node.conn.connected = false;
         node.open           = false;
         node.repos.clear();
-        save_conn(node.conn);
-        close_tree_node({node.conn.name});
+        back::save_conn(node.conn);
+        back::close_tree_node({node.conn.name});
       } else {
         // Присоединиться: verify connection, mark connected, persist
-        auto [ok, err] = test_connection(node.conn.host, node.conn.port, node.conn.dbname, node.conn.user, node.conn.pass);
+        auto [ok, err] = back::test_connection(node.conn.host, node.conn.port, node.conn.dbname, node.conn.user, node.conn.pass);
         if (ok) {
           node.conn.connected = true;
-          save_conn(node.conn);
-          ensure_unit_tables(node.conn); // create the unit table in every repo schema
+          back::save_conn(node.conn);
+          back::ensure_unit_tables(node.conn); // create the unit table in every repo schema
         } else {
           app.msg_dlg = {true, "Connection failed", std::move(err)};
         }
@@ -634,26 +631,26 @@ namespace front {
 
   // Recursively reopen folders whose marker file exists. A folder's children
   // only "appear" once the folder itself is open, so we descend only then.
-  static void restore_folder_open(std::vector<std::string> prefix, FolderNode &folder)
+  static void restore_folder_open(std::vector<std::string> prefix, back::model::FolderNode &folder)
   {
     prefix.push_back(folder.id);
-    if (is_tree_node_open(prefix)) {
+    if (back::is_tree_node_open(prefix)) {
       folder.open = true;
       for (auto &child : folder.children)
         restore_folder_open(prefix, child);
     }
   }
 
-  void restore_repo_folders_open(const std::string &conn_name, RepoNode &repo)
+  void restore_repo_folders_open(const std::string &conn_name, back::model::RepoNode &repo)
   {
     for (auto &folder : repo.folders)
       restore_folder_open({conn_name, repo.schema_name}, folder);
   }
 
-  void restore_open_repos_and_folders(ConnNode &node)
+  void restore_open_repos_and_folders(back::model::ConnNode &node)
   {
     for (auto &repo : node.repos) {
-      if (is_tree_node_open({node.conn.name, repo.schema_name})) repo.open = true;
+      if (back::is_tree_node_open({node.conn.name, repo.schema_name})) repo.open = true;
       restore_repo_folders_open(node.conn.name, repo);
     }
   }
@@ -663,10 +660,10 @@ namespace front {
     for (auto &node : app.conns) {
       // Roots: only connected connections whose marker file exists.
       if (!node.conn.connected) continue;
-      if (!is_tree_node_open({node.conn.name})) continue;
+      if (!back::is_tree_node_open({node.conn.name})) continue;
 
-      std::vector<RepoNode> repos;
-      auto [ok, err] = connect_and_load(node.conn, repos);
+      std::vector<back::model::RepoNode> repos;
+      auto [ok, err] = back::connect_and_load(node.conn, repos);
       if (!ok) continue;
       node.open  = true;
       node.repos = std::move(repos);
@@ -676,14 +673,14 @@ namespace front {
   }
 
   // Find folder `target` in the tree, open it and persist its marker.
-  static bool open_folder_branch_rec(std::vector<std::string> prefix, std::vector<FolderNode> &folders, const std::string &target)
+  static bool open_folder_branch_rec(std::vector<std::string> prefix, std::vector<back::model::FolderNode> &folders, const std::string &target)
   {
     for (auto &folder : folders) {
       std::vector<std::string> path = prefix;
       path.push_back(folder.id);
       if (folder.id == target) {
         folder.open = true;
-        open_tree_node(path);
+        back::open_tree_node(path);
         return true;
       }
       if (open_folder_branch_rec(path, folder.children, target)) return true;
@@ -691,12 +688,12 @@ namespace front {
     return false;
   }
 
-  void open_added_folder_parent(const std::string &conn_name, RepoNode &repo, const std::string &parent_folder_id)
+  void open_added_folder_parent(const std::string &conn_name, back::model::RepoNode &repo, const std::string &parent_folder_id)
   {
     if (parent_folder_id.empty()) {
       // Parent is the repo itself: already open while adding, just persist.
       repo.open = true;
-      open_tree_node({conn_name, repo.schema_name});
+      back::open_tree_node({conn_name, repo.schema_name});
       return;
     }
     open_folder_branch_rec({conn_name, repo.schema_name}, repo.folders, parent_folder_id);
@@ -715,14 +712,19 @@ namespace front {
     int                      parent   = -1; // index of the parent row in the list
     std::string              menu_id;       // folder.id / unit.id (for the context menu)
     std::string              menu_name;
-    UnitType                 unit_type = UnitType::Class;
+    back::model::UnitType    unit_type = back::model::UnitType::Class;
     bool                     has_kids  = false;
     bool                    *open      = nullptr; // &node.open for conn/repo/folder; null for units
-    FolderNode              *folder    = nullptr; // for folders (to restore children on open)
+    back::model::FolderNode *folder    = nullptr; // for folders (to restore children on open)
   };
 
-  static void build_units(
-      std::vector<Unit> &units, int ci, int ri, const std::string &conn, const std::string &schema, int parent, std::vector<VisNode> &out)
+  static void build_units(std::vector<back::model::Unit> &units,
+                          int                             ci,
+                          int                             ri,
+                          const std::string              &conn,
+                          const std::string              &schema,
+                          int                             parent,
+                          std::vector<VisNode>           &out)
   {
     for (auto &u : units) {
       VisNode n;
@@ -738,14 +740,14 @@ namespace front {
     }
   }
 
-  static void build_folders(std::vector<FolderNode> &folders,
-                            int                      ci,
-                            int                      ri,
-                            const std::string       &conn,
-                            const std::string       &schema,
-                            std::vector<std::string> prefix,
-                            int                      parent,
-                            std::vector<VisNode>    &out)
+  static void build_folders(std::vector<back::model::FolderNode> &folders,
+                            int                                   ci,
+                            int                                   ri,
+                            const std::string                    &conn,
+                            const std::string                    &schema,
+                            std::vector<std::string>              prefix,
+                            int                                   parent,
+                            std::vector<VisNode>                 &out)
   {
     for (auto &f : folders) {
       std::vector<std::string> path = prefix;
@@ -775,8 +777,8 @@ namespace front {
   {
     std::vector<VisNode> out;
     for (int ci = 0; ci < static_cast<int>(app.conns.size()); ci++) {
-      ConnNode &node = app.conns[ci];
-      VisNode   n;
+      back::model::ConnNode &node = app.conns[ci];
+      VisNode                n;
       n.kind     = 0;
       n.conn_idx = ci;
       n.key      = conn_key(node.conn.name);
@@ -787,8 +789,8 @@ namespace front {
       out.push_back(std::move(n));
       if (node.open) {
         for (int ri = 0; ri < static_cast<int>(node.repos.size()); ri++) {
-          RepoNode &repo = node.repos[ri];
-          VisNode   r;
+          back::model::RepoNode &repo = node.repos[ri];
+          VisNode                r;
           r.kind     = 1;
           r.conn_idx = ci;
           r.repo_idx = ri;
@@ -813,28 +815,28 @@ namespace front {
   static void tree_set_open(App &app, const VisNode &n, bool want)
   {
     if (n.kind == 0) {
-      ConnNode &node = app.conns[n.conn_idx];
+      back::model::ConnNode &node = app.conns[n.conn_idx];
       if (want && !node.open) {
-        std::vector<RepoNode> repos;
-        auto [ok, err] = connect_and_load(node.conn, repos);
+        std::vector<back::model::RepoNode> repos;
+        auto [ok, err] = back::connect_and_load(node.conn, repos);
         if (ok) {
           node.open  = true;
           node.repos = std::move(repos);
-          open_tree_node({node.conn.name});
+          back::open_tree_node({node.conn.name});
           restore_open_repos_and_folders(node);
         } else {
           app.msg_dlg = {true, "Connection error", std::move(err)};
         }
       } else if (!want && node.open) {
         node.open = false;
-        close_tree_node({node.conn.name});
+        back::close_tree_node({node.conn.name});
       }
       return;
     }
     if (!n.open) return;
     if (want && !*n.open) {
       *n.open = true;
-      open_tree_node(n.path);
+      back::open_tree_node(n.path);
       if (n.kind == 1)
         restore_repo_folders_open(app.conns[n.conn_idx].conn.name, app.conns[n.conn_idx].repos[n.repo_idx]);
       else if (n.folder)
@@ -842,7 +844,7 @@ namespace front {
           restore_folder_open(n.path, child);
     } else if (!want && *n.open) {
       *n.open = false;
-      close_tree_node(n.path);
+      back::close_tree_node(n.path);
     }
   }
 

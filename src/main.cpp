@@ -14,10 +14,6 @@
 #include "back/service/RepoServiceR.h"
 #include "back/service/UnitServiceRW.h"
 
-using namespace front;
-using namespace back;
-using namespace back::model;
-
 int main(int /*argc*/, char * /*argv*/[])
 {
   if (!SDL_Init(SDL_INIT_VIDEO)) {
@@ -25,7 +21,7 @@ int main(int /*argc*/, char * /*argv*/[])
     return 1;
   }
 
-  App app{};
+  front::App app{};
   app.win = SDL_CreateWindow("probe_lang", app.ww, app.wh, SDL_WINDOW_RESIZABLE);
   if (!app.win) {
     SDL_Log("CreateWindow: %s", SDL_GetError());
@@ -38,13 +34,13 @@ int main(int /*argc*/, char * /*argv*/[])
   }
 
   // Window / taskbar icon: a procedurally drawn hedgehog (ёжик).
-  if (SDL_Surface *icon = make_hedgehog_icon()) {
+  if (SDL_Surface *icon = front::make_hedgehog_icon()) {
     SDL_SetWindowIcon(app.win, icon);
     SDL_DestroySurface(icon);
   }
 
   SDL_SetRenderDrawBlendMode(app.ren, SDL_BLENDMODE_NONE);
-  font_init(app.ren);
+  front::font_init(app.ren);
   app.reload_conns();
   restore_tree_open_state(app);
 
@@ -167,8 +163,8 @@ int main(int /*argc*/, char * /*argv*/[])
           if (app.dlg.open && (ev.key.mod & SDL_KMOD_CTRL) && (ev.key.key == SDLK_RETURN || ev.key.key == SDLK_KP_ENTER)) {
             // Ctrl+Enter presses Save from anywhere — only when Save is active.
             if (app.dlg.save_enabled()) {
-              if (Conn c = app.dlg.to_conn(); !c.name.empty()) {
-                save_conn(c, app.dlg.old_name);
+              if (back::model::Conn c = app.dlg.to_conn(); !c.name.empty()) {
+                back::save_conn(c, app.dlg.old_name);
                 app.reload_conns();
                 app.dlg.open = false;
                 SDL_StopTextInput(app.win);
@@ -178,7 +174,7 @@ int main(int /*argc*/, char * /*argv*/[])
             }
           } else if (app.dlg.open) {
             // ReSharper disable once CppUseStructuredBinding
-            for (InputField &f : app.dlg.fields)
+            for (front::InputField &f : app.dlg.fields)
               f.ctx.open = false;
             SDL_Keymod mod = ev.key.mod;
             // ReSharper disable once CppTooWideScopeInitStatement
@@ -195,8 +191,8 @@ int main(int /*argc*/, char * /*argv*/[])
                 case SDLK_KP_ENTER:
                   if (app.dlg.focus < 5) {
                     app.dlg.focus++;
-                  } else if (Conn c = app.dlg.to_conn(); !c.name.empty() && !c.host.empty()) {
-                    save_conn(c, app.dlg.old_name);
+                  } else if (back::model::Conn c = app.dlg.to_conn(); !c.name.empty() && !c.host.empty()) {
+                    back::save_conn(c, app.dlg.old_name);
                     app.reload_conns();
                     app.dlg.open = false;
                     SDL_StopTextInput(app.win);
@@ -252,7 +248,7 @@ int main(int /*argc*/, char * /*argv*/[])
               }
             }
           } else if (app.sel_unit_form.open) {
-            FormSelectUnit &d        = app.sel_unit_form;
+            front::FormSelectUnit &d = app.sel_unit_form;
             SDL_Keymod      mod      = ev.key.mod;
             bool            consumed = d.focus == 0 && d.filter_field.handle_key(ev.key.key, mod);
             if (!consumed && !form_nav(d.focus, d.activate, d.FOCUS_COUNT, d.FIRST_BUTTON, ev.key.key, mod) && ev.key.key == SDLK_ESCAPE) {
@@ -277,12 +273,12 @@ int main(int /*argc*/, char * /*argv*/[])
     // ── render ────────────────────────────────────────────────────────────────
     bool dblclick = l_click && l_clicks >= 2;
 
-    sc(app.ren, C_BG);
+    sc(app.ren, front::C_BG);
     SDL_RenderClear(app.ren);
     panel_render(app.ren, app, l_click, r_click, dblclick);
 
     float pw = app.ww * 0.30f;
-    fill(app.ren, C_BG, pw, 0, app.ww - pw, static_cast<float>(app.wh));
+    fill(app.ren, front::C_BG, pw, 0, app.ww - pw, static_cast<float>(app.wh));
 
     if (app.editor.open) {
       bool        editor_clicks = !any_dlg();
@@ -313,7 +309,7 @@ int main(int /*argc*/, char * /*argv*/[])
     }
 
     if (app.dlg.open) {
-      DlgMouse dm;
+      front::DlgMouse dm;
       dm.mx     = l_click ? l_click_x : (r_click ? r_click_x : app.mx);
       dm.my     = l_click ? l_click_y : (r_click ? r_click_y : app.my);
       dm.ldown  = l_click;
@@ -321,7 +317,7 @@ int main(int /*argc*/, char * /*argv*/[])
       dm.clicks = l_clicks;
 
       if (int result = dlg_render(app.ren, app.dlg, dm); result == 1) {
-        save_conn(app.dlg.to_conn(), app.dlg.old_name);
+        back::save_conn(app.dlg.to_conn(), app.dlg.old_name);
         app.reload_conns();
         app.dlg.open = false;
         SDL_StopTextInput(app.win);
@@ -338,19 +334,19 @@ int main(int /*argc*/, char * /*argv*/[])
       int res   = app.repo_dlg.render(app.ren, mx2, my2, l_click, r_click, l_clicks);
       if (res == 1) {
         // ReSharper disable once CppUseStructuredBinding
-        for (ConnNode &node : app.conns) {
+        for (back::model::ConnNode &node : app.conns) {
           if (node.conn.name == app.repo_dlg.conn.name) {
             if (!app.repo_dlg.editing) {
               node.conn.connected = true;
-              save_conn(node.conn);
+              back::save_conn(node.conn);
             }
             if (node.open) {
-              std::vector<RepoNode> repos;
+              std::vector<back::model::RepoNode> repos;
               // ReSharper disable once CppTooWideScopeInitStatement
-              auto [ok, err] = connect_and_load(node.conn, repos);
+              auto [ok, err] = back::connect_and_load(node.conn, repos);
               if (ok) {
                 node.repos = std::move(repos);
-                restore_open_repos_and_folders(node); // keep already-open repos/folders open
+                front::restore_open_repos_and_folders(node); // keep already-open repos/folders open
               }
             }
             break;
@@ -379,12 +375,12 @@ int main(int /*argc*/, char * /*argv*/[])
           const bool        editing   = app.folder_dlg.editing;
           const std::string parent_id = app.folder_dlg.parent_folder_id;
 
-          auto [ok, err] = load_repo_tree(node.conn, repo.schema_name, repo);
+          auto [ok, err] = back::load_repo_tree(node.conn, repo.schema_name, repo);
           if (!ok) {
             app.msg_dlg = {true, "Ошибка", std::move(err)};
           } else {
-            restore_repo_folders_open(node.conn.name, repo); // keep already-open folders open
-            if (!editing) open_added_folder_parent(node.conn.name, repo, parent_id);
+            front::restore_repo_folders_open(node.conn.name, repo); // keep already-open folders open
+            if (!editing) front::open_added_folder_parent(node.conn.name, repo, parent_id);
           }
         }
         app.folder_dlg.open = false;
@@ -405,17 +401,17 @@ int main(int /*argc*/, char * /*argv*/[])
         // ReSharper disable once CppTooWideScopeInitStatement
         int uri = app.unit_dlg.repo_idx;
         if (uci >= 0 && uci < static_cast<int>(app.conns.size()) && uri >= 0 && uri < static_cast<int>(app.conns[uci].repos.size())) {
-          ConnNode         &node      = app.conns[uci];
-          RepoNode         &repo      = node.repos[uri];
-          const bool        editing   = app.unit_dlg.editing;
-          const std::string parent_id = app.unit_dlg.parent_folder_id;
+          back::model::ConnNode &node      = app.conns[uci];
+          back::model::RepoNode &repo      = node.repos[uri];
+          const bool             editing   = app.unit_dlg.editing;
+          const std::string      parent_id = app.unit_dlg.parent_folder_id;
 
-          auto [ok, err] = load_repo_tree(node.conn, repo.schema_name, repo);
+          auto [ok, err] = back::load_repo_tree(node.conn, repo.schema_name, repo);
           if (!ok) {
             app.msg_dlg = {true, "Ошибка", std::move(err)};
           } else {
-            restore_repo_folders_open(node.conn.name, repo);                         // keep already-open folders open
-            if (!editing) open_added_folder_parent(node.conn.name, repo, parent_id); // reveal the new unit
+            front::restore_repo_folders_open(node.conn.name, repo);                         // keep already-open folders open
+            if (!editing) front::open_added_folder_parent(node.conn.name, repo, parent_id); // reveal the new unit
           }
         }
         app.unit_dlg.open = false;
@@ -448,7 +444,7 @@ int main(int /*argc*/, char * /*argv*/[])
           // ReSharper disable once CppTooWideScopeInitStatement
           int idx = app.pending_delete_idx;
           if (idx < static_cast<int>(app.conns.size())) {
-            delete_conn(app.conns[idx].conn.name);
+            back::delete_conn(app.conns[idx].conn.name);
             app.reload_conns();
           }
           app.pending_delete_idx = -1;
@@ -459,14 +455,14 @@ int main(int /*argc*/, char * /*argv*/[])
           if (fci >= 0 && fci < static_cast<int>(app.conns.size()) && fri >= 0 && fri < static_cast<int>(app.conns[fci].repos.size())) {
             auto &repo     = app.conns[fci].repos[fri];
             // ReSharper disable once CppTooWideScopeInitStatement
-            auto [ok, err] = delete_folder_recursive(app.conns[fci].conn, repo.schema_name, app.pending_delete_folder_id);
+            auto [ok, err] = back::delete_folder_recursive(app.conns[fci].conn, repo.schema_name, app.pending_delete_folder_id);
             if (ok) {
               // ReSharper disable once CppTooWideScopeInitStatement
-              auto [ok2, err2] = load_repo_tree(app.conns[fci].conn, repo.schema_name, repo);
+              auto [ok2, err2] = back::load_repo_tree(app.conns[fci].conn, repo.schema_name, repo);
               if (!ok2)
                 app.msg_dlg = {true, "Ошибка", std::move(err2)};
               else
-                restore_repo_folders_open(app.conns[fci].conn.name, repo); // keep already-open folders open
+                front::restore_repo_folders_open(app.conns[fci].conn.name, repo); // keep already-open folders open
             } else {
               app.msg_dlg = {true, "Ошибка", std::move(err)};
             }
@@ -481,14 +477,14 @@ int main(int /*argc*/, char * /*argv*/[])
           if (uci >= 0 && uci < static_cast<int>(app.conns.size()) && uri >= 0 && uri < static_cast<int>(app.conns[uci].repos.size())) {
             auto &repo     = app.conns[uci].repos[uri];
             // ReSharper disable once CppTooWideScopeInitStatement
-            auto [ok, err] = delete_unit(app.conns[uci].conn, repo.schema_name, app.pending_delete_unit_id);
+            auto [ok, err] = back::delete_unit(app.conns[uci].conn, repo.schema_name, app.pending_delete_unit_id);
             if (ok) {
               // ReSharper disable once CppTooWideScopeInitStatement
-              auto [ok2, err2] = load_repo_tree(app.conns[uci].conn, repo.schema_name, repo);
+              auto [ok2, err2] = back::load_repo_tree(app.conns[uci].conn, repo.schema_name, repo);
               if (!ok2)
                 app.msg_dlg = {true, "Ошибка", std::move(err2)};
               else
-                restore_repo_folders_open(app.conns[uci].conn.name, repo); // keep already-open folders open
+                front::restore_repo_folders_open(app.conns[uci].conn.name, repo); // keep already-open folders open
             } else {
               app.msg_dlg = {true, "Ошибка", std::move(err)};
             }

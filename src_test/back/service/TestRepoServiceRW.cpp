@@ -5,8 +5,6 @@
 #include <string>
 #include <vector>
 
-using namespace back;
-
 // ---------------------------------------------------------------------------
 // DB-backed tests
 // ---------------------------------------------------------------------------
@@ -26,7 +24,7 @@ TEST_F(RepoServiceRWTest, CreateRepositoryCreatesSchemaAndTables)
 {
   //
   //
-  auto [ok, msg] = create_repository(conn(), schema, "My Repo");
+  auto [ok, msg] = back::create_repository(conn(), schema, "My Repo");
   //
   //
 
@@ -41,7 +39,7 @@ TEST_F(RepoServiceRWTest, CreateRepositoryAddsAuditColumns)
 {
   //
   //
-  auto [ok, msg] = create_repository(conn(), schema, "R");
+  auto [ok, msg] = back::create_repository(conn(), schema, "R");
   //
   //
 
@@ -52,11 +50,11 @@ TEST_F(RepoServiceRWTest, CreateRepositoryAddsAuditColumns)
 
 TEST_F(RepoServiceRWTest, CreateRepositoryIsIdempotentAndUpdatesName)
 {
-  ASSERT_TRUE(create_repository(conn(), schema, "First").first);
+  ASSERT_TRUE(back::create_repository(conn(), schema, "First").first);
 
   //
   //
-  auto [ok, msg] = create_repository(conn(), schema, "Second"); // ON CONFLICT updates value
+  auto [ok, msg] = back::create_repository(conn(), schema, "Second"); // ON CONFLICT updates value
   //
   //
 
@@ -66,11 +64,11 @@ TEST_F(RepoServiceRWTest, CreateRepositoryIsIdempotentAndUpdatesName)
 
 TEST_F(RepoServiceRWTest, EditRepositoryRenamesValueOnly)
 {
-  ASSERT_TRUE(create_repository(conn(), schema, "Old Name").first);
+  ASSERT_TRUE(back::create_repository(conn(), schema, "Old Name").first);
 
   //
   //
-  auto [ok, msg] = edit_repository(conn(), schema, schema, "New Name");
+  auto [ok, msg] = back::edit_repository(conn(), schema, schema, "New Name");
   //
   //
 
@@ -80,12 +78,12 @@ TEST_F(RepoServiceRWTest, EditRepositoryRenamesValueOnly)
 
 TEST_F(RepoServiceRWTest, EditRepositoryRenamesSchema)
 {
-  ASSERT_TRUE(create_repository(conn(), schema, "R").first);
+  ASSERT_TRUE(back::create_repository(conn(), schema, "R").first);
   const std::string new_schema = schema + "_renamed";
 
   //
   //
-  auto [ok, msg] = edit_repository(conn(), schema, new_schema, "R2");
+  auto [ok, msg] = back::edit_repository(conn(), schema, new_schema, "R2");
   //
   //
 

@@ -5,10 +5,8 @@
 
 namespace back {
 
-  using namespace model;
-
   std::pair<bool, std::string> create_unit(
-      const Conn &c, const std::string &schema, const std::string &parent_folder_id, const std::string &name, UnitType type)
+      const model::Conn &c, const std::string &schema, const std::string &parent_folder_id, const std::string &name, model::UnitType type)
   {
     try {
       pqxx::connection pg(make_cs(c));
@@ -19,7 +17,7 @@ namespace back {
       InitDb(txn, pg, schema).init_unit_table();
 
       std::string       id       = new_id();
-      const std::string type_str = to_string(type);
+      const std::string type_str = model::to_string(type);
       if (parent_folder_id.empty()) {
         txn.exec("INSERT INTO " + schemaQuote + ".unit (id, name, type) VALUES ($1, $2, $3)", pqxx::params{txn, id, name, type_str});
       } else {
@@ -35,12 +33,13 @@ namespace back {
     }
   }
 
-  std::pair<bool, std::string> edit_unit(const Conn &c, const std::string &schema, const std::string &id, const std::string &name, UnitType type)
+  std::pair<bool, std::string> edit_unit(
+      const model::Conn &c, const std::string &schema, const std::string &id, const std::string &name, model::UnitType type)
   {
     try {
       pqxx::connection  pg(make_cs(c));
       pqxx::work        txn(pg);
-      const std::string type_str = to_string(type);
+      const std::string type_str = model::to_string(type);
       txn.exec("UPDATE " + pg.quote_name(schema) + ".unit SET name = $1, type = $2 WHERE id = $3", pqxx::params{txn, name, type_str, id});
       txn.commit();
       return {true, ""};
@@ -51,7 +50,7 @@ namespace back {
     }
   }
 
-  std::pair<bool, std::string> delete_unit(const Conn &c, const std::string &schema, const std::string &id)
+  std::pair<bool, std::string> delete_unit(const model::Conn &c, const std::string &schema, const std::string &id)
   {
     try {
       pqxx::connection pg(make_cs(c));
@@ -66,7 +65,7 @@ namespace back {
     }
   }
 
-  std::pair<bool, std::string> ensure_unit_tables(const Conn &c)
+  std::pair<bool, std::string> ensure_unit_tables(const model::Conn &c)
   {
     try {
       pqxx::connection pg(make_cs(c));

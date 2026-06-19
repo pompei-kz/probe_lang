@@ -2,15 +2,13 @@
 #include "back/etc/InitDb.h"
 #include <gtest/gtest.h>
 
-using namespace back;
-
 class InitDbTest : public DbTest
 {
 protected:
   void init_repo()
   {
     pqxx::work txn(*pg);
-    InitDb(txn, *pg, schema).init_repo_schema();
+    back::InitDb(txn, *pg, schema).init_repo_schema();
     txn.commit();
   }
 };
@@ -76,7 +74,7 @@ TEST_F(InitDbTest, InitRepoSchemaIsIdempotent)
   pqxx::work txn(*pg);
   //
   //
-  EXPECT_NO_THROW(InitDb(txn, *pg, schema).init_repo_schema());
+  EXPECT_NO_THROW(back::InitDb(txn, *pg, schema).init_repo_schema());
   //
   //
   txn.commit();
@@ -98,7 +96,7 @@ TEST_F(InitDbTest, InitFolderTableCreatesTable)
     pqxx::work txn(*pg);
     //
     //
-    InitDb(txn, *pg, schema).init_folder_table();
+    back::InitDb(txn, *pg, schema).init_folder_table();
     //
     //
     txn.commit();
@@ -115,14 +113,14 @@ TEST_F(InitDbTest, InitFolderTableIsIdempotent)
   make_schema();
   {
     pqxx::work txn(*pg);
-    InitDb(txn, *pg, schema).init_folder_table(); // first creation
+    back::InitDb(txn, *pg, schema).init_folder_table(); // first creation
     txn.commit();
   }
 
   pqxx::work txn(*pg);
   //
   //
-  EXPECT_NO_THROW(InitDb(txn, *pg, schema).init_folder_table());
+  EXPECT_NO_THROW(back::InitDb(txn, *pg, schema).init_folder_table());
   //
   //
   txn.commit();

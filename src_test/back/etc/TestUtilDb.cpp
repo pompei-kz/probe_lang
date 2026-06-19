@@ -8,8 +8,6 @@
 #include <string>
 #include <thread>
 
-using namespace back;
-
 // ---------------------------------------------------------------------------
 // Fixture: each test runs in its own schema named "<TestName>_<timestamp>".
 // The schema is deliberately left in place after the test (no cleanup) so the
@@ -74,7 +72,7 @@ TEST_F(UtilDbTest, EnsureCreatedAtAddsColumn)
     pqxx::work txn(*pg);
     //
     //
-    ensureCreatedAt(txn, schema, "t");
+    back::ensureCreatedAt(txn, schema, "t");
     //
     //
     txn.commit();
@@ -91,7 +89,7 @@ TEST_F(UtilDbTest, EnsureCreatedAtIsTimestampWithNowDefault)
     pqxx::work txn(*pg);
     //
     //
-    ensureCreatedAt(txn, schema, "t");
+    back::ensureCreatedAt(txn, schema, "t");
     //
     //
     txn.commit();
@@ -115,7 +113,7 @@ TEST_F(UtilDbTest, EnsureCreatedAtPopulatedOnInsert)
     pqxx::work txn(*pg);
     //
     //
-    ensureCreatedAt(txn, schema, "t");
+    back::ensureCreatedAt(txn, schema, "t");
     //
     //
     txn.commit();
@@ -134,7 +132,7 @@ TEST_F(UtilDbTest, EnsureCreatedAtIsIdempotent)
   create_table("t", "id int");
   {
     pqxx::work txn(*pg);
-    ensureCreatedAt(txn, schema, "t"); // first call
+    back::ensureCreatedAt(txn, schema, "t"); // first call
     txn.commit();
   }
 
@@ -142,7 +140,7 @@ TEST_F(UtilDbTest, EnsureCreatedAtIsIdempotent)
     pqxx::work txn(*pg);
     //
     //
-    EXPECT_NO_THROW(ensureCreatedAt(txn, schema, "t"));
+    EXPECT_NO_THROW(back::ensureCreatedAt(txn, schema, "t"));
     //
     //
     txn.commit();
@@ -167,7 +165,7 @@ TEST_F(UtilDbTest, EnsureLastModifiedAtAddsColumn)
     pqxx::work txn(*pg);
     //
     //
-    ensureLastModifiedAt(txn, schema, "t");
+    back::ensureLastModifiedAt(txn, schema, "t");
     //
     //
     txn.commit();
@@ -184,7 +182,7 @@ TEST_F(UtilDbTest, LastModifiedAtNullBeforeUpdate)
     pqxx::work txn(*pg);
     //
     //
-    ensureLastModifiedAt(txn, schema, "t");
+    back::ensureLastModifiedAt(txn, schema, "t");
     //
     //
     txn.commit();
@@ -211,7 +209,7 @@ TEST_F(UtilDbTest, LastModifiedAtSetWhenAnotherFieldChanges)
     pqxx::work txn(*pg);
     //
     //
-    ensureLastModifiedAt(txn, schema, "t");
+    back::ensureLastModifiedAt(txn, schema, "t");
     //
     //
     txn.commit();
@@ -242,7 +240,7 @@ TEST_F(UtilDbTest, LastModifiedAtAdvancesOnSubsequentUpdate)
     pqxx::work txn(*pg);
     //
     //
-    ensureLastModifiedAt(txn, schema, "t");
+    back::ensureLastModifiedAt(txn, schema, "t");
     //
     //
     txn.commit();
@@ -282,7 +280,7 @@ TEST_F(UtilDbTest, EnsureLastModifiedAtIsIdempotent)
   create_table("t", "id int primary key, val text");
   {
     pqxx::work txn(*pg);
-    ensureLastModifiedAt(txn, schema, "t"); // first call
+    back::ensureLastModifiedAt(txn, schema, "t"); // first call
     txn.commit();
   }
 
@@ -291,7 +289,7 @@ TEST_F(UtilDbTest, EnsureLastModifiedAtIsIdempotent)
     pqxx::work txn(*pg);
     //
     //
-    EXPECT_NO_THROW(ensureLastModifiedAt(txn, schema, "t"));
+    EXPECT_NO_THROW(back::ensureLastModifiedAt(txn, schema, "t"));
     //
     //
     txn.commit();
@@ -316,7 +314,7 @@ TEST_F(UtilDbTest, HasSchemaTrueForExistingSchema)
   pqxx::work txn(*pg);
   //
   //
-  const bool result = hasSchema(txn, schema);
+  const bool result = back::hasSchema(txn, schema);
   //
   //
   EXPECT_TRUE(result);
@@ -327,7 +325,7 @@ TEST_F(UtilDbTest, HasSchemaFalseForMissingSchema)
   pqxx::work txn(*pg);
   //
   //
-  const bool result = hasSchema(txn, schema + "_does_not_exist");
+  const bool result = back::hasSchema(txn, schema + "_does_not_exist");
   //
   //
   EXPECT_FALSE(result);
@@ -338,7 +336,7 @@ TEST_F(UtilDbTest, HasSchemaTrueForBuiltinPublicSchema)
   pqxx::work txn(*pg);
   //
   //
-  const bool result = hasSchema(txn, "public");
+  const bool result = back::hasSchema(txn, "public");
   //
   //
   EXPECT_TRUE(result);
@@ -355,7 +353,7 @@ TEST_F(UtilDbTest, HasTableTrueForExistingTable)
   pqxx::work txn(*pg);
   //
   //
-  const bool result = hasTable(txn, schema, "t");
+  const bool result = back::hasTable(txn, schema, "t");
   //
   //
   EXPECT_TRUE(result);
@@ -366,7 +364,7 @@ TEST_F(UtilDbTest, HasTableFalseForMissingTable)
   pqxx::work txn(*pg);
   //
   //
-  const bool result = hasTable(txn, schema, "no_such_table");
+  const bool result = back::hasTable(txn, schema, "no_such_table");
   //
   //
   EXPECT_FALSE(result);
@@ -380,7 +378,7 @@ TEST_F(UtilDbTest, HasTableFalseWhenTableInDifferentSchema)
   pqxx::work txn(*pg);
   //
   //
-  const bool result = hasTable(txn, "public", "t");
+  const bool result = back::hasTable(txn, "public", "t");
   //
   //
   EXPECT_FALSE(result);
@@ -391,7 +389,7 @@ TEST_F(UtilDbTest, HasTableFalseForMissingSchema)
   pqxx::work txn(*pg);
   //
   //
-  const bool result = hasTable(txn, schema + "_does_not_exist", "t");
+  const bool result = back::hasTable(txn, schema + "_does_not_exist", "t");
   //
   //
   EXPECT_FALSE(result);
@@ -413,7 +411,7 @@ TEST_F(UtilDbTest, HasIndexTrueForExistingIndex)
   pqxx::work txn(*pg);
   //
   //
-  const bool result = hasIndex(txn, schema, "t_val_idx");
+  const bool result = back::hasIndex(txn, schema, "t_val_idx");
   //
   //
   EXPECT_TRUE(result);
@@ -426,7 +424,7 @@ TEST_F(UtilDbTest, HasIndexFalseForMissingIndex)
   pqxx::work txn(*pg);
   //
   //
-  const bool result = hasIndex(txn, schema, "no_such_index");
+  const bool result = back::hasIndex(txn, schema, "no_such_index");
   //
   //
   EXPECT_FALSE(result);
@@ -445,7 +443,7 @@ TEST_F(UtilDbTest, HasIndexFalseWhenIndexInDifferentSchema)
   pqxx::work txn(*pg);
   //
   //
-  const bool result = hasIndex(txn, "public", "t_val_idx");
+  const bool result = back::hasIndex(txn, "public", "t_val_idx");
   //
   //
   EXPECT_FALSE(result);
@@ -459,7 +457,7 @@ TEST_F(UtilDbTest, HasIndexTrueForPrimaryKeyIndex)
   pqxx::work txn(*pg);
   //
   //
-  const bool result = hasIndex(txn, schema, "t_pkey");
+  const bool result = back::hasIndex(txn, schema, "t_pkey");
   //
   //
   EXPECT_TRUE(result);
@@ -470,7 +468,7 @@ TEST_F(UtilDbTest, HasIndexFalseForMissingSchema)
   pqxx::work txn(*pg);
   //
   //
-  const bool result = hasIndex(txn, schema + "_does_not_exist", "t_val_idx");
+  const bool result = back::hasIndex(txn, schema + "_does_not_exist", "t_val_idx");
   //
   //
   EXPECT_FALSE(result);
@@ -491,7 +489,7 @@ TEST_F(UtilDbTest, HasSequenceTrueForExistingSequence)
   pqxx::work txn(*pg);
   //
   //
-  const bool result = hasSequence(txn, schema, "s");
+  const bool result = back::hasSequence(txn, schema, "s");
   //
   //
   EXPECT_TRUE(result);
@@ -502,7 +500,7 @@ TEST_F(UtilDbTest, HasSequenceFalseForMissingSequence)
   pqxx::work txn(*pg);
   //
   //
-  const bool result = hasSequence(txn, schema, "no_such_sequence");
+  const bool result = back::hasSequence(txn, schema, "no_such_sequence");
   //
   //
   EXPECT_FALSE(result);
@@ -520,7 +518,7 @@ TEST_F(UtilDbTest, HasSequenceFalseWhenSequenceInDifferentSchema)
   pqxx::work txn(*pg);
   //
   //
-  const bool result = hasSequence(txn, "public", "s");
+  const bool result = back::hasSequence(txn, "public", "s");
   //
   //
   EXPECT_FALSE(result);
@@ -531,7 +529,7 @@ TEST_F(UtilDbTest, HasSequenceFalseForMissingSchema)
   pqxx::work txn(*pg);
   //
   //
-  const bool result = hasSequence(txn, schema + "_does_not_exist", "s");
+  const bool result = back::hasSequence(txn, schema + "_does_not_exist", "s");
   //
   //
   EXPECT_FALSE(result);

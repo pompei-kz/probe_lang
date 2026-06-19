@@ -9,7 +9,6 @@
 #include <vector>
 
 namespace fs = std::filesystem;
-using namespace back;
 
 // ---------------------------------------------------------------------------
 // Fixture
@@ -62,7 +61,7 @@ TEST_F(ProjectTreeServiceRWTest, OpenCreatesMarkerFile)
 {
   //
   //
-  open_tree_node({"conn"});
+  back::open_tree_node({"conn"});
   //
   //
 
@@ -73,7 +72,7 @@ TEST_F(ProjectTreeServiceRWTest, OpenJoinsPathWithHash)
 {
   //
   //
-  open_tree_node({"conn", "public", "abc"});
+  back::open_tree_node({"conn", "public", "abc"});
   //
   //
 
@@ -84,7 +83,7 @@ TEST_F(ProjectTreeServiceRWTest, OpenCreatesEmptyFile)
 {
   //
   //
-  open_tree_node({"conn", "public"});
+  back::open_tree_node({"conn", "public"});
   //
   //
 
@@ -94,11 +93,11 @@ TEST_F(ProjectTreeServiceRWTest, OpenCreatesEmptyFile)
 
 TEST_F(ProjectTreeServiceRWTest, OpenIsIdempotent)
 {
-  open_tree_node({"conn"});
+  back::open_tree_node({"conn"});
 
   //
   //
-  open_tree_node({"conn"});
+  back::open_tree_node({"conn"});
   //
   //
 
@@ -111,12 +110,12 @@ TEST_F(ProjectTreeServiceRWTest, OpenIsIdempotent)
 
 TEST_F(ProjectTreeServiceRWTest, CloseRemovesMarkerFile)
 {
-  open_tree_node({"conn", "public"});
+  back::open_tree_node({"conn", "public"});
   ASSERT_TRUE(fs::exists(marker("conn#public")));
 
   //
   //
-  close_tree_node({"conn", "public"});
+  back::close_tree_node({"conn", "public"});
   //
   //
 
@@ -127,19 +126,19 @@ TEST_F(ProjectTreeServiceRWTest, CloseMissingNodeDoesNotThrow)
 {
   //
   //
-  EXPECT_NO_THROW(close_tree_node({"never", "created"}));
+  EXPECT_NO_THROW(back::close_tree_node({"never", "created"}));
   //
   //
 }
 
 TEST_F(ProjectTreeServiceRWTest, CloseAffectsOnlyTheGivenNode)
 {
-  open_tree_node({"conn"});
-  open_tree_node({"conn", "public"});
+  back::open_tree_node({"conn"});
+  back::open_tree_node({"conn", "public"});
 
   //
   //
-  close_tree_node({"conn", "public"});
+  back::close_tree_node({"conn", "public"});
   //
   //
 

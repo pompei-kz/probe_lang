@@ -6,9 +6,6 @@
 #include <string>
 #include <vector>
 
-using namespace back;
-using namespace back::model;
-
 class BlockServiceRTest : public DbTest
 {
 };
@@ -20,12 +17,12 @@ class BlockServiceRTest : public DbTest
 TEST_F(BlockServiceRTest, LoadReturnsBlockIntersectingView)
 {
   make_schema();
-  auto [id, msg] = create_block(conn(), schema, "u1", BlockType::Method, 10, 20, 30, 40, "m");
+  auto [id, msg] = back::create_block(conn(), schema, "u1", back::model::BlockType::Method, 10, 20, 30, 40, "m");
   ASSERT_FALSE(id.empty()) << msg;
 
   //
   //
-  auto [blocks, err] = load_blocks_in_view(conn(), schema, "u1", 0, 0, 100, 100);
+  auto [blocks, err] = back::load_blocks_in_view(conn(), schema, "u1", 0, 0, 100, 100);
   //
   //
 
@@ -33,7 +30,7 @@ TEST_F(BlockServiceRTest, LoadReturnsBlockIntersectingView)
   ASSERT_EQ(blocks.size(), 1u);
   EXPECT_EQ(blocks[0].id, id);
   EXPECT_EQ(blocks[0].unit_id, "u1");
-  EXPECT_EQ(blocks[0].type, BlockType::Method);
+  EXPECT_EQ(blocks[0].type, back::model::BlockType::Method);
   EXPECT_EQ(blocks[0].name, "m");
   EXPECT_FLOAT_EQ(blocks[0].x, 10);
   EXPECT_FLOAT_EQ(blocks[0].y, 20);
@@ -44,12 +41,12 @@ TEST_F(BlockServiceRTest, LoadReturnsBlockIntersectingView)
 TEST_F(BlockServiceRTest, LoadExcludesBlockOutsideView)
 {
   make_schema();
-  auto [id, msg] = create_block(conn(), schema, "u1", BlockType::Method, 10, 20, 30, 40, "m");
+  auto [id, msg] = back::create_block(conn(), schema, "u1", back::model::BlockType::Method, 10, 20, 30, 40, "m");
   ASSERT_FALSE(id.empty()) << msg;
 
   //
   //
-  auto [blocks, err] = load_blocks_in_view(conn(), schema, "u1", 500, 500, 600, 600);
+  auto [blocks, err] = back::load_blocks_in_view(conn(), schema, "u1", 500, 500, 600, 600);
   //
   //
 
@@ -60,12 +57,12 @@ TEST_F(BlockServiceRTest, LoadExcludesBlockOutsideView)
 TEST_F(BlockServiceRTest, LoadExcludesBlocksOfOtherUnits)
 {
   make_schema();
-  ASSERT_FALSE(create_block(conn(), schema, "u1", BlockType::Method, 0, 0, 50, 20, "mine").first.empty());
-  ASSERT_FALSE(create_block(conn(), schema, "u2", BlockType::Method, 0, 30, 50, 20, "other").first.empty());
+  ASSERT_FALSE(back::create_block(conn(), schema, "u1", back::model::BlockType::Method, 0, 0, 50, 20, "mine").first.empty());
+  ASSERT_FALSE(back::create_block(conn(), schema, "u2", back::model::BlockType::Method, 0, 30, 50, 20, "other").first.empty());
 
   //
   //
-  auto [blocks, err] = load_blocks_in_view(conn(), schema, "u1", -1000, -1000, 1000, 1000);
+  auto [blocks, err] = back::load_blocks_in_view(conn(), schema, "u1", -1000, -1000, 1000, 1000);
   //
   //
 
@@ -77,12 +74,12 @@ TEST_F(BlockServiceRTest, LoadExcludesBlocksOfOtherUnits)
 TEST_F(BlockServiceRTest, LoadReturnsBothMethodAndFieldNames)
 {
   make_schema();
-  ASSERT_FALSE(create_block(conn(), schema, "u1", BlockType::Method, 0, 0, 50, 20, "doWork").first.empty());
-  ASSERT_FALSE(create_block(conn(), schema, "u1", BlockType::Field, 0, 30, 50, 20, "count").first.empty());
+  ASSERT_FALSE(back::create_block(conn(), schema, "u1", back::model::BlockType::Method, 0, 0, 50, 20, "doWork").first.empty());
+  ASSERT_FALSE(back::create_block(conn(), schema, "u1", back::model::BlockType::Field, 0, 30, 50, 20, "count").first.empty());
 
   //
   //
-  auto [blocks, err] = load_blocks_in_view(conn(), schema, "u1", -1000, -1000, 1000, 1000);
+  auto [blocks, err] = back::load_blocks_in_view(conn(), schema, "u1", -1000, -1000, 1000, 1000);
   //
   //
 
@@ -90,10 +87,10 @@ TEST_F(BlockServiceRTest, LoadReturnsBothMethodAndFieldNames)
   ASSERT_EQ(blocks.size(), 2u);
   bool sawMethod = false, sawField = false;
   for (const auto &s : blocks) {
-    if (s.type == BlockType::Method) {
+    if (s.type == back::model::BlockType::Method) {
       sawMethod = (s.name == "doWork");
     }
-    if (s.type == BlockType::Field) {
+    if (s.type == back::model::BlockType::Field) {
       sawField = (s.name == "count");
     }
   }
@@ -107,7 +104,7 @@ TEST_F(BlockServiceRTest, LoadEmptyWhenTableMissing)
 
   //
   //
-  auto [blocks, err] = load_blocks_in_view(conn(), schema, "u1", 0, 0, 100, 100);
+  auto [blocks, err] = back::load_blocks_in_view(conn(), schema, "u1", 0, 0, 100, 100);
   //
   //
 
@@ -118,15 +115,15 @@ TEST_F(BlockServiceRTest, LoadEmptyWhenTableMissing)
 TEST_F(BlockServiceRTest, LoadAttachesArgsToMethodsInOrder)
 {
   make_schema();
-  auto [mid, mmsg] = create_block(conn(), schema, "u1", BlockType::Method, 0, 0, 50, 20, "m");
+  auto [mid, mmsg] = back::create_block(conn(), schema, "u1", back::model::BlockType::Method, 0, 0, 50, 20, "m");
   ASSERT_FALSE(mid.empty()) << mmsg;
   // Insert out of order; load must sort by order_index.
-  ASSERT_FALSE(create_method_arg(conn(), schema, mid, 1, "second").first.empty());
-  ASSERT_FALSE(create_method_arg(conn(), schema, mid, 0, "first").first.empty());
+  ASSERT_FALSE(back::create_method_arg(conn(), schema, mid, 1, "second").first.empty());
+  ASSERT_FALSE(back::create_method_arg(conn(), schema, mid, 0, "first").first.empty());
 
   //
   //
-  auto [blocks, err] = load_blocks_in_view(conn(), schema, "u1", -1000, -1000, 1000, 1000);
+  auto [blocks, err] = back::load_blocks_in_view(conn(), schema, "u1", -1000, -1000, 1000, 1000);
   //
   //
 
@@ -144,14 +141,14 @@ TEST_F(BlockServiceRTest, LoadAttachesArgsToMethodsInOrder)
 TEST_F(BlockServiceRTest, BboxSpansAllBlocksOfUnit)
 {
   make_schema();
-  ASSERT_FALSE(create_block(conn(), schema, "u1", BlockType::Method, 10, 10, 20, 20, "a").first.empty());
-  ASSERT_FALSE(create_block(conn(), schema, "u1", BlockType::Field, 50, 60, 20, 20, "b").first.empty());
+  ASSERT_FALSE(back::create_block(conn(), schema, "u1", back::model::BlockType::Method, 10, 10, 20, 20, "a").first.empty());
+  ASSERT_FALSE(back::create_block(conn(), schema, "u1", back::model::BlockType::Field, 50, 60, 20, 20, "b").first.empty());
   // Another unit's block must not affect u1's bbox.
-  ASSERT_FALSE(create_block(conn(), schema, "u2", BlockType::Method, 500, 500, 20, 20, "c").first.empty());
+  ASSERT_FALSE(back::create_block(conn(), schema, "u2", back::model::BlockType::Method, 500, 500, 20, 20, "c").first.empty());
 
   //
   //
-  auto [box, err] = block_bbox_for_unit(conn(), schema, "u1");
+  auto [box, err] = back::block_bbox_for_unit(conn(), schema, "u1");
   //
   //
 
@@ -166,11 +163,11 @@ TEST_F(BlockServiceRTest, BboxSpansAllBlocksOfUnit)
 TEST_F(BlockServiceRTest, BboxNullWhenUnitHasNoBlocks)
 {
   make_schema();
-  ASSERT_FALSE(create_block(conn(), schema, "u1", BlockType::Method, 0, 0, 20, 20, "a").first.empty());
+  ASSERT_FALSE(back::create_block(conn(), schema, "u1", back::model::BlockType::Method, 0, 0, 20, 20, "a").first.empty());
 
   //
   //
-  auto [box, err] = block_bbox_for_unit(conn(), schema, "other");
+  auto [box, err] = back::block_bbox_for_unit(conn(), schema, "other");
   //
   //
 
@@ -185,35 +182,35 @@ TEST_F(BlockServiceRTest, BboxNullWhenUnitHasNoBlocks)
 TEST_F(BlockServiceRTest, NewMethodHasDefaultAttributes)
 {
   make_schema();
-  ASSERT_FALSE(create_block(conn(), schema, "u1", BlockType::Method, 0, 0, 50, 20, "m").first.empty());
+  ASSERT_FALSE(back::create_block(conn(), schema, "u1", back::model::BlockType::Method, 0, 0, 50, 20, "m").first.empty());
 
   //
   //
-  auto [blocks, err] = load_blocks_in_view(conn(), schema, "u1", -1000, -1000, 1000, 1000);
+  auto [blocks, err] = back::load_blocks_in_view(conn(), schema, "u1", -1000, -1000, 1000, 1000);
   //
   //
 
   ASSERT_TRUE(err.empty()) << err;
   ASSERT_EQ(blocks.size(), 1u);
   EXPECT_FALSE(blocks[0].disabled);
-  EXPECT_EQ(blocks[0].method_type, MethodType::Inner);
-  EXPECT_EQ(blocks[0].access, MethodAccess::Private);
+  EXPECT_EQ(blocks[0].method_type, back::model::MethodType::Inner);
+  EXPECT_EQ(blocks[0].access, back::model::MethodAccess::Private);
 }
 
 TEST_F(BlockServiceRTest, NewFieldHasDefaultAttributes)
 {
   make_schema();
-  ASSERT_FALSE(create_block(conn(), schema, "u1", BlockType::Field, 0, 0, 50, 20, "f").first.empty());
+  ASSERT_FALSE(back::create_block(conn(), schema, "u1", back::model::BlockType::Field, 0, 0, 50, 20, "f").first.empty());
 
   //
   //
-  auto [blocks, err] = load_blocks_in_view(conn(), schema, "u1", -1000, -1000, 1000, 1000);
+  auto [blocks, err] = back::load_blocks_in_view(conn(), schema, "u1", -1000, -1000, 1000, 1000);
   //
   //
 
   ASSERT_TRUE(err.empty()) << err;
   ASSERT_EQ(blocks.size(), 1u);
-  EXPECT_EQ(blocks[0].type, BlockType::Field);
+  EXPECT_EQ(blocks[0].type, back::model::BlockType::Field);
   EXPECT_FALSE(blocks[0].disabled);
-  EXPECT_EQ(blocks[0].access, MethodAccess::Private);
+  EXPECT_EQ(blocks[0].access, back::model::MethodAccess::Private);
 }

@@ -5,8 +5,6 @@
 
 namespace back {
 
-  using namespace model;
-
   namespace fs = std::filesystem;
 
   static const char *PROG = "probe_lang";
@@ -18,9 +16,9 @@ namespace back {
     return fs::path(home ? home : ".") / ".config" / PROG / "workspace";
   }
 
-  std::vector<Conn> load_all()
+  std::vector<model::Conn> load_all()
   {
-    std::vector<Conn>     v;
+    std::vector<model::Conn> v;
     std::filesystem::path d = ws_dir();
 
     if (!fs::exists(d)) {
@@ -32,7 +30,7 @@ namespace back {
 
     for (const std::filesystem::directory_entry &e : fs::directory_iterator(d, ec)) {
       if (e.path().extension() != EXT) continue;
-      Conn c;
+      model::Conn c;
       c.name = e.path().stem().string();
       std::ifstream f(e.path());
       std::string   ln;

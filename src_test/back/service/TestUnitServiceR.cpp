@@ -7,9 +7,8 @@
 #include <string>
 #include <vector>
 
-using namespace back;
-using model::Unit;
-using model::UnitType;
+using back::model::Unit;
+using back::model::UnitType;
 
 class UnitServiceRTest : public DbTest
 {
@@ -17,7 +16,7 @@ protected:
   std::vector<Unit> load_units()
   {
     pqxx::work txn(*pg);
-    auto       u = load_units_for_schema(txn, *pg, schema);
+    auto       u = back::load_units_for_schema(txn, *pg, schema);
     txn.commit();
     return u;
   }
@@ -43,9 +42,9 @@ TEST_F(UnitServiceRTest, LoadUnitsWithoutTableReturnsEmpty)
 TEST_F(UnitServiceRTest, LoadUnitsSortedByName)
 {
   make_schema();
-  ASSERT_TRUE(create_unit(conn(), schema, "", "charlie", UnitType::Class).first);
-  ASSERT_TRUE(create_unit(conn(), schema, "", "alpha", UnitType::Class).first);
-  ASSERT_TRUE(create_unit(conn(), schema, "", "bravo", UnitType::Class).first);
+  ASSERT_TRUE(back::create_unit(conn(), schema, "", "charlie", UnitType::Class).first);
+  ASSERT_TRUE(back::create_unit(conn(), schema, "", "alpha", UnitType::Class).first);
+  ASSERT_TRUE(back::create_unit(conn(), schema, "", "bravo", UnitType::Class).first);
 
   //
   //
@@ -66,13 +65,13 @@ TEST_F(UnitServiceRTest, LoadUnitsSortedByName)
 TEST_F(UnitServiceRTest, ListUnitsPaginatedFiltersByWordsInOrder)
 {
   make_schema();
-  ASSERT_TRUE(create_unit(conn(), schema, "", "Foo Bar", UnitType::Class).first);
-  ASSERT_TRUE(create_unit(conn(), schema, "", "Foo Baz Bar", UnitType::Class).first);
-  ASSERT_TRUE(create_unit(conn(), schema, "", "Bar Foo", UnitType::Class).first);
+  ASSERT_TRUE(back::create_unit(conn(), schema, "", "Foo Bar", UnitType::Class).first);
+  ASSERT_TRUE(back::create_unit(conn(), schema, "", "Foo Baz Bar", UnitType::Class).first);
+  ASSERT_TRUE(back::create_unit(conn(), schema, "", "Bar Foo", UnitType::Class).first);
 
   //
   //
-  auto [units, err] = list_units_paginated(conn(), schema, "foo bar", 0, 10);
+  auto [units, err] = back::list_units_paginated(conn(), schema, "foo bar", 0, 10);
   //
   //
 
@@ -85,14 +84,14 @@ TEST_F(UnitServiceRTest, ListUnitsPaginatedFiltersByWordsInOrder)
 TEST_F(UnitServiceRTest, ListUnitsPaginatedRespectsOffsetAndLimit)
 {
   make_schema();
-  ASSERT_TRUE(create_unit(conn(), schema, "", "u1", UnitType::Class).first);
-  ASSERT_TRUE(create_unit(conn(), schema, "", "u2", UnitType::Class).first);
-  ASSERT_TRUE(create_unit(conn(), schema, "", "u3", UnitType::Class).first);
+  ASSERT_TRUE(back::create_unit(conn(), schema, "", "u1", UnitType::Class).first);
+  ASSERT_TRUE(back::create_unit(conn(), schema, "", "u2", UnitType::Class).first);
+  ASSERT_TRUE(back::create_unit(conn(), schema, "", "u3", UnitType::Class).first);
 
   //
   //
-  auto [page1, e1] = list_units_paginated(conn(), schema, "", 0, 2);
-  auto [page2, e2] = list_units_paginated(conn(), schema, "", 2, 2);
+  auto [page1, e1] = back::list_units_paginated(conn(), schema, "", 0, 2);
+  auto [page2, e2] = back::list_units_paginated(conn(), schema, "", 2, 2);
   //
   //
 
@@ -108,11 +107,11 @@ TEST_F(UnitServiceRTest, ListUnitsPaginatedRespectsOffsetAndLimit)
 TEST_F(UnitServiceRTest, ListUnitsPaginatedEmptyFilterMatchesAll)
 {
   make_schema();
-  ASSERT_TRUE(create_unit(conn(), schema, "", "only", UnitType::Class).first);
+  ASSERT_TRUE(back::create_unit(conn(), schema, "", "only", UnitType::Class).first);
 
   //
   //
-  auto [units, err] = list_units_paginated(conn(), schema, "", 0, 10);
+  auto [units, err] = back::list_units_paginated(conn(), schema, "", 0, 10);
   //
   //
 

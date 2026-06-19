@@ -5,8 +5,6 @@
 
 namespace back {
 
-  using namespace model;
-
   namespace fs = std::filesystem;
 
   static const char *EXT = ".pg-connect";
@@ -16,7 +14,7 @@ namespace back {
     fs::remove(ws_dir() / (name + EXT));
   }
 
-  void save_conn(const Conn &c, const std::string &old_name)
+  void save_conn(const model::Conn &c, const std::string &old_name)
   {
     const std::filesystem::path d = ws_dir();
 

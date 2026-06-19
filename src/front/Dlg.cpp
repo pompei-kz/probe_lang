@@ -2,9 +2,6 @@
 
 namespace front {
 
-  using namespace back;
-  using namespace back::model;
-
   void Dlg::open_add()
   {
     for (int i = 0; i < 6; i++) {
@@ -21,7 +18,7 @@ namespace front {
     snap_host = snap_port = snap_dbname = snap_user = snap_pass = "";
   }
 
-  void Dlg::open_edit(const Conn &c)
+  void Dlg::open_edit(const back::model::Conn &c)
   {
     open_add();
     fields[0].ed.set(c.name);
@@ -40,9 +37,9 @@ namespace front {
     snap_pass   = c.pass;
   }
 
-  Conn Dlg::to_conn() const
+  back::model::Conn Dlg::to_conn() const
   {
-    Conn c;
+    back::model::Conn c;
     c.name   = fields[0].ed.buf;
     c.host   = fields[1].ed.buf;
     c.port   = fields[2].ed.buf;

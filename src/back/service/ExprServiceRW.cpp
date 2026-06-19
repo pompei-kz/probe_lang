@@ -5,8 +5,6 @@
 
 namespace back {
 
-  using namespace model;
-
   // Placeholder geometry for a freshly created unit_e: the expression is drawn
   // inline next to its field for now, so its own canvas box is unused. Avoid a
   // degenerate (zero-size) envelope for the generated geom column.
@@ -15,9 +13,9 @@ namespace back {
   // Return the field's expression unit_e id, creating the row with `type` if the
   // soft reference unit_b_field.expr_id is absent (NULL or dangling). Otherwise
   // updates the existing row's type. Runs inside the caller's transaction.
-  static std::string ensure_field_expr(pqxx::work &txn, const std::string &qs, const std::string &field_id, ExprType type)
+  static std::string ensure_field_expr(pqxx::work &txn, const std::string &qs, const std::string &field_id, model::ExprType type)
   {
-    const std::string type_str = to_string(type);
+    const std::string type_str = model::to_string(type);
 
     // Resolve the current soft reference: existing unit_e id, or empty.
     pqxx::result r = txn.exec("SELECT e.id "
@@ -43,7 +41,7 @@ namespace back {
     return eid;
   }
 
-  std::pair<bool, std::string> set_field_expr_this_type(const Conn &c, const std::string &schema, const std::string &field_id, ExprType type)
+  std::pair<bool, std::string> set_field_expr_this_type(const model::Conn &c, const std::string &schema, const std::string &field_id, model::ExprType type)
   {
     try {
       pqxx::connection pg(make_cs(c));
@@ -61,7 +59,7 @@ namespace back {
     }
   }
 
-  std::pair<bool, std::string> set_field_expr_unit(const Conn &c, const std::string &schema, const std::string &field_id, const std::string &unit_id)
+  std::pair<bool, std::string> set_field_expr_unit(const model::Conn &c, const std::string &schema, const std::string &field_id, const std::string &unit_id)
   {
     try {
       pqxx::connection  pg(make_cs(c));
@@ -69,7 +67,7 @@ namespace back {
       const std::string qs = pg.quote_name(schema);
       InitDb(txn, pg, schema).init_unit_e_tables();
 
-      const std::string eid = ensure_field_expr(txn, qs, field_id, ExprType::Unit);
+      const std::string eid = ensure_field_expr(txn, qs, field_id, model::ExprType::Unit);
 
       // unit_e_unit.id -> unit_e.id (1:1). Upsert the detail row.
       txn.exec("INSERT INTO " + qs +
@@ -87,7 +85,7 @@ namespace back {
   }
 
   std::pair<bool, std::string> update_field_expr_rect(
-      const Conn &c, const std::string &schema, const std::string &field_id, float ex, float ey, float ew, float eh)
+      const model::Conn &c, const std::string &schema, const std::string &field_id, float ex, float ey, float ew, float eh)
   {
     try {
       pqxx::connection  pg(make_cs(c));

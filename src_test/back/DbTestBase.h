@@ -40,7 +40,7 @@ protected:
   back::model::Conn conn() const { return test_db::conn(); }
 
   // Create the (empty) per-test schema.
-  void make_schema()
+  void make_schema() const
   {
     pqxx::work txn(*pg);
     txn.exec("CREATE SCHEMA " + txn.quote_name(schema));
@@ -50,7 +50,7 @@ protected:
   // Fully-qualified, quoted "schema"."table".
   std::string qual(const std::string &table) const { return pg->quote_name(schema) + "." + pg->quote_name(table); }
 
-  bool schema_exists(const std::string &name)
+  bool schema_exists(const std::string &name) const
   {
     pqxx::work txn(*pg);
     return !txn.exec("SELECT 1 FROM information_schema.schemata WHERE schema_name=$1", pqxx::params{txn, name}).empty();

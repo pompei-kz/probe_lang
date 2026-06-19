@@ -6,8 +6,6 @@
 #include <string>
 #include <vector>
 
-using namespace back;
-
 class FolderServiceRTest : public DbTest
 {
 protected:
@@ -34,10 +32,10 @@ TEST_F(FolderServiceRTest, LoadRepoFoldersWithoutFolderTableReturnsEmpty)
 {
   make_schema(); // schema exists, but no folder table
 
-  std::vector<model::FolderNode> roots;
+  std::vector<back::model::FolderNode> roots;
   //
   //
-  auto [ok, msg] = load_repo_folders(conn(), schema, roots);
+  auto [ok, msg] = back::load_repo_folders(conn(), schema, roots);
   //
   //
 
@@ -48,14 +46,14 @@ TEST_F(FolderServiceRTest, LoadRepoFoldersWithoutFolderTableReturnsEmpty)
 TEST_F(FolderServiceRTest, LoadFoldersForSchemaBuildsTree)
 {
   make_schema();
-  ASSERT_TRUE(create_folder(conn(), schema, "", "Root").first);
+  ASSERT_TRUE(back::create_folder(conn(), schema, "", "Root").first);
   const std::string root = folder_id("Root");
-  ASSERT_TRUE(create_folder(conn(), schema, root, "Child").first);
+  ASSERT_TRUE(back::create_folder(conn(), schema, root, "Child").first);
 
   pqxx::work txn(*pg);
   //
   //
-  auto tree = load_folders_for_schema(txn, *pg, schema);
+  auto tree = back::load_folders_for_schema(txn, *pg, schema);
   //
   //
   txn.commit();

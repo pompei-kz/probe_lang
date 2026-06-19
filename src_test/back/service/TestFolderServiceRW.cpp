@@ -6,8 +6,6 @@
 #include <string>
 #include <vector>
 
-using namespace back;
-
 class FolderServiceRWTest : public DbTest
 {
 protected:
@@ -37,7 +35,7 @@ TEST_F(FolderServiceRWTest, CreateFolderCreatesTableIfMissing)
 
   //
   //
-  auto [ok, msg] = create_folder(conn(), schema, "", "X");
+  auto [ok, msg] = back::create_folder(conn(), schema, "", "X");
   //
   //
 
@@ -51,13 +49,13 @@ TEST_F(FolderServiceRWTest, CreateRootFolder)
 
   //
   //
-  auto [ok, msg] = create_folder(conn(), schema, "", "Root");
+  auto [ok, msg] = back::create_folder(conn(), schema, "", "Root");
   //
   //
 
   ASSERT_TRUE(ok) << msg;
-  std::vector<model::FolderNode> roots;
-  ASSERT_TRUE(load_repo_folders(conn(), schema, roots).first);
+  std::vector<back::model::FolderNode> roots;
+  ASSERT_TRUE(back::load_repo_folders(conn(), schema, roots).first);
   ASSERT_EQ(roots.size(), 1u);
   EXPECT_EQ(roots[0].name, "Root");
   EXPECT_TRUE(roots[0].parent_id.empty());
@@ -66,19 +64,19 @@ TEST_F(FolderServiceRWTest, CreateRootFolder)
 TEST_F(FolderServiceRWTest, CreateChildFolderBuildsTree)
 {
   make_schema();
-  ASSERT_TRUE(create_folder(conn(), schema, "", "Parent").first);
+  ASSERT_TRUE(back::create_folder(conn(), schema, "", "Parent").first);
   const std::string pid = folder_id("Parent");
   ASSERT_FALSE(pid.empty());
 
   //
   //
-  auto [ok, msg] = create_folder(conn(), schema, pid, "Child");
+  auto [ok, msg] = back::create_folder(conn(), schema, pid, "Child");
   //
   //
 
   ASSERT_TRUE(ok) << msg;
-  std::vector<model::FolderNode> roots;
-  ASSERT_TRUE(load_repo_folders(conn(), schema, roots).first);
+  std::vector<back::model::FolderNode> roots;
+  ASSERT_TRUE(back::load_repo_folders(conn(), schema, roots).first);
   ASSERT_EQ(roots.size(), 1u);
   EXPECT_EQ(roots[0].name, "Parent");
   ASSERT_EQ(roots[0].children.size(), 1u);
@@ -93,12 +91,12 @@ TEST_F(FolderServiceRWTest, CreateChildFolderBuildsTree)
 TEST_F(FolderServiceRWTest, RenameFolder)
 {
   make_schema();
-  ASSERT_TRUE(create_folder(conn(), schema, "", "Before").first);
+  ASSERT_TRUE(back::create_folder(conn(), schema, "", "Before").first);
   const std::string id = folder_id("Before");
 
   //
   //
-  auto [ok, msg] = rename_folder(conn(), schema, id, "After");
+  auto [ok, msg] = back::rename_folder(conn(), schema, id, "After");
   //
   //
 
@@ -114,16 +112,16 @@ TEST_F(FolderServiceRWTest, RenameFolder)
 TEST_F(FolderServiceRWTest, DeleteFolderRecursiveRemovesDescendants)
 {
   make_schema();
-  ASSERT_TRUE(create_folder(conn(), schema, "", "Root").first);
+  ASSERT_TRUE(back::create_folder(conn(), schema, "", "Root").first);
   const std::string root = folder_id("Root");
-  ASSERT_TRUE(create_folder(conn(), schema, root, "Child").first);
+  ASSERT_TRUE(back::create_folder(conn(), schema, root, "Child").first);
   const std::string child = folder_id("Child");
-  ASSERT_TRUE(create_folder(conn(), schema, child, "Grand").first);
+  ASSERT_TRUE(back::create_folder(conn(), schema, child, "Grand").first);
   ASSERT_EQ(folder_count(), 3);
 
   //
   //
-  auto [ok, msg] = delete_folder_recursive(conn(), schema, root);
+  auto [ok, msg] = back::delete_folder_recursive(conn(), schema, root);
   //
   //
 
@@ -134,13 +132,13 @@ TEST_F(FolderServiceRWTest, DeleteFolderRecursiveRemovesDescendants)
 TEST_F(FolderServiceRWTest, DeleteFolderRecursiveKeepsSiblings)
 {
   make_schema();
-  ASSERT_TRUE(create_folder(conn(), schema, "", "A").first);
-  ASSERT_TRUE(create_folder(conn(), schema, "", "B").first);
+  ASSERT_TRUE(back::create_folder(conn(), schema, "", "A").first);
+  ASSERT_TRUE(back::create_folder(conn(), schema, "", "B").first);
   const std::string a = folder_id("A");
 
   //
   //
-  auto [ok, msg] = delete_folder_recursive(conn(), schema, a);
+  auto [ok, msg] = back::delete_folder_recursive(conn(), schema, a);
   //
   //
 

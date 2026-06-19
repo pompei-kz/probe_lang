@@ -4,16 +4,14 @@
 
 namespace back {
 
-  using namespace model;
-
   // Build folder tree from flat list (parent_id == "" means root)
-  static std::vector<FolderNode> build_folder_tree(const std::vector<std::tuple<std::string, std::string, std::string>> &flat,
-                                                   const std::string                                                    &parent_id)
+  static std::vector<model::FolderNode> build_folder_tree(const std::vector<std::tuple<std::string, std::string, std::string>> &flat,
+                                                          const std::string                                                    &parent_id)
   {
-    std::vector<FolderNode> result;
+    std::vector<model::FolderNode> result;
     for (const auto &[id, pid, name] : flat) {
       if (pid == parent_id) {
-        FolderNode node{id, pid, name, build_folder_tree(flat, id)};
+        model::FolderNode node{id, pid, name, build_folder_tree(flat, id)};
         result.push_back(std::move(node));
       }
     }
@@ -21,7 +19,7 @@ namespace back {
   }
 
   // Load all folders for a schema into a flat list, then build tree
-  std::vector<FolderNode> load_folders_for_schema(pqxx::work &txn, pqxx::connection &pg, const std::string &sch)
+  std::vector<model::FolderNode> load_folders_for_schema(pqxx::work &txn, pqxx::connection &pg, const std::string &sch)
   {
     // Check if folder table exists
     auto check = txn.exec("SELECT 1 FROM information_schema.tables "
@@ -39,7 +37,7 @@ namespace back {
     return build_folder_tree(flat, "");
   }
 
-  std::pair<bool, std::string> load_repo_folders(const Conn &c, const std::string &schema, std::vector<FolderNode> &root_folders)
+  std::pair<bool, std::string> load_repo_folders(const model::Conn &c, const std::string &schema, std::vector<model::FolderNode> &root_folders)
   {
     root_folders.clear();
     try {

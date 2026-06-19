@@ -9,7 +9,6 @@
 #include <vector>
 
 namespace fs = std::filesystem;
-using namespace back;
 
 // UnitEditorState stores one file per unit under
 // $HOME/.config/probe_lang/unit_editor_sys_coord/. The directory is derived from
@@ -52,7 +51,7 @@ TEST_F(UnitEditorStateTest, DirIsUnderHome)
 {
   //
   //
-  const fs::path dir = unit_editor_sys_coord_dir();
+  const fs::path dir = back::unit_editor_sys_coord_dir();
   //
   //
 
@@ -63,7 +62,7 @@ TEST_F(UnitEditorStateTest, LoadMissingReturnsNullopt)
 {
   //
   //
-  const auto st = load_unit_editor_coord("nope");
+  const auto st = back::load_unit_editor_coord("nope");
   //
   //
 
@@ -74,7 +73,7 @@ TEST_F(UnitEditorStateTest, SaveCreatesFileNamedByUnitId)
 {
   //
   //
-  save_unit_editor_coord("unit42", {1.5, 10.0, 20.0});
+  back::save_unit_editor_coord("unit42", {1.5, 10.0, 20.0});
   //
   //
 
@@ -83,11 +82,11 @@ TEST_F(UnitEditorStateTest, SaveCreatesFileNamedByUnitId)
 
 TEST_F(UnitEditorStateTest, SaveThenLoadRoundTrips)
 {
-  save_unit_editor_coord("u1", {2.25, -123.5, 678.75});
+  back::save_unit_editor_coord("u1", {2.25, -123.5, 678.75});
 
   //
   //
-  const auto st = load_unit_editor_coord("u1");
+  const auto st = back::load_unit_editor_coord("u1");
   //
   //
 
@@ -99,15 +98,15 @@ TEST_F(UnitEditorStateTest, SaveThenLoadRoundTrips)
 
 TEST_F(UnitEditorStateTest, SaveOverwritesPreviousState)
 {
-  save_unit_editor_coord("u1", {1.0, 0.0, 0.0});
+  back::save_unit_editor_coord("u1", {1.0, 0.0, 0.0});
 
   //
   //
-  save_unit_editor_coord("u1", {3.0, 5.0, 6.0});
+  back::save_unit_editor_coord("u1", {3.0, 5.0, 6.0});
   //
   //
 
-  const auto st = load_unit_editor_coord("u1");
+  const auto st = back::load_unit_editor_coord("u1");
   ASSERT_TRUE(st.has_value());
   EXPECT_DOUBLE_EQ(st->zoom, 3.0);
   EXPECT_DOUBLE_EQ(st->cam_x, 5.0);
@@ -116,7 +115,7 @@ TEST_F(UnitEditorStateTest, SaveOverwritesPreviousState)
 
 TEST_F(UnitEditorStateTest, FileHoldsKeyValueLines)
 {
-  save_unit_editor_coord("u1", {1.5, 10.0, 20.0});
+  back::save_unit_editor_coord("u1", {1.5, 10.0, 20.0});
 
   //
   //
@@ -140,7 +139,7 @@ TEST_F(UnitEditorStateTest, MissingKeysKeepDefaults)
 
   //
   //
-  const auto st = load_unit_editor_coord("partial");
+  const auto st = back::load_unit_editor_coord("partial");
   //
   //
 

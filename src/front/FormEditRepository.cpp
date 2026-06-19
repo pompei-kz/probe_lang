@@ -8,16 +8,13 @@
 
 namespace front {
 
-  using namespace back;
-  using namespace back::model;
-
   static constexpr float FDW   = 420.f;
   static constexpr float FDH   = 320.f;
   static constexpr float FFH   = 28.f;
   static constexpr float FFS   = 58.f;
   static constexpr float ERR_H = 80.f;
 
-  void FormEditRepository::open_for(const Conn &c)
+  void FormEditRepository::open_for(const back::model::Conn &c)
   {
     for (auto &f : fields) {
       f.ed       = TextEditor{};
@@ -31,7 +28,7 @@ namespace front {
     original_schema = "";
   }
 
-  void FormEditRepository::open_edit_for(const Conn &c, const RepoNode &repo)
+  void FormEditRepository::open_edit_for(const back::model::Conn &c, const back::model::RepoNode &repo)
   {
     open_for(c);
     fields[0].ed.set(repo.schema_name);
@@ -116,7 +113,7 @@ namespace front {
         err_view.set("Repository name is required");
         return 0;
       }
-      auto [ok, msg] = editing ? edit_repository(conn, original_schema, schema, reponame) : create_repository(conn, schema, reponame);
+      auto [ok, msg] = editing ? back::edit_repository(conn, original_schema, schema, reponame) : back::create_repository(conn, schema, reponame);
       if (ok) return 1;
       err_view.set(msg);
     }
