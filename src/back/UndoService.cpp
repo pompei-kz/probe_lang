@@ -5,7 +5,6 @@
 #include "UndoService.h"
 
 #include <optional>
-#include <stdexcept>
 
 namespace back {
   using model::UndoRowChange;
@@ -27,12 +26,25 @@ namespace back {
       const std::string    qtable = pg_.quote_name(schema_) + "." + pg_.quote_name(u.tableName);
 
       if (u.toDelete) {
-        // Модель UndoRowChange умеет лишь удалять строки или менять значение
-        // одной колонки — вставлять строки она не может, поэтому восстановить
-        // удалённую строку нечем.
-        throw std::runtime_error("UndoService: отмена удаления (toDelete=TRUE) не поддерживается "
-                                 "текущей моделью UndoRowChange (нет вставки строк), таблица " +
-                                 u.tableName);
+        // Отмена удаления: вставки в модели нет, поэтому строку воссоздаём
+        // набором обновлений — по одному изменению на каждую колонку текущей
+        // строки. Первое применённое изменение создаст строку (upsert по id),
+        // остальные проставят оставшиеся колонки.
+        pqxx::result rows = txn_.exec_params("SELECT * FROM " + qtable + " WHERE id = $1", u.idValue);
+        if (rows.empty()) continue; // строки нет — удаление ничего не сделает, отменять нечего
+
+        for (const pqxx::field &f : rows[0]) {
+          if (std::string(f.name()) == "id") continue; // id уже задан в idValue каждого изменения
+
+          UndoRowChange undo;
+          undo.tableName = u.tableName;
+          undo.idValue   = u.idValue;
+          undo.toDelete  = false;
+          undo.colName   = f.name();
+          undo.value     = f.is_null() ? std::nullopt : std::optional<std::string>(f.c_str());
+          result.push_back(std::move(undo));
+        }
+        continue;
       }
 
       // Отмена обновления строки (id == idValue).

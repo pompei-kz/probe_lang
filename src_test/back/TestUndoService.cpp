@@ -1,6 +1,7 @@
 #include "DbTestBase.h"
 #include "back/UndoService.h"
 #include <gtest/gtest.h>
+#include <map>
 
 using namespace back;
 using namespace back::model;
@@ -110,21 +111,55 @@ TEST_F(UndoServiceTest, UpdateOnMissingRowIsUndoneByDelete)
   EXPECT_TRUE(undo[0].toDelete);
 }
 
-TEST_F(UndoServiceTest, DeleteIsNotSupportedAndThrows)
+TEST_F(UndoServiceTest, DeleteIsUndoneByPerColumnChanges)
 {
   make_schema();
-  setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
-  setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r1', 'old')");
+  setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, a text, b int4)");
+  setup_sql("INSERT INTO " + qual("t") + " (id, a, b) VALUES ('r1', 'hello', 5)");
 
   UndoRowChange change{"t", "r1", true, "", std::nullopt};
 
   pqxx::work  txn(*pg);
   UndoService svc(txn, *pg, schema);
+
   //
   //
-  EXPECT_THROW(svc.collectUndoChanges({change}), std::exception);
+  std::vector<UndoRowChange> undo = svc.collectUndoChanges({change});
   //
   //
+
+  // One set-column change per non-id column of the deleted row, recreating it.
+  ASSERT_EQ(undo.size(), 2u);
+  std::map<std::string, std::optional<std::string>> byCol;
+  for (const UndoRowChange &u : undo) {
+    EXPECT_EQ(u.tableName, "t");
+    EXPECT_EQ(u.idValue, "r1");
+    EXPECT_FALSE(u.toDelete);
+    byCol[u.colName] = u.value;
+  }
+  EXPECT_FALSE(byCol.count("id")); // id передаётся через idValue, отдельного change нет
+  ASSERT_TRUE(byCol.count("a") && byCol["a"].has_value());
+  EXPECT_EQ(*byCol["a"], "hello");
+  ASSERT_TRUE(byCol.count("b") && byCol["b"].has_value());
+  EXPECT_EQ(*byCol["b"], "5");
+}
+
+TEST_F(UndoServiceTest, DeleteOfMissingRowGivesNoUndo)
+{
+  make_schema();
+  setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
+
+  UndoRowChange change{"t", "missing", true, "", std::nullopt};
+
+  pqxx::work  txn(*pg);
+  UndoService svc(txn, *pg, schema);
+  //
+  //
+  std::vector<UndoRowChange> undo = svc.collectUndoChanges({change});
+  //
+  //
+
+  EXPECT_TRUE(undo.empty());
 }
 
 TEST_F(UndoServiceTest, UpdatesAcrossThreeColumnsCaptureEachOldValue)
@@ -199,4 +234,39 @@ TEST_F(UndoServiceTest, UpdateUndoCapturesOldTimestampWithSubsecondPrecision)
   txn.exec_params("UPDATE " + qual("t") + " SET ts = $1 WHERE id = 'r1'", *undo[0].value);
   const std::string restored = txn.exec("SELECT ts FROM " + qual("t") + " WHERE id = 'r1'")[0][0].c_str();
   EXPECT_EQ(restored, original);
+}
+
+TEST_F(UndoServiceTest, DeleteIsUndoneByThreeColumnChanges)
+{
+  make_schema();
+  setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, a text, b int4, c bool)");
+  setup_sql("INSERT INTO " + qual("t") + " (id, a, b, c) VALUES ('r1', 'hello', 5, true)");
+
+  UndoRowChange change{"t", "r1", true, "", std::nullopt};
+
+  pqxx::work  txn(*pg);
+  UndoService svc(txn, *pg, schema);
+
+  //
+  //
+  std::vector<UndoRowChange> undo = svc.collectUndoChanges({change});
+  //
+  //
+
+  // One set-column change per non-id column (three of them), recreating the row.
+  ASSERT_EQ(undo.size(), 3u);
+  std::map<std::string, std::optional<std::string>> byCol;
+  for (const UndoRowChange &u : undo) {
+    EXPECT_EQ(u.tableName, "t");
+    EXPECT_EQ(u.idValue, "r1");
+    EXPECT_FALSE(u.toDelete);
+    byCol[u.colName] = u.value;
+  }
+  EXPECT_FALSE(byCol.count("id"));
+  ASSERT_TRUE(byCol.contains("a") && byCol["a"].has_value());
+  EXPECT_EQ(*byCol["a"], "hello");
+  ASSERT_TRUE(byCol.count("b") && byCol["b"].has_value());
+  EXPECT_EQ(*byCol["b"], "5");
+  ASSERT_TRUE(byCol.count("c") && byCol["c"].has_value());
+  EXPECT_EQ(*byCol["c"], "t"); // PostgreSQL bool text form
 }
