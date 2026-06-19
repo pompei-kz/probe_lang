@@ -36,6 +36,36 @@ namespace back {
                pqxx::params{txn, c.idValue, c.value});
     }
 
+    // Найти буфер отмены цели по её id. Возвращает id буфера или пустую строку,
+    // если буфера ещё нет. target_type не используется: цель идентифицируется
+    // одним target_id (на цель приходится один буфер).
+    std::string findBufferId(pqxx::work &txn, const std::string &sq, const std::string &targetId)
+    {
+      pqxx::result r = txn.exec("SELECT id FROM " + sq + ".undo_buffer WHERE target_id = $1", pqxx::params{txn, targetId});
+      return r.empty() ? std::string() : std::string(r[0][0].c_str());
+    }
+
+    // Применить к таблицам данных все изменения операции `opId` в заданном
+    // направлении ('Forward' — повтор пользовательских изменений, 'ForUndo' —
+    // их отмена). Итоговое состояние не зависит от порядка изменений внутри
+    // одной операции, но порядок фиксируется по `id` ради детерминизма.
+    void applyOpChanges(pqxx::work &txn, pqxx::connection &pg, const std::string &schema, const std::string &opId, const char *direction)
+    {
+      const std::string sq   = pg.quote_name(schema);
+      pqxx::result      rows = txn.exec("SELECT table_name, id_value, to_delete, col_name, col_value FROM " + sq +
+                                            ".undo_row_change WHERE undo_op_id = $1 AND direction = $2 ORDER BY id",
+                                        pqxx::params{txn, opId, std::string(direction)});
+      for (const auto &row : rows) {
+        RowChange c;
+        c.tableName = row[0].c_str();
+        c.idValue   = row[1].c_str();
+        c.toDelete  = row[2].as<bool>();
+        c.colName   = row[3].is_null() ? std::string() : std::string(row[3].c_str());
+        c.value     = row[4].is_null() ? std::nullopt : std::optional<std::string>(row[4].c_str());
+        applyRowChange(txn, pg, schema, c);
+      }
+    }
+
   } // namespace
 
   ChangeSystem::ChangeSystem(pqxx::work &txn, pqxx::connection &pg, const std::string &schema)
@@ -165,8 +195,79 @@ namespace back {
     // 7. Отметить, что в буфере произошло изменение.
     txn_.exec("UPDATE " + sq + ".undo_buffer SET updated_at = now() WHERE id = $1", pqxx::params{txn_, bufferId});
   }
+
   bool ChangeSystem::undo(const std::string &targetId, bool grouped) const
-  {}
+  {
+    const std::string sq = pg_.quote_name(schema_);
+
+    // 1. Буфер цели. Нет буфера — отменять нечего.
+    const std::string bufferId = findBufferId(txn_, sq, targetId);
+    if (bufferId.empty()) return false;
+
+    // 2. Активные (не отменённые) операции буфера, новейшие первыми. Первая —
+    //    активная операция, которую можно отменить.
+    pqxx::result ops =
+        txn_.exec("SELECT id, group_name FROM " + sq + ".undo_op WHERE undo_buffer_id = $1 AND undone = FALSE ORDER BY order_index DESC",
+                  pqxx::params{txn_, bufferId});
+    if (ops.empty()) return false; // нечего отменять
+
+    // 3. Какие операции отменяем: только активную, либо непрерывную группу
+    //    новейших операций с тем же group_name.
+    auto groupOf = [](const auto &r) -> std::optional<std::string> {
+      return r[1].is_null() ? std::nullopt : std::optional<std::string>(r[1].c_str());
+    };
+    const std::optional<std::string> activeGroup = groupOf(ops[0]);
+
+    std::vector<std::string> opIds;
+    for (const auto &op : ops) {
+      if (grouped && groupOf(op) != activeGroup) break; // другая группа — стоп
+      opIds.push_back(op[0].c_str());
+      if (!grouped) break; // без группировки — только активная операция
+    }
+
+    // 4. Отменяем от новейшей к старейшей: применяем ForUndo и помечаем undone.
+    for (const std::string &opId : opIds) {
+      applyOpChanges(txn_, pg_, schema_, opId, "ForUndo");
+      txn_.exec("UPDATE " + sq + ".undo_op SET undone = TRUE WHERE id = $1", pqxx::params{txn_, opId});
+    }
+    txn_.exec("UPDATE " + sq + ".undo_buffer SET updated_at = now() WHERE id = $1", pqxx::params{txn_, bufferId});
+    return true;
+  }
+
   bool ChangeSystem::redo(const std::string &targetId, bool grouped) const
-  {}
+  {
+    const std::string sq = pg_.quote_name(schema_);
+
+    // 1. Буфер цели. Нет буфера — возвращать нечего.
+    const std::string bufferId = findBufferId(txn_, sq, targetId);
+    if (bufferId.empty()) return false;
+
+    // 2. Отменённые операции буфера, старейшие первыми. Первая — та, которую
+    //    нужно вернуть следующей.
+    pqxx::result ops = txn_.exec("SELECT id, group_name FROM " + sq + ".undo_op WHERE undo_buffer_id = $1 AND undone = TRUE ORDER BY order_index ASC",
+                                 pqxx::params{txn_, bufferId});
+    if (ops.empty()) return false; // нет отменённых операций — возвращать нечего
+
+    // 3. Какие операции возвращаем: только первую, либо непрерывную группу
+    //    отменённых операций с тем же group_name.
+    auto groupOf = [](const auto &r) -> std::optional<std::string> {
+      return r[1].is_null() ? std::nullopt : std::optional<std::string>(r[1].c_str());
+    };
+    const std::optional<std::string> firstGroup = groupOf(ops[0]);
+
+    std::vector<std::string> opIds;
+    for (const auto &op : ops) {
+      if (grouped && groupOf(op) != firstGroup) break; // другая группа — стоп
+      opIds.push_back(op[0].c_str());
+      if (!grouped) break; // без группировки — только одна операция
+    }
+
+    // 4. Возвращаем в исходном порядке применения: повторяем Forward и снимаем undone.
+    for (const std::string &opId : opIds) {
+      applyOpChanges(txn_, pg_, schema_, opId, "Forward");
+      txn_.exec("UPDATE " + sq + ".undo_op SET undone = FALSE WHERE id = $1", pqxx::params{txn_, opId});
+    }
+    txn_.exec("UPDATE " + sq + ".undo_buffer SET updated_at = now() WHERE id = $1", pqxx::params{txn_, bufferId});
+    return true;
+  }
 } // namespace back

@@ -27,11 +27,19 @@ protected:
   }
 
   // Apply a set of changes in its own committed transaction (test setup helper).
-  void apply_committed(std::vector<RowChange> changes, const ChangeOp &op, const ChangeSysTarget &target)
+  void apply_committed(std::vector<RowChange> changes, const ChangeOp &op, const ChangeSysTarget &target) const
   {
     pqxx::work txn(*pg);
     ChangeSystem(txn, *pg, schema).apply(std::move(changes), op, target);
     txn.commit();
+  }
+
+  // Read column `val` of row `id` in table `t` (within the given transaction);
+  // empty result is reported as "<none>".
+  std::string read_val(pqxx::work &txn, const std::string &id)
+  {
+    pqxx::result r = txn.exec("SELECT val FROM " + qual("t") + " WHERE id = $1", pqxx::params{txn, id});
+    return r.empty() ? "<none>" : std::string(r[0][0].c_str());
   }
 };
 
@@ -510,4 +518,351 @@ TEST_F(ChangeSystemTest, ApplyDeletesRow)
   const long forUndo =
       txn.exec("SELECT count(*) FROM " + qual("undo_row_change") + " WHERE direction = 'ForUndo' AND to_delete = FALSE")[0][0].as<long>();
   EXPECT_EQ(forUndo, 2); // columns a and b
+}
+
+// ---------------------------------------------------------------------------
+// ChangeSystem::undo / ChangeSystem::redo
+// ---------------------------------------------------------------------------
+
+TEST_F(ChangeSystemTest, UndoRevertsLastUpdate)
+{
+  make_schema();
+  make_change_system();
+  setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
+  setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r1', 'old')");
+
+  apply_committed({RowChange{"t", "r1", false, "val", "new"}}, ChangeOp{"set-val", "g"}, ChangeSysTarget{"u1", "Unit"});
+
+  pqxx::work   txn(*pg);
+  ChangeSystem svc(txn, *pg, schema);
+  //
+  //
+  const bool changed = svc.undo("u1", false);
+  //
+  //
+
+  EXPECT_TRUE(changed);
+  EXPECT_EQ(read_val(txn, "r1"), "old"); // restored to the value before the op
+  const bool undone = txn.exec("SELECT undone FROM " + qual("undo_op"))[0][0].as<bool>();
+  EXPECT_TRUE(undone); // the operation is now a redo candidate
+}
+
+TEST_F(ChangeSystemTest, UndoWithNothingToUndoReturnsFalse)
+{
+  make_schema();
+  make_change_system();
+  setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
+
+  pqxx::work   txn(*pg);
+  ChangeSystem svc(txn, *pg, schema);
+  //
+  //
+  const bool changed = svc.undo("absent-target", false);
+  //
+  //
+
+  EXPECT_FALSE(changed);
+}
+
+TEST_F(ChangeSystemTest, UndoWalksBackThroughHistory)
+{
+  make_schema();
+  make_change_system();
+  setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
+  setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r1', 'a')");
+  apply_committed({RowChange{"t", "r1", false, "val", "b"}}, ChangeOp{"op1", "g1"}, ChangeSysTarget{"u1", "Unit"});
+  apply_committed({RowChange{"t", "r1", false, "val", "c"}}, ChangeOp{"op2", "g2"}, ChangeSysTarget{"u1", "Unit"});
+
+  pqxx::work   txn(*pg);
+  ChangeSystem svc(txn, *pg, schema);
+  //
+  //
+  const bool first = svc.undo("u1", false);
+  //
+  //
+
+  EXPECT_TRUE(first);
+  EXPECT_EQ(read_val(txn, "r1"), "b"); // op2 undone
+
+  EXPECT_TRUE(svc.undo("u1", false));
+  EXPECT_EQ(read_val(txn, "r1"), "a"); // op1 undone
+
+  EXPECT_FALSE(svc.undo("u1", false)); // nothing left to undo
+}
+
+TEST_F(ChangeSystemTest, UndoNonGroupedUndoesOnlyOneOfSameGroup)
+{
+  make_schema();
+  make_change_system();
+  setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
+  setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r1', 'a')");
+  apply_committed({RowChange{"t", "r1", false, "val", "b"}}, ChangeOp{"op1", "g"}, ChangeSysTarget{"u1", "Unit"});
+  apply_committed({RowChange{"t", "r1", false, "val", "c"}}, ChangeOp{"op2", "g"}, ChangeSysTarget{"u1", "Unit"});
+
+  pqxx::work   txn(*pg);
+  ChangeSystem svc(txn, *pg, schema);
+  //
+  //
+  const bool changed = svc.undo("u1", false);
+  //
+  //
+
+  EXPECT_TRUE(changed);
+  EXPECT_EQ(read_val(txn, "r1"), "b"); // only the latest op rolled back
+  const long undone = txn.exec("SELECT count(*) FROM " + qual("undo_op") + " WHERE undone = TRUE")[0][0].as<long>();
+  EXPECT_EQ(undone, 1);
+}
+
+TEST_F(ChangeSystemTest, UndoGroupedUndoesWholeGroup)
+{
+  make_schema();
+  make_change_system();
+  setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
+  setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r1', 'a')");
+  apply_committed({RowChange{"t", "r1", false, "val", "b"}}, ChangeOp{"op1", "g"}, ChangeSysTarget{"u1", "Unit"});
+  apply_committed({RowChange{"t", "r1", false, "val", "c"}}, ChangeOp{"op2", "g"}, ChangeSysTarget{"u1", "Unit"});
+
+  pqxx::work   txn(*pg);
+  ChangeSystem svc(txn, *pg, schema);
+  //
+  //
+  const bool changed = svc.undo("u1", true);
+  //
+  //
+
+  EXPECT_TRUE(changed);
+  EXPECT_EQ(read_val(txn, "r1"), "a"); // both ops of the group rolled back at once
+  const long undone = txn.exec("SELECT count(*) FROM " + qual("undo_op") + " WHERE undone = TRUE")[0][0].as<long>();
+  EXPECT_EQ(undone, 2);
+}
+
+TEST_F(ChangeSystemTest, UndoGroupedStopsAtGroupBoundary)
+{
+  make_schema();
+  make_change_system();
+  setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
+  setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r1', 'a')");
+  apply_committed({RowChange{"t", "r1", false, "val", "b"}}, ChangeOp{"op1", "gA"}, ChangeSysTarget{"u1", "Unit"});
+  apply_committed({RowChange{"t", "r1", false, "val", "c"}}, ChangeOp{"op2", "gB"}, ChangeSysTarget{"u1", "Unit"});
+  apply_committed({RowChange{"t", "r1", false, "val", "d"}}, ChangeOp{"op3", "gB"}, ChangeSysTarget{"u1", "Unit"});
+
+  pqxx::work   txn(*pg);
+  ChangeSystem svc(txn, *pg, schema);
+  //
+  //
+  const bool changed = svc.undo("u1", true);
+  //
+  //
+
+  EXPECT_TRUE(changed);
+  EXPECT_EQ(read_val(txn, "r1"), "b"); // gB group (op3, op2) undone; op1 (gA) untouched
+  const bool op1Undone = txn.exec("SELECT undone FROM " + qual("undo_op") + " WHERE name = 'op1'")[0][0].as<bool>();
+  EXPECT_FALSE(op1Undone);
+}
+
+TEST_F(ChangeSystemTest, UndoOfCreateDeletesRow)
+{
+  make_schema();
+  make_change_system();
+  setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
+  apply_committed({RowChange{"t", "r2", false, "val", "created"}}, ChangeOp{"create", "g"}, ChangeSysTarget{"u1", "Unit"});
+
+  pqxx::work   txn(*pg);
+  ChangeSystem svc(txn, *pg, schema);
+
+  //
+  //
+  const bool changed = svc.undo("u1", false);
+  //
+  //
+
+  EXPECT_TRUE(changed);
+  EXPECT_EQ(read_val(txn, "r2"), "<none>"); // the created row is gone again
+}
+
+TEST_F(ChangeSystemTest, UndoOfDeleteRecreatesRow)
+{
+  make_schema();
+  make_change_system();
+  setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, a text, b int4)");
+  setup_sql("INSERT INTO " + qual("t") + " (id, a, b) VALUES ('r1', 'hello', 5)");
+  apply_committed({RowChange{"t", "r1", true, "", std::nullopt}}, ChangeOp{"delete", "g"}, ChangeSysTarget{"u1", "Unit"});
+
+  pqxx::work   txn(*pg);
+  ChangeSystem svc(txn, *pg, schema);
+
+  //
+  //
+  const bool changed = svc.undo("u1", false);
+  //
+  //
+
+  EXPECT_TRUE(changed);
+  pqxx::row row = txn.exec("SELECT a, b FROM " + qual("t") + " WHERE id = 'r1'").one_row();
+  EXPECT_EQ(row[0].c_str(), std::string("hello"));
+  EXPECT_EQ(row[1].as<int>(), 5);
+}
+
+TEST_F(ChangeSystemTest, RedoReappliesUndoneOperation)
+{
+  make_schema();
+  make_change_system();
+  setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
+  setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r1', 'old')");
+  apply_committed({RowChange{"t", "r1", false, "val", "new"}}, ChangeOp{"set-val", "g"}, ChangeSysTarget{"u1", "Unit"});
+
+  pqxx::work   txn(*pg);
+  ChangeSystem svc(txn, *pg, schema);
+  ASSERT_TRUE(svc.undo("u1", false));
+  ASSERT_EQ(read_val(txn, "r1"), "old");
+
+  //
+  //
+  const bool changed = svc.redo("u1", false);
+  //
+  //
+
+  EXPECT_TRUE(changed);
+  EXPECT_EQ(read_val(txn, "r1"), "new"); // operation re-applied
+  const bool undone = txn.exec("SELECT undone FROM " + qual("undo_op"))[0][0].as<bool>();
+  EXPECT_FALSE(undone); // active again
+}
+
+TEST_F(ChangeSystemTest, RedoWithNothingToRedoReturnsFalse)
+{
+  make_schema();
+  make_change_system();
+  setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
+  setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r1', 'old')");
+  apply_committed({RowChange{"t", "r1", false, "val", "new"}}, ChangeOp{"set-val", "g"}, ChangeSysTarget{"u1", "Unit"});
+
+  pqxx::work   txn(*pg);
+  ChangeSystem svc(txn, *pg, schema);
+
+  //
+  //
+  const bool changed = svc.redo("u1", false); // never undone → nothing to redo
+  //
+  //
+
+  EXPECT_FALSE(changed);
+  EXPECT_EQ(read_val(txn, "r1"), "new"); // unchanged
+}
+
+TEST_F(ChangeSystemTest, RedoGroupedReappliesWholeGroup)
+{
+  make_schema();
+  make_change_system();
+  setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
+  setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r1', 'a')");
+  apply_committed({RowChange{"t", "r1", false, "val", "b"}}, ChangeOp{"op1", "g"}, ChangeSysTarget{"u1", "Unit"});
+  apply_committed({RowChange{"t", "r1", false, "val", "c"}}, ChangeOp{"op2", "g"}, ChangeSysTarget{"u1", "Unit"});
+
+  pqxx::work   txn(*pg);
+  ChangeSystem svc(txn, *pg, schema);
+  ASSERT_TRUE(svc.undo("u1", true)); // both ops undone
+  ASSERT_EQ(read_val(txn, "r1"), "a");
+
+  //
+  //
+  const bool changed = svc.redo("u1", true);
+  //
+  //
+
+  EXPECT_TRUE(changed);
+  EXPECT_EQ(read_val(txn, "r1"), "c"); // whole group re-applied
+  const long undone = txn.exec("SELECT count(*) FROM " + qual("undo_op") + " WHERE undone = TRUE")[0][0].as<long>();
+  EXPECT_EQ(undone, 0);
+}
+
+TEST_F(ChangeSystemTest, RedoNonGroupedReappliesOnlyOne)
+{
+  make_schema();
+  make_change_system();
+  setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
+  setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r1', 'a')");
+  apply_committed({RowChange{"t", "r1", false, "val", "b"}}, ChangeOp{"op1", "g"}, ChangeSysTarget{"u1", "Unit"});
+  apply_committed({RowChange{"t", "r1", false, "val", "c"}}, ChangeOp{"op2", "g"}, ChangeSysTarget{"u1", "Unit"});
+
+  pqxx::work   txn(*pg);
+  ChangeSystem svc(txn, *pg, schema);
+  ASSERT_TRUE(svc.undo("u1", true)); // both ops undone, value back to 'a'
+  ASSERT_EQ(read_val(txn, "r1"), "a");
+
+  //
+  //
+  const bool changed = svc.redo("u1", false);
+  //
+  //
+
+  EXPECT_TRUE(changed);
+  EXPECT_EQ(read_val(txn, "r1"), "b"); // only the oldest undone op (op1) re-applied
+  const long undone = txn.exec("SELECT count(*) FROM " + qual("undo_op") + " WHERE undone = TRUE")[0][0].as<long>();
+  EXPECT_EQ(undone, 1); // op2 still a redo candidate
+}
+
+TEST_F(ChangeSystemTest, RedoGroupedStopsAtGroupBoundary)
+{
+  make_schema();
+  make_change_system();
+  setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
+  setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r1', 'a')");
+  apply_committed({RowChange{"t", "r1", false, "val", "b"}}, ChangeOp{"op1", "gA"}, ChangeSysTarget{"u1", "Unit"});
+  apply_committed({RowChange{"t", "r1", false, "val", "c"}}, ChangeOp{"op2", "gA"}, ChangeSysTarget{"u1", "Unit"});
+  apply_committed({RowChange{"t", "r1", false, "val", "d"}}, ChangeOp{"op3", "gB"}, ChangeSysTarget{"u1", "Unit"});
+
+  // Undo everything: all three ops become redo candidates (value back to 'a').
+  {
+    pqxx::work   t0(*pg);
+    ChangeSystem cs(t0, *pg, schema);
+    EXPECT_TRUE(cs.undo("u1", false)); // op3
+    EXPECT_TRUE(cs.undo("u1", false)); // op2
+    EXPECT_TRUE(cs.undo("u1", false)); // op1
+    t0.commit();
+  }
+
+  pqxx::work   txn(*pg);
+  ChangeSystem svc(txn, *pg, schema);
+  ASSERT_EQ(read_val(txn, "r1"), "a");
+
+  //
+  //
+  const bool changed = svc.redo("u1", true);
+  //
+  //
+
+  EXPECT_TRUE(changed);
+  EXPECT_EQ(read_val(txn, "r1"), "c"); // gA group (op1, op2) re-applied; op3 (gB) left untouched
+  const bool op3Undone = txn.exec("SELECT undone FROM " + qual("undo_op") + " WHERE name = 'op3'")[0][0].as<bool>();
+  EXPECT_TRUE(op3Undone); // the gB op is still a redo candidate
+}
+
+TEST_F(ChangeSystemTest, ApplyAfterUndoWipesRedo)
+{
+  make_schema();
+  make_change_system();
+  setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
+  setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r1', 'a')");
+  apply_committed({RowChange{"t", "r1", false, "val", "b"}}, ChangeOp{"op1", "g"}, ChangeSysTarget{"u1", "Unit"});
+
+  // Undo op1, then apply a fresh op — the redo stack must be discarded.
+  {
+    pqxx::work t0(*pg);
+    EXPECT_TRUE(ChangeSystem(t0, *pg, schema).undo("u1", false));
+    t0.commit();
+  }
+
+  apply_committed({RowChange{"t", "r1", false, "val", "c"}}, ChangeOp{"op2", "g"}, ChangeSysTarget{"u1", "Unit"});
+
+  pqxx::work   txn(*pg);
+  ChangeSystem svc(txn, *pg, schema);
+
+  //
+  //
+  const bool changed = svc.redo("u1", false);
+  //
+  //
+
+  EXPECT_FALSE(changed); // op1's undone entry was wiped by the new apply
+  EXPECT_EQ(read_val(txn, "r1"), "c");
 }
