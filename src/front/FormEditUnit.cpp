@@ -14,7 +14,7 @@ namespace front {
   static constexpr float ERR_H = 60.f;
   static constexpr float DD_IH = 26.f; // type dropdown item height
 
-  void FormEditUnit::open_add(int ci, int ri, const back::model::Conn &c, const std::string &schema, const std::string &parent_id)
+  void FormEditUnit::open_add(int ci, int ri, const back::model::ConnStore &c, const std::string &schema, const std::string &parent_id)
   {
     conn_idx            = ci;
     repo_idx            = ri;
@@ -33,7 +33,7 @@ namespace front {
   }
 
   void FormEditUnit::open_edit(
-      int ci, int ri, const back::model::Conn &c, const std::string &schema, const std::string &uid, const std::string &uname, back::model::UnitType utype)
+      int ci, int ri, const back::model::ConnStore &c, const std::string &schema, const std::string &uid, const std::string &uname, back::model::UnitType utype)
   {
     open_add(ci, ri, c, schema, "");
     unit_id = uid;

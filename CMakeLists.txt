@@ -65,6 +65,15 @@ add_executable(probe_lang
         src/back/etc/ChangeSystem.h
         src/back/model/ChangeSysTarget.h
         src/back/model/ChangeOp.h
+        src/back/model/Conn.cpp
+        src/back/model/Conn.h
+        src/back/model/ConnHash.h
+        src/back/pool/Connection.cpp
+        src/back/pool/Connection.h
+        src/back/pool/Pool.cpp
+        src/back/pool/Pool.h
+        src/back/pool/PoolManager.cpp
+        src/back/pool/PoolManager.h
 )
 target_include_directories(probe_lang PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_include_directories(probe_lang PRIVATE ${stb_SOURCE_DIR})

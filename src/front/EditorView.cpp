@@ -479,7 +479,7 @@ namespace front {
   }
 
   // ── lifecycle ────────────────────────────────────────────────────────────────
-  void EditorView::open_for(const back::model::Conn &c, const std::string &schema_, const std::string &uid, const std::string &uname, back::model::UnitType utype)
+  void EditorView::open_for(const back::model::ConnStore &c, const std::string &schema_, const std::string &uid, const std::string &uname, back::model::UnitType utype)
   {
     for (int i = 0; i < static_cast<int>(tabs.size()); i++) {
       if (tabs[i].unit_id == uid && tabs[i].schema == schema_ && tabs[i].conn.name == c.name) {

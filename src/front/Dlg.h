@@ -1,6 +1,6 @@
 #pragma once
 #include "InputField.h"
-#include "back/model/Conn.h"
+#include "back/model/ConnStore.h"
 #include <string>
 
 namespace front {
@@ -25,8 +25,8 @@ namespace front {
     }
 
     void              open_add();
-    void              open_edit(const back::model::Conn &c);
-    back::model::Conn to_conn() const;
+    void              open_edit(const back::model::ConnStore &c);
+    back::model::ConnStore to_conn() const;
   };
 
 } // namespace front

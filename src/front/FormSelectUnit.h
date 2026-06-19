@@ -1,6 +1,6 @@
 #pragma once
 #include "InputField.h"
-#include "back/model/Conn.h"
+#include "back/model/ConnStore.h"
 #include "back/model/Unit.h"
 #include <SDL3/SDL.h>
 #include <string>
@@ -19,7 +19,7 @@ namespace front {
   struct FormSelectUnit
   {
     bool              open = false;
-    back::model::Conn conn;
+    back::model::ConnStore conn;
     std::string       schema;
     std::string       field_id; // the field whose expression we are setting
 
@@ -34,7 +34,7 @@ namespace front {
     std::string                    applied_filter;  // filter the loaded pages reflect
     float                          scroll_y = 0.f;
 
-    void open_for(const back::model::Conn &c, const std::string &schema, const std::string &field_id);
+    void open_for(const back::model::ConnStore &c, const std::string &schema, const std::string &field_id);
     void close();
 
     void on_scroll(float dy);

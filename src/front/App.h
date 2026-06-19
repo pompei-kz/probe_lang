@@ -57,7 +57,7 @@ namespace front {
 
     void reload_conns()
     {
-      const std::vector<back::model::Conn> fresh = back::load_all();
+      const std::vector<back::model::ConnStore> fresh = back::load_all();
       std::vector<back::model::ConnNode>   updated;
       updated.reserve(fresh.size());
       for (auto &c : fresh) {

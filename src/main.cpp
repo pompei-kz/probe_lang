@@ -163,7 +163,7 @@ int main(int /*argc*/, char * /*argv*/[])
           if (app.dlg.open && (ev.key.mod & SDL_KMOD_CTRL) && (ev.key.key == SDLK_RETURN || ev.key.key == SDLK_KP_ENTER)) {
             // Ctrl+Enter presses Save from anywhere — only when Save is active.
             if (app.dlg.save_enabled()) {
-              if (back::model::Conn c = app.dlg.to_conn(); !c.name.empty()) {
+              if (back::model::ConnStore c = app.dlg.to_conn(); !c.name.empty()) {
                 back::save_conn(c, app.dlg.old_name);
                 app.reload_conns();
                 app.dlg.open = false;
@@ -191,7 +191,7 @@ int main(int /*argc*/, char * /*argv*/[])
                 case SDLK_KP_ENTER:
                   if (app.dlg.focus < 5) {
                     app.dlg.focus++;
-                  } else if (back::model::Conn c = app.dlg.to_conn(); !c.name.empty() && !c.host.empty()) {
+                  } else if (back::model::ConnStore c = app.dlg.to_conn(); !c.name.empty() && !c.host.empty()) {
                     back::save_conn(c, app.dlg.old_name);
                     app.reload_conns();
                     app.dlg.open = false;

@@ -1,5 +1,5 @@
 #pragma once
-#include "back/model/Conn.h"
+#include "back/model/ConnStore.h"
 #include "back/model/Unit.h"
 #include <pqxx/pqxx>
 #include <string>
@@ -16,6 +16,6 @@ namespace back {
   // words in order (case-insensitive); empty filter matches everything. Returns
   // up to `limit` units starting at `offset` (a full page hints there may be more).
   std::pair<std::vector<model::Unit>, std::string> list_units_paginated(
-      const model::Conn &c, const std::string &schema, const std::string &filter, int offset, int limit);
+      const model::ConnStore &c, const std::string &schema, const std::string &filter, int offset, int limit);
 
 } // namespace back

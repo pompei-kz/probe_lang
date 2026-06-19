@@ -14,7 +14,7 @@ namespace back {
     fs::remove(ws_dir() / (name + EXT));
   }
 
-  void save_conn(const model::Conn &c, const std::string &old_name)
+  void save_conn(const model::ConnStore &c, const std::string &old_name)
   {
     const std::filesystem::path d = ws_dir();
 

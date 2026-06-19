@@ -140,7 +140,7 @@ namespace front {
     if (m.ldown && !any_ctx) {
       if (h_can) return -1;
       if (h_save && can_save) {
-        back::model::Conn c = d.to_conn();
+        back::model::ConnStore c = d.to_conn();
         if (c.name.empty()) {
           d.err = "Name is required";
           return 0;

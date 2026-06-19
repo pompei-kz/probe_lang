@@ -10,7 +10,7 @@
 #include <vector>
 
 namespace fs = std::filesystem;
-using back::model::Conn;
+using back::model::ConnStore;
 
 // ---------------------------------------------------------------------------
 // Fixture
@@ -55,9 +55,9 @@ protected:
   // Path of the workspace file for a given connection name.
   fs::path conn_file(const std::string &name) const { return tmp_home / ".config" / "probe_lang" / "workspace" / (name + ".pg-connect"); }
 
-  static Conn make_conn(const std::string &name)
+  static ConnStore make_conn(const std::string &name)
   {
-    Conn c;
+    ConnStore c;
     c.name      = name;
     c.host      = "db.example.com";
     c.port      = "5433";
@@ -93,7 +93,7 @@ TEST_F(ConnServiceRTest, LoadAllOnMissingDirReturnsEmpty)
   // Workspace dir does not exist yet.
   //
   //
-  const std::vector<Conn> all = back::load_all();
+  const std::vector<ConnStore> all = back::load_all();
   //
   //
 
@@ -106,7 +106,7 @@ TEST_F(ConnServiceRTest, LoadAllOnEmptyDirReturnsEmpty)
 
   //
   //
-  const std::vector<Conn> all = back::load_all();
+  const std::vector<ConnStore> all = back::load_all();
   //
   //
 
@@ -125,7 +125,7 @@ TEST_F(ConnServiceRTest, LoadAllReturnsSortedByName)
 
   //
   //
-  const std::vector<Conn> all = back::load_all();
+  const std::vector<ConnStore> all = back::load_all();
   //
   //
 
@@ -145,7 +145,7 @@ TEST_F(ConnServiceRTest, LoadAllIgnoresForeignExtensions)
 
   //
   //
-  const std::vector<Conn> all = back::load_all();
+  const std::vector<ConnStore> all = back::load_all();
   //
   //
 
@@ -165,7 +165,7 @@ TEST_F(ConnServiceRTest, LoadAllIgnoresUnknownKeysAndBlankLines)
 
   //
   //
-  const std::vector<Conn> all = back::load_all();
+  const std::vector<ConnStore> all = back::load_all();
   //
   //
 
@@ -183,7 +183,7 @@ TEST_F(ConnServiceRTest, ConnectedNonYesParsesAsFalse)
 
   //
   //
-  const std::vector<Conn> all = back::load_all();
+  const std::vector<ConnStore> all = back::load_all();
   //
   //
 

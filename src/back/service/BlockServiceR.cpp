@@ -5,7 +5,7 @@
 namespace back {
 
   std::pair<std::vector<model::Block>, std::string> load_blocks_in_view(
-      const model::Conn &c, const std::string &schema, const std::string &unit_id, float min_x, float min_y, float max_x, float max_y)
+      const model::ConnStore &c, const std::string &schema, const std::string &unit_id, float min_x, float min_y, float max_x, float max_y)
   {
     try {
       pqxx::connection pg(make_cs(c));
@@ -136,7 +136,7 @@ namespace back {
     }
   }
 
-  std::pair<std::optional<model::BBox>, std::string> block_bbox_for_unit(const model::Conn &c, const std::string &schema, const std::string &unit_id)
+  std::pair<std::optional<model::BBox>, std::string> block_bbox_for_unit(const model::ConnStore &c, const std::string &schema, const std::string &unit_id)
   {
     try {
       pqxx::connection pg(make_cs(c));

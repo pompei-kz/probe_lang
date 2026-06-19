@@ -13,7 +13,7 @@ namespace front {
   static constexpr float FFH   = 28.f;
   static constexpr float ERR_H = 60.f;
 
-  void FormEditFolder::open_add(int ci, int ri, const back::model::Conn &c, const std::string &schema, const std::string &parent_id)
+  void FormEditFolder::open_add(int ci, int ri, const back::model::ConnStore &c, const std::string &schema, const std::string &parent_id)
   {
     conn_idx            = ci;
     repo_idx            = ri;
@@ -29,7 +29,7 @@ namespace front {
     activate = false;
   }
 
-  void FormEditFolder::open_edit(int ci, int ri, const back::model::Conn &c, const std::string &schema, const std::string &fid, const std::string &fname)
+  void FormEditFolder::open_edit(int ci, int ri, const back::model::ConnStore &c, const std::string &schema, const std::string &fid, const std::string &fname)
   {
     open_add(ci, ri, c, schema, "");
     folder_id = fid;

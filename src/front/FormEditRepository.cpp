@@ -14,7 +14,7 @@ namespace front {
   static constexpr float FFS   = 58.f;
   static constexpr float ERR_H = 80.f;
 
-  void FormEditRepository::open_for(const back::model::Conn &c)
+  void FormEditRepository::open_for(const back::model::ConnStore &c)
   {
     for (auto &f : fields) {
       f.ed       = TextEditor{};
@@ -28,7 +28,7 @@ namespace front {
     original_schema = "";
   }
 
-  void FormEditRepository::open_edit_for(const back::model::Conn &c, const back::model::RepoNode &repo)
+  void FormEditRepository::open_edit_for(const back::model::ConnStore &c, const back::model::RepoNode &repo)
   {
     open_for(c);
     fields[0].ed.set(repo.schema_name);

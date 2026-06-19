@@ -6,7 +6,7 @@
 
 namespace back {
 
-  std::pair<std::string, std::string> create_block(const model::Conn &c,
+  std::pair<std::string, std::string> create_block(const model::ConnStore &c,
                                                    const std::string &schema,
                                                    const std::string &unit_id,
                                                    model::BlockType   type,
@@ -45,7 +45,7 @@ namespace back {
   }
 
   std::pair<std::string, std::string> create_method_arg(
-      const model::Conn &c, const std::string &schema, const std::string &owner_method_id, double order_index, const std::string &name)
+      const model::ConnStore &c, const std::string &schema, const std::string &owner_method_id, double order_index, const std::string &name)
   {
     try {
       pqxx::connection pg(make_cs(c));
@@ -66,7 +66,7 @@ namespace back {
     }
   }
 
-  std::pair<std::string, std::string> append_method_arg(const model::Conn &c,
+  std::pair<std::string, std::string> append_method_arg(const model::ConnStore &c,
                                                         const std::string &schema,
                                                         const std::string &owner_method_id,
                                                         const std::string &name)
@@ -96,7 +96,7 @@ namespace back {
     }
   }
 
-  std::pair<bool, std::string> update_method_arg_name(const model::Conn &c, const std::string &schema, const std::string &id, const std::string &name)
+  std::pair<bool, std::string> update_method_arg_name(const model::ConnStore &c, const std::string &schema, const std::string &id, const std::string &name)
   {
     try {
       pqxx::connection pg(make_cs(c));
@@ -111,7 +111,7 @@ namespace back {
     }
   }
 
-  std::pair<bool, std::string> delete_method_arg(const model::Conn &c, const std::string &schema, const std::string &id)
+  std::pair<bool, std::string> delete_method_arg(const model::ConnStore &c, const std::string &schema, const std::string &id)
   {
     try {
       pqxx::connection pg(make_cs(c));
@@ -126,7 +126,7 @@ namespace back {
     }
   }
 
-  std::pair<bool, std::string> reorder_method_args(const model::Conn              &c,
+  std::pair<bool, std::string> reorder_method_args(const model::ConnStore              &c,
                                                    const std::string              &schema,
                                                    const std::string              &owner_method_id,
                                                    const std::vector<std::string> &ordered_ids)
@@ -150,7 +150,7 @@ namespace back {
 
   // Helper: UPDATE one unit_b_method column for a single method id.
   static std::pair<bool, std::string> update_method_column(
-      const model::Conn &c, const std::string &schema, const std::string &id, const std::string &column, const std::string &value)
+      const model::ConnStore &c, const std::string &schema, const std::string &id, const std::string &column, const std::string &value)
   {
     try {
       pqxx::connection pg(make_cs(c));
@@ -166,7 +166,7 @@ namespace back {
     }
   }
 
-  std::pair<bool, std::string> update_block_disabled(const model::Conn &c, const std::string &schema, const std::string &id, bool disabled)
+  std::pair<bool, std::string> update_block_disabled(const model::ConnStore &c, const std::string &schema, const std::string &id, bool disabled)
   {
     try {
       pqxx::connection  pg(make_cs(c));
@@ -182,19 +182,19 @@ namespace back {
     }
   }
 
-  std::pair<bool, std::string> update_method_type(const model::Conn &c, const std::string &schema, const std::string &id, model::MethodType type)
+  std::pair<bool, std::string> update_method_type(const model::ConnStore &c, const std::string &schema, const std::string &id, model::MethodType type)
   {
     return update_method_column(c, schema, id, "type", model::to_string(type));
   }
 
-  std::pair<bool, std::string> update_method_access(const model::Conn &c, const std::string &schema, const std::string &id, model::MethodAccess access)
+  std::pair<bool, std::string> update_method_access(const model::ConnStore &c, const std::string &schema, const std::string &id, model::MethodAccess access)
   {
     return update_method_column(c, schema, id, "access", model::to_string(access));
   }
 
   // Helper: UPDATE one unit_b_field column for a single field id.
   static std::pair<bool, std::string> update_field_column(
-      const model::Conn &c, const std::string &schema, const std::string &id, const std::string &column, const std::string &value)
+      const model::ConnStore &c, const std::string &schema, const std::string &id, const std::string &column, const std::string &value)
   {
     try {
       pqxx::connection pg(make_cs(c));
@@ -210,23 +210,23 @@ namespace back {
     }
   }
 
-  std::pair<bool, std::string> update_field_access(const model::Conn &c, const std::string &schema, const std::string &id, model::MethodAccess access)
+  std::pair<bool, std::string> update_field_access(const model::ConnStore &c, const std::string &schema, const std::string &id, model::MethodAccess access)
   {
     return update_field_column(c, schema, id, "access", model::to_string(access));
   }
 
-  std::pair<bool, std::string> update_field_expr_id_used(const model::Conn &c, const std::string &schema, const std::string &id, bool expr_id_used)
+  std::pair<bool, std::string> update_field_expr_id_used(const model::ConnStore &c, const std::string &schema, const std::string &id, bool expr_id_used)
   {
     return update_field_column(c, schema, id, "expr_id_used", expr_id_used ? "true" : "false");
   }
 
-  std::pair<bool, std::string> update_field_size_bytes(const model::Conn &c, const std::string &schema, const std::string &id, int size_bytes)
+  std::pair<bool, std::string> update_field_size_bytes(const model::ConnStore &c, const std::string &schema, const std::string &id, int size_bytes)
   {
     return update_field_column(c, schema, id, "size_bytes", std::to_string(size_bytes));
   }
 
   std::pair<bool, std::string> update_block_name(
-      const model::Conn &c, const std::string &schema, const std::string &id, model::BlockType type, const std::string &name)
+      const model::ConnStore &c, const std::string &schema, const std::string &id, model::BlockType type, const std::string &name)
   {
     try {
       pqxx::connection  pg(make_cs(c));
@@ -242,7 +242,7 @@ namespace back {
     }
   }
 
-  std::pair<bool, std::string> delete_block(const model::Conn &c, const std::string &schema, const std::string &id, model::BlockType type)
+  std::pair<bool, std::string> delete_block(const model::ConnStore &c, const std::string &schema, const std::string &id, model::BlockType type)
   {
     try {
       pqxx::connection  pg(make_cs(c));
@@ -261,7 +261,7 @@ namespace back {
     }
   }
 
-  std::pair<bool, std::string> update_block_size(const model::Conn &c, const std::string &schema, const std::string &id, float width, float height)
+  std::pair<bool, std::string> update_block_size(const model::ConnStore &c, const std::string &schema, const std::string &id, float width, float height)
   {
     try {
       pqxx::connection pg(make_cs(c));
@@ -276,7 +276,7 @@ namespace back {
     }
   }
 
-  std::pair<bool, std::string> update_block_position(const model::Conn &c, const std::string &schema, const std::string &id, float x, float y)
+  std::pair<bool, std::string> update_block_position(const model::ConnStore &c, const std::string &schema, const std::string &id, float x, float y)
   {
     try {
       pqxx::connection  pg(make_cs(c));

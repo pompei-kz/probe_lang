@@ -18,7 +18,7 @@ namespace front {
     snap_host = snap_port = snap_dbname = snap_user = snap_pass = "";
   }
 
-  void Dlg::open_edit(const back::model::Conn &c)
+  void Dlg::open_edit(const back::model::ConnStore &c)
   {
     open_add();
     fields[0].ed.set(c.name);
@@ -37,9 +37,9 @@ namespace front {
     snap_pass   = c.pass;
   }
 
-  back::model::Conn Dlg::to_conn() const
+  back::model::ConnStore Dlg::to_conn() const
   {
-    back::model::Conn c;
+    back::model::ConnStore c;
     c.name   = fields[0].ed.buf;
     c.host   = fields[1].ed.buf;
     c.port   = fields[2].ed.buf;

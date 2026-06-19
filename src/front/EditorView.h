@@ -1,8 +1,8 @@
 #pragma once
 #include "ContextMenuSelExpr.h"
 #include "InputField.h"
-#include "back/model/Conn.h"
 #include "back/model/Block.h"
+#include "back/model/ConnStore.h"
 #include "back/model/Expr.h"
 #include "back/model/Unit.h"
 #include <SDL3/SDL.h>
@@ -15,7 +15,7 @@ namespace front {
   // plus an independent camera (pan/zoom remembered per tab).
   struct EditorTab
   {
-    back::model::Conn     conn;
+    back::model::ConnStore     conn;
     std::string           schema;
     std::string           unit_id;
     std::string           unit_name;
@@ -93,7 +93,7 @@ namespace front {
     float size_inc_bx = 0, size_inc_by = 0, size_dec_bx = 0, size_dec_by = 0, size_btn_w = 0, size_btn_h = 0;
 
     // Open a unit (focus its tab if already open, else add a new one).
-    void open_for(const back::model::Conn &c, const std::string &schema, const std::string &uid, const std::string &uname, back::model::UnitType utype);
+    void open_for(const back::model::ConnStore &c, const std::string &schema, const std::string &uid, const std::string &uname, back::model::UnitType utype);
     void close();          // close the whole editor
     void close_tab(int i); // close one tab
 

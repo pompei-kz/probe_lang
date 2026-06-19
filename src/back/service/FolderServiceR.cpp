@@ -37,7 +37,7 @@ namespace back {
     return build_folder_tree(flat, "");
   }
 
-  std::pair<bool, std::string> load_repo_folders(const model::Conn &c, const std::string &schema, std::vector<model::FolderNode> &root_folders)
+  std::pair<bool, std::string> load_repo_folders(const model::ConnStore &c, const std::string &schema, std::vector<model::FolderNode> &root_folders)
   {
     root_folders.clear();
     try {

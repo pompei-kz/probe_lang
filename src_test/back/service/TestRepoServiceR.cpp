@@ -13,7 +13,7 @@
 
 TEST(RepoServiceMakeCs, IncludesProvidedFields)
 {
-  back::model::Conn c;
+  back::model::ConnStore c;
   c.host   = "myhost";
   c.port   = "1234";
   c.dbname = "mydb";
@@ -35,7 +35,7 @@ TEST(RepoServiceMakeCs, IncludesProvidedFields)
 
 TEST(RepoServiceMakeCs, AppliesDefaultsAndOmitsEmptyCredentials)
 {
-  back::model::Conn c;
+  back::model::ConnStore c;
   c.host = "h"; // port, dbname, user, pass left empty
 
   //

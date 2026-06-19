@@ -18,7 +18,7 @@ namespace front {
     constexpr int   PAGE  = 40; // units fetched per page
   } // namespace
 
-  void FormSelectUnit::open_for(const back::model::Conn &c, const std::string &sch, const std::string &fid)
+  void FormSelectUnit::open_for(const back::model::ConnStore &c, const std::string &sch, const std::string &fid)
   {
     open         = true;
     conn         = c;

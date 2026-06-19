@@ -1,6 +1,6 @@
 #pragma once
 #include "TestDb.h"
-#include "back/model/Conn.h"
+#include "back/model/ConnStore.h"
 #include <gtest/gtest.h>
 #include <pqxx/pqxx>
 
@@ -37,7 +37,7 @@ protected:
   }
 
   // The test database as a back::model::Conn (for service-level APIs).
-  back::model::Conn conn() const { return test_db::conn(); }
+  back::model::ConnStore conn() const { return test_db::conn(); }
 
   // Create the (empty) per-test schema.
   void make_schema() const

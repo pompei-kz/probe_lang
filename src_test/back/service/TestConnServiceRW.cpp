@@ -10,7 +10,7 @@
 #include <vector>
 
 namespace fs = std::filesystem;
-using back::model::Conn;
+using back::model::ConnStore;
 
 // ---------------------------------------------------------------------------
 // Fixture
@@ -55,9 +55,9 @@ protected:
   // Path of the workspace file for a given connection name.
   fs::path conn_file(const std::string &name) const { return tmp_home / ".config" / "probe_lang" / "workspace" / (name + ".pg-connect"); }
 
-  static Conn make_conn(const std::string &name)
+  static ConnStore make_conn(const std::string &name)
   {
-    Conn c;
+    ConnStore c;
     c.name      = name;
     c.host      = "db.example.com";
     c.port      = "5433";
@@ -86,7 +86,7 @@ TEST_F(ConnServiceRWTest, SaveCreatesFile)
 
 TEST_F(ConnServiceRWTest, SaveThenLoadRoundTripsAllFields)
 {
-  Conn c = make_conn("prod");
+  ConnStore c = make_conn("prod");
 
   //
   //
@@ -94,11 +94,11 @@ TEST_F(ConnServiceRWTest, SaveThenLoadRoundTripsAllFields)
   //
   //
 
-  std::vector<Conn> all = back::load_all();
+  std::vector<ConnStore> all = back::load_all();
   ASSERT_EQ(all.size(), 1u);
 
   // ReSharper disable once CppUseStructuredBinding
-  const Conn &got = all[0];
+  const ConnStore &got = all[0];
 
   EXPECT_EQ(got.name, "prod"); // name comes from the file stem
   EXPECT_EQ(got.host, c.host);
@@ -111,7 +111,7 @@ TEST_F(ConnServiceRWTest, SaveThenLoadRoundTripsAllFields)
 
 TEST_F(ConnServiceRWTest, ConnectedFalseRoundTrips)
 {
-  Conn c      = make_conn("local");
+  ConnStore c      = make_conn("local");
   c.connected = false;
 
   //
@@ -120,14 +120,14 @@ TEST_F(ConnServiceRWTest, ConnectedFalseRoundTrips)
   //
   //
 
-  const std::vector<Conn> all = back::load_all();
+  const std::vector<ConnStore> all = back::load_all();
   ASSERT_EQ(all.size(), 1u);
   EXPECT_FALSE(all[0].connected);
 }
 
 TEST_F(ConnServiceRWTest, EmptyOptionalFieldsRoundTrip)
 {
-  Conn c;
+  ConnStore c;
   c.name = "minimal"; // everything else empty, connected=false
 
   //
@@ -136,7 +136,7 @@ TEST_F(ConnServiceRWTest, EmptyOptionalFieldsRoundTrip)
   //
   //
 
-  std::vector<Conn> all = back::load_all();
+  std::vector<ConnStore> all = back::load_all();
   ASSERT_EQ(all.size(), 1u);
   EXPECT_EQ(all[0].name, "minimal");
   EXPECT_TRUE(all[0].host.empty());
@@ -149,7 +149,7 @@ TEST_F(ConnServiceRWTest, EmptyOptionalFieldsRoundTrip)
 
 TEST_F(ConnServiceRWTest, SaveOverwritesExisting)
 {
-  Conn c = make_conn("prod");
+  ConnStore c = make_conn("prod");
   back::save_conn(c);
   c.host = "new-host";
 
@@ -159,7 +159,7 @@ TEST_F(ConnServiceRWTest, SaveOverwritesExisting)
   //
   //
 
-  const std::vector<Conn> all = back::load_all();
+  const std::vector<ConnStore> all = back::load_all();
   ASSERT_EQ(all.size(), 1u);
   EXPECT_EQ(all[0].host, "new-host");
 }
@@ -182,14 +182,14 @@ TEST_F(ConnServiceRWTest, SaveWithRenameRemovesOldFile)
   EXPECT_FALSE(fs::exists(conn_file("old")));
   EXPECT_TRUE(fs::exists(conn_file("new")));
 
-  const std::vector<Conn> all = back::load_all();
+  const std::vector<ConnStore> all = back::load_all();
   ASSERT_EQ(all.size(), 1u);
   EXPECT_EQ(all[0].name, "new");
 }
 
 TEST_F(ConnServiceRWTest, SaveWithSameOldNameKeepsFile)
 {
-  const Conn c = make_conn("same");
+  const ConnStore c = make_conn("same");
   back::save_conn(c);
 
   //
