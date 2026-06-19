@@ -39,7 +39,7 @@ namespace back {
 
       std::vector<Block> out;
       out.reserve(rows.size());
-      for (const pqxx::row &row : rows) {
+      for (const auto &row : rows) {
         Block s{};
         s.id          = row[0].c_str();
         s.unit_id     = row[1].c_str();
@@ -74,7 +74,7 @@ namespace back {
             "WHERE s.unit_id = $1 "
             "ORDER BY a.owner_method_id, a.order_index, a.id",
             unit_id);
-        for (const pqxx::row &row : args) {
+        for (const auto &row : args) {
           const std::string owner = row[1].c_str();
           for (Block &b : out) {
             if (b.id != owner) continue;
@@ -102,7 +102,7 @@ namespace back {
             "LEFT JOIN " + qs + ".unit_e_unit eu ON eu.id = e.id "
             "WHERE s.unit_id = $1",
             unit_id);
-        for (const pqxx::row &row : exprs) {
+        for (const auto &row : exprs) {
           const std::string bid = row[0].c_str();
           for (Block &b : out) {
             if (b.id != bid) continue;

@@ -39,7 +39,7 @@ namespace back {
 
       std::vector<Expr> out;
       out.reserve(rows.size());
-      for (const pqxx::row &row : rows) {
+      for (const auto &row : rows) {
         Expr e{};
         e.id             = row[0].c_str();
         e.type           = expr_type_from_string(row[1].c_str());

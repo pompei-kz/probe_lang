@@ -55,7 +55,7 @@ namespace back {
                                           std::max(0, limit));
 
       std::vector<Unit> units;
-      for (const pqxx::row &row : rows) {
+      for (const auto &row : rows) {
         Unit u{};
         u.id               = row[0].c_str();
         u.parent_folder_id = row[1].c_str();
@@ -84,7 +84,7 @@ namespace back {
                                  pg.quote_name(sch) + ".unit ORDER BY name");
 
     std::vector<Unit> units;
-    for (const pqxx::row &row : rows) {
+    for (const auto &row : rows) {
       Unit u{};
       u.id               = row[0].c_str();
       u.parent_folder_id = row[1].c_str();

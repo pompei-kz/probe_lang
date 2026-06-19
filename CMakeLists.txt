@@ -12,6 +12,10 @@ find_package(SDL3 REQUIRED CONFIG)
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(PQXX REQUIRED libpqxx)
+# libpqxx 8 may be installed as a static archive whose .pc only lists libpq under
+# Requires.private, so the C client library is not pulled in automatically — link it
+# explicitly (after libpqxx, for static archive symbol resolution).
+pkg_check_modules(PQ REQUIRED libpq)
 
 include(cmake/EmbedResources.cmake)
 
@@ -60,7 +64,7 @@ target_include_directories(probe_lang PRIVATE ${stb_SOURCE_DIR})
 target_link_libraries(probe_lang PRIVATE SDL3::SDL3)
 target_link_libraries(probe_lang PRIVATE ICU::uc ICU::i18n ICU::io ICU::data)
 target_include_directories(probe_lang PRIVATE ${PQXX_INCLUDE_DIRS})
-target_link_libraries(probe_lang PRIVATE ${PQXX_LINK_LIBRARIES})
+target_link_libraries(probe_lang PRIVATE ${PQXX_LINK_LIBRARIES} ${PQ_LINK_LIBRARIES})
 
 embed_resources(probe_lang "${CMAKE_CURRENT_SOURCE_DIR}/resources")
 target_include_directories(probe_lang PRIVATE external/stb)
@@ -102,7 +106,7 @@ target_include_directories(probe_lang_tests PRIVATE src)
 target_include_directories(probe_lang_tests PRIVATE src_test)
 target_include_directories(probe_lang_tests PRIVATE ${PQXX_INCLUDE_DIRS})
 target_link_libraries(probe_lang_tests PRIVATE GTest::GTest GTest::Main)
-target_link_libraries(probe_lang_tests PRIVATE ${PQXX_LINK_LIBRARIES})
+target_link_libraries(probe_lang_tests PRIVATE ${PQXX_LINK_LIBRARIES} ${PQ_LINK_LIBRARIES})
 
 include(GoogleTest)
 gtest_discover_tests(probe_lang_tests)

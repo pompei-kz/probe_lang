@@ -61,7 +61,7 @@ namespace back {
         pqxx::result rows = txn_.exec_params("SELECT * FROM " + qtable + " WHERE id = $1", u.idValue);
         if (rows.empty()) continue; // строки нет — удаление ничего не сделает, отменять нечего
 
-        for (const pqxx::field &f : rows[0]) {
+        for (const auto &f : rows[0]) {
           if (std::string(f.name()) == "id") continue; // id уже задан в idValue каждого изменения
 
           RowChange undo;
