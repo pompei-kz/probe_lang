@@ -3,7 +3,7 @@
 #include "ContextMenu.h"
 #include "FontAtlas.h"
 #include "FormWidgets.h"
-#include "back/service/RepoService.h"
+#include "back/service/RepoServiceRW.h"
 #include "render_helpers.h"
 
 namespace front {

@@ -4,10 +4,12 @@
 #include "PanelMenu.h"
 #include "SchemaMenu.h"
 #include "back/model/ConnNode.h"
-#include "back/service/ConnService.h"
-#include "back/service/ProjectTreeService.h"
-#include "back/service/RepoService.h"
-#include "back/service/UnitService.h"
+#include "back/service/ConnServiceRW.h"
+#include "back/service/ProjectTreeServiceR.h"
+#include "back/service/ProjectTreeServiceRW.h"
+#include "back/service/RepoServiceR.h"
+#include "back/service/RepoServiceRW.h"
+#include "back/service/UnitServiceRW.h"
 #include "render_helpers.h"
 
 namespace front {

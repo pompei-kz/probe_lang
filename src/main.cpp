@@ -9,10 +9,10 @@
 #include "front/render_helpers.h"
 
 #include "back/model/SchemaNode.h"
-#include "back/service/ConnService.h"
-#include "back/service/FolderService.h"
-#include "back/service/RepoService.h"
-#include "back/service/UnitService.h"
+#include "back/service/ConnServiceRW.h"
+#include "back/service/FolderServiceRW.h"
+#include "back/service/RepoServiceR.h"
+#include "back/service/UnitServiceRW.h"
 
 using namespace front;
 using namespace back;

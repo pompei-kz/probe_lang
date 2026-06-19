@@ -1,24 +1,18 @@
 #include "back/DbTestBase.h"
-#include "back/service/BlockService.h"
-#include "back/service/ExprService.h"
-#include "back/service/UnitService.h"
+#include "back/service/BlockServiceR.h"
+#include "back/service/BlockServiceRW.h"
+#include "back/service/ExprServiceR.h"
+#include "back/service/ExprServiceRW.h"
+#include "back/service/UnitServiceR.h"
+#include "back/service/UnitServiceRW.h"
 #include <gtest/gtest.h>
 
 using namespace back;
 using namespace back::model;
 
-class ExprServiceTest : public DbTest
+class ExprServiceRWTest : public DbTest
 {
 protected:
-  // id of the only field block in the unit (assumes exactly one).
-  std::string only_field()
-  {
-    auto [blocks, err] = load_blocks_in_view(conn(), schema, "u1", -1000, -1000, 1000, 1000);
-    EXPECT_TRUE(err.empty()) << err;
-    EXPECT_EQ(blocks.size(), 1u);
-    return blocks.empty() ? "" : blocks[0].id;
-  }
-
   Block reload_field()
   {
     auto [blocks, err] = load_blocks_in_view(conn(), schema, "u1", -1000, -1000, 1000, 1000);
@@ -28,7 +22,7 @@ protected:
   }
 };
 
-TEST_F(ExprServiceTest, SetThisTypeCreatesExpressionAndPersists)
+TEST_F(ExprServiceRWTest, SetThisTypeCreatesExpressionAndPersists)
 {
   make_schema();
   auto [fid, fmsg] = create_block(conn(), schema, "u1", BlockType::Field, 0, 0, 50, 20, "f");
@@ -46,7 +40,7 @@ TEST_F(ExprServiceTest, SetThisTypeCreatesExpressionAndPersists)
   EXPECT_EQ(b.expr_type, ExprType::ThisMethod);
 }
 
-TEST_F(ExprServiceTest, SetThisTypeTwiceUpdatesInPlace)
+TEST_F(ExprServiceRWTest, SetThisTypeTwiceUpdatesInPlace)
 {
   make_schema();
   auto [fid, fmsg] = create_block(conn(), schema, "u1", BlockType::Field, 0, 0, 50, 20, "f");
@@ -66,7 +60,7 @@ TEST_F(ExprServiceTest, SetThisTypeTwiceUpdatesInPlace)
   EXPECT_EQ(reload_field().expr_type, ExprType::ThisUnit);
 }
 
-TEST_F(ExprServiceTest, SetUnitResolvesToExistingUnitName)
+TEST_F(ExprServiceRWTest, SetUnitResolvesToExistingUnitName)
 {
   make_schema();
   ASSERT_TRUE(create_unit(conn(), schema, "", "Альфа", UnitType::Class).first);
@@ -91,7 +85,7 @@ TEST_F(ExprServiceTest, SetUnitResolvesToExistingUnitName)
   EXPECT_EQ(b.expr_unit_name, "Альфа");
 }
 
-TEST_F(ExprServiceTest, DanglingUnitReferenceIsTreatedAsAbsent)
+TEST_F(ExprServiceRWTest, DanglingUnitReferenceIsTreatedAsAbsent)
 {
   make_schema();
   auto [fid, fmsg] = create_block(conn(), schema, "u1", BlockType::Field, 0, 0, 50, 20, "f");
@@ -112,7 +106,7 @@ TEST_F(ExprServiceTest, DanglingUnitReferenceIsTreatedAsAbsent)
   EXPECT_TRUE(b.expr_unit_name.empty());
 }
 
-TEST_F(ExprServiceTest, ExprRectSyncsWorldCoordsAndSpatialQuery)
+TEST_F(ExprServiceRWTest, ExprRectSyncsWorldCoordsAndSpatialQuery)
 {
   make_schema();
   auto [fid, fmsg] = create_block(conn(), schema, "u1", BlockType::Field, 100, 200, 50, 20, "f");
@@ -141,19 +135,4 @@ TEST_F(ExprServiceTest, ExprRectSyncsWorldCoordsAndSpatialQuery)
   auto [off_view, e2] = load_exprs_in_view(conn(), schema, "u1", -1000, -1000, -500, -500);
   ASSERT_TRUE(e2.empty()) << e2;
   EXPECT_TRUE(off_view.empty());
-}
-
-TEST_F(ExprServiceTest, NoExpressionWhenNoneSet)
-{
-  make_schema();
-  auto [fid, fmsg] = create_block(conn(), schema, "u1", BlockType::Field, 0, 0, 50, 20, "f");
-  ASSERT_FALSE(fid.empty()) << fmsg;
-
-  //
-  //
-  Block b = reload_field();
-  //
-  //
-
-  EXPECT_FALSE(b.expr_present);
 }

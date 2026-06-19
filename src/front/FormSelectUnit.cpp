@@ -3,8 +3,8 @@
 #include "ContextMenu.h"
 #include "FontAtlas.h"
 #include "FormWidgets.h"
-#include "back/service/ExprService.h"
-#include "back/service/UnitService.h"
+#include "back/service/ExprServiceRW.h"
+#include "back/service/UnitServiceR.h"
 #include "render_helpers.h"
 #include <algorithm>
 

@@ -1,4 +1,5 @@
-#include "back/service/ConnService.h"
+#include "back/service/ConnServiceR.h"
+#include "back/service/ConnServiceRW.h"
 #include <gtest/gtest.h>
 
 #include <cstdlib>
@@ -19,7 +20,7 @@ using back::model::Conn;
 // $HOME to a throw-away temp directory. The real ~/.config is never touched.
 // ---------------------------------------------------------------------------
 
-class ConnServiceTest : public testing::Test
+class ConnServiceRWTest : public testing::Test
 {
 protected:
   fs::path                   tmp_home;
@@ -69,54 +70,10 @@ protected:
 };
 
 // ---------------------------------------------------------------------------
-// ws_dir
-// ---------------------------------------------------------------------------
-
-TEST_F(ConnServiceTest, WsDirIsUnderHome)
-{
-  //
-  //
-  const fs::path dir = back::ws_dir();
-  //
-  //
-
-  EXPECT_EQ(dir, tmp_home / ".config" / "probe_lang" / "workspace");
-}
-
-// ---------------------------------------------------------------------------
-// load_all — empty state
-// ---------------------------------------------------------------------------
-
-TEST_F(ConnServiceTest, LoadAllOnMissingDirReturnsEmpty)
-{
-  // Workspace dir does not exist yet.
-  //
-  //
-  const std::vector<Conn> all = back::load_all();
-  //
-  //
-
-  EXPECT_TRUE(all.empty());
-}
-
-TEST_F(ConnServiceTest, LoadAllOnEmptyDirReturnsEmpty)
-{
-  fs::create_directories(back::ws_dir());
-
-  //
-  //
-  const std::vector<Conn> all = back::load_all();
-  //
-  //
-
-  EXPECT_TRUE(all.empty());
-}
-
-// ---------------------------------------------------------------------------
 // save_conn
 // ---------------------------------------------------------------------------
 
-TEST_F(ConnServiceTest, SaveCreatesFile)
+TEST_F(ConnServiceRWTest, SaveCreatesFile)
 {
   //
   //
@@ -127,7 +84,7 @@ TEST_F(ConnServiceTest, SaveCreatesFile)
   EXPECT_TRUE(fs::exists(conn_file("prod")));
 }
 
-TEST_F(ConnServiceTest, SaveThenLoadRoundTripsAllFields)
+TEST_F(ConnServiceRWTest, SaveThenLoadRoundTripsAllFields)
 {
   Conn c = make_conn("prod");
 
@@ -152,7 +109,7 @@ TEST_F(ConnServiceTest, SaveThenLoadRoundTripsAllFields)
   EXPECT_TRUE(got.connected);
 }
 
-TEST_F(ConnServiceTest, ConnectedFalseRoundTrips)
+TEST_F(ConnServiceRWTest, ConnectedFalseRoundTrips)
 {
   Conn c      = make_conn("local");
   c.connected = false;
@@ -168,7 +125,7 @@ TEST_F(ConnServiceTest, ConnectedFalseRoundTrips)
   EXPECT_FALSE(all[0].connected);
 }
 
-TEST_F(ConnServiceTest, EmptyOptionalFieldsRoundTrip)
+TEST_F(ConnServiceRWTest, EmptyOptionalFieldsRoundTrip)
 {
   Conn c;
   c.name = "minimal"; // everything else empty, connected=false
@@ -190,7 +147,7 @@ TEST_F(ConnServiceTest, EmptyOptionalFieldsRoundTrip)
   EXPECT_FALSE(all[0].connected);
 }
 
-TEST_F(ConnServiceTest, SaveOverwritesExisting)
+TEST_F(ConnServiceRWTest, SaveOverwritesExisting)
 {
   Conn c = make_conn("prod");
   back::save_conn(c);
@@ -211,7 +168,7 @@ TEST_F(ConnServiceTest, SaveOverwritesExisting)
 // save_conn with rename (old_name)
 // ---------------------------------------------------------------------------
 
-TEST_F(ConnServiceTest, SaveWithRenameRemovesOldFile)
+TEST_F(ConnServiceRWTest, SaveWithRenameRemovesOldFile)
 {
   back::save_conn(make_conn("old"));
   ASSERT_TRUE(fs::exists(conn_file("old")));
@@ -230,7 +187,7 @@ TEST_F(ConnServiceTest, SaveWithRenameRemovesOldFile)
   EXPECT_EQ(all[0].name, "new");
 }
 
-TEST_F(ConnServiceTest, SaveWithSameOldNameKeepsFile)
+TEST_F(ConnServiceRWTest, SaveWithSameOldNameKeepsFile)
 {
   const Conn c = make_conn("same");
   back::save_conn(c);
@@ -249,7 +206,7 @@ TEST_F(ConnServiceTest, SaveWithSameOldNameKeepsFile)
 // delete_conn
 // ---------------------------------------------------------------------------
 
-TEST_F(ConnServiceTest, DeleteRemovesFile)
+TEST_F(ConnServiceRWTest, DeleteRemovesFile)
 {
   back::save_conn(make_conn("doomed"));
   ASSERT_TRUE(fs::exists(conn_file("doomed")));
@@ -262,82 +219,4 @@ TEST_F(ConnServiceTest, DeleteRemovesFile)
 
   EXPECT_FALSE(fs::exists(conn_file("doomed")));
   EXPECT_TRUE(back::load_all().empty());
-}
-
-// ---------------------------------------------------------------------------
-// load_all — multiple entries, sorting, filtering
-// ---------------------------------------------------------------------------
-
-TEST_F(ConnServiceTest, LoadAllReturnsSortedByName)
-{
-  back::save_conn(make_conn("charlie"));
-  back::save_conn(make_conn("alpha"));
-  back::save_conn(make_conn("bravo"));
-
-  //
-  //
-  const std::vector<Conn> all = back::load_all();
-  //
-  //
-
-  ASSERT_EQ(all.size(), 3u);
-  EXPECT_EQ(all[0].name, "alpha");
-  EXPECT_EQ(all[1].name, "bravo");
-  EXPECT_EQ(all[2].name, "charlie");
-}
-
-TEST_F(ConnServiceTest, LoadAllIgnoresForeignExtensions)
-{
-  back::save_conn(make_conn("real"));
-
-  // Drop an unrelated file into the workspace dir.
-  const fs::path stray = back::ws_dir() / "notes.txt";
-  std::ofstream(stray) << "host=should-be-ignored\n";
-
-  //
-  //
-  const std::vector<Conn> all = back::load_all();
-  //
-  //
-
-  ASSERT_EQ(all.size(), 1u);
-  EXPECT_EQ(all[0].name, "real");
-}
-
-TEST_F(ConnServiceTest, LoadAllIgnoresUnknownKeysAndBlankLines)
-{
-  fs::create_directories(back::ws_dir());
-  std::ofstream(back::ws_dir() / "manual.pg-connect") << "host=h\n"
-                                                      << "\n"                   // blank line
-                                                      << "garbage-without-eq\n" // no '='
-                                                      << "unknown=value\n"      // unknown key
-                                                      << "port=1234\n"
-                                                      << "connected=YES\n";
-
-  //
-  //
-  const std::vector<Conn> all = back::load_all();
-  //
-  //
-
-  ASSERT_EQ(all.size(), 1u);
-  EXPECT_EQ(all[0].name, "manual");
-  EXPECT_EQ(all[0].host, "h");
-  EXPECT_EQ(all[0].port, "1234");
-  EXPECT_TRUE(all[0].connected);
-}
-
-TEST_F(ConnServiceTest, ConnectedNonYesParsesAsFalse)
-{
-  fs::create_directories(back::ws_dir());
-  std::ofstream(back::ws_dir() / "weird.pg-connect") << "connected=maybe\n";
-
-  //
-  //
-  const std::vector<Conn> all = back::load_all();
-  //
-  //
-
-  ASSERT_EQ(all.size(), 1u);
-  EXPECT_FALSE(all[0].connected); // only the literal "YES" means connected
 }

@@ -41,15 +41,22 @@ add_executable(probe_lang
         src/front/UnitMenu.cpp
         src/front/ContextMenuSelExpr.cpp
         src/front/EditorView.cpp
-        src/back/service/ConnService.cpp
-        src/back/service/RepoService.cpp
-        src/back/service/FolderService.cpp
+        src/back/service/ConnServiceR.cpp
+        src/back/service/ConnServiceRW.cpp
+        src/back/service/RepoServiceR.cpp
+        src/back/service/RepoServiceRW.cpp
+        src/back/service/FolderServiceR.cpp
+        src/back/service/FolderServiceRW.cpp
         src/back/etc/InitDb.cpp
         src/back/etc/UtilDb.cpp
-        src/back/service/ProjectTreeService.cpp
-        src/back/service/UnitService.cpp
-        src/back/service/BlockService.cpp
-        src/back/service/ExprService.cpp
+        src/back/service/ProjectTreeServiceR.cpp
+        src/back/service/ProjectTreeServiceRW.cpp
+        src/back/service/UnitServiceR.cpp
+        src/back/service/UnitServiceRW.cpp
+        src/back/service/BlockServiceR.cpp
+        src/back/service/BlockServiceRW.cpp
+        src/back/service/ExprServiceR.cpp
+        src/back/service/ExprServiceRW.cpp
         src/back/etc/UnitEditorState.cpp
         src/back/etc/CustomId.cpp
         src/back/model/RowChange.h
@@ -76,27 +83,41 @@ find_package(GTest REQUIRED)
 
 add_executable(probe_lang_tests
         src_test/back/etc/TestCustomId.cpp
-        src_test/back/service/TestConnService.cpp
+        src_test/back/service/TestConnServiceR.cpp
+        src_test/back/service/TestConnServiceRW.cpp
         src_test/back/etc/TestUtilDb.cpp
         src_test/back/etc/TestInitDb.cpp
-        src_test/back/service/TestRepoService.cpp
-        src_test/back/service/TestFolderService.cpp
-        src_test/back/service/TestProjectTreeService.cpp
-        src_test/back/service/TestUnitService.cpp
-        src_test/back/service/TestBlockService.cpp
-        src_test/back/service/TestExprService.cpp
+        src_test/back/service/TestRepoServiceR.cpp
+        src_test/back/service/TestRepoServiceRW.cpp
+        src_test/back/service/TestFolderServiceR.cpp
+        src_test/back/service/TestFolderServiceRW.cpp
+        src_test/back/service/TestProjectTreeServiceR.cpp
+        src_test/back/service/TestProjectTreeServiceRW.cpp
+        src_test/back/service/TestUnitServiceR.cpp
+        src_test/back/service/TestUnitServiceRW.cpp
+        src_test/back/service/TestBlockServiceR.cpp
+        src_test/back/service/TestBlockServiceRW.cpp
+        src_test/back/service/TestExprServiceR.cpp
+        src_test/back/service/TestExprServiceRW.cpp
         src_test/back/etc/TestChangeSystem.cpp
         src_test/back/etc/TestUnitEditorState.cpp
         src/back/etc/CustomId.cpp
-        src/back/service/ConnService.cpp
+        src/back/service/ConnServiceR.cpp
+        src/back/service/ConnServiceRW.cpp
         src/back/etc/UtilDb.cpp
         src/back/etc/InitDb.cpp
-        src/back/service/RepoService.cpp
-        src/back/service/FolderService.cpp
-        src/back/service/ProjectTreeService.cpp
-        src/back/service/UnitService.cpp
-        src/back/service/BlockService.cpp
-        src/back/service/ExprService.cpp
+        src/back/service/RepoServiceR.cpp
+        src/back/service/RepoServiceRW.cpp
+        src/back/service/FolderServiceR.cpp
+        src/back/service/FolderServiceRW.cpp
+        src/back/service/ProjectTreeServiceR.cpp
+        src/back/service/ProjectTreeServiceRW.cpp
+        src/back/service/UnitServiceR.cpp
+        src/back/service/UnitServiceRW.cpp
+        src/back/service/BlockServiceR.cpp
+        src/back/service/BlockServiceRW.cpp
+        src/back/service/ExprServiceR.cpp
+        src/back/service/ExprServiceRW.cpp
         src/back/etc/ChangeSystem.cpp
         src/back/etc/UnitEditorState.cpp
         src/back/model/RowChange.h

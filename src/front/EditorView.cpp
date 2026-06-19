@@ -2,8 +2,10 @@
 #include "Clr.h"
 #include "FontAtlas.h"
 #include "back/etc/UnitEditorState.h"
-#include "back/service/BlockService.h"
-#include "back/service/ExprService.h"
+#include "back/service/BlockServiceR.h"
+#include "back/service/BlockServiceRW.h"
+#include "back/service/ExprServiceR.h"
+#include "back/service/ExprServiceRW.h"
 #include "render_helpers.h"
 
 #include <algorithm>

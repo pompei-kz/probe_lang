@@ -87,11 +87,19 @@ Two namespaces, cleanly separated — `back` (logic + persistence) never include
 
 - `model/` holds plain structs (`Conn`, `RepoNode`, `FolderNode`, `Unit`, `Block`, `BBox`, …) plus
   free `to_string` / `*_from_string` enum converters. No behavior.
-- `service/` holds every `*Service.{h,cpp}` (`BlockService`, `ConnService`, `ExprService`,
-  `FolderService`, `ProjectTreeService`, `RepoService`, `UnitService`) — each a set of **free
-  functions** (no service classes). The pervasive convention: operations return
-  `std::pair<bool, std::string>` = `{ok, error_message}`, or `std::pair<T, std::string>` where an
-  empty/`nullopt` first element signals failure. Callers surface the error string in a `MsgDlg`.
+- `service/` holds the services as **free functions** (no service classes). Each service is **split by
+  read vs write**: `Foo` has a read-only `FooServiceR.{h,cpp}` (only reads the DB / filesystem) and a
+  read-write `FooServiceRW.{h,cpp}` (creates / updates / deletes). The seven services are `Block`,
+  `Conn`, `Expr`, `Folder`, `ProjectTree`, `Repo`, `Unit`. Everything stays in namespace `back` with
+  unchanged function names — a caller just includes the R and/or RW header(s) it needs. The pervasive
+  convention: operations return `std::pair<bool, std::string>` = `{ok, error_message}`, or
+  `std::pair<T, std::string>` where an empty/`nullopt` first element signals failure. Callers surface
+  the error string in a `MsgDlg`.
+  - The pure helpers `make_cs` (Conn → libpq connection string) and `sql_err_msg` (format a
+    `pqxx::sql_error`) live in **`RepoServiceR`**; every service `.cpp` that needs them includes
+    `back/service/RepoServiceR.h`. `RepoServiceR` also owns the cross-service readers `load_tree` /
+    `load_folders_for_schema` / `load_units_for_schema` it composes from `FolderServiceR` /
+    `UnitServiceR`.
 - `etc/` holds the rest of `back` that isn't a service: `InitDb`, `UtilDb`, `CustomId`,
   `UnitEditorState`, `ChangeSystem`.
 - `InitDb` / `UtilDb` (`back/etc/`) hold **idempotent DDL** (`CREATE ... IF NOT EXISTS`,

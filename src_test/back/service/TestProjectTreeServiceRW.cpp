@@ -1,4 +1,4 @@
-#include "back/service/ProjectTreeService.h"
+#include "back/service/ProjectTreeServiceRW.h"
 #include <gtest/gtest.h>
 
 #include <cstdlib>
@@ -20,7 +20,7 @@ using namespace back;
 // directory. The real ~/.config is never touched.
 // ---------------------------------------------------------------------------
 
-class ProjectTreeServiceTest : public testing::Test
+class ProjectTreeServiceRWTest : public testing::Test
 {
 protected:
   fs::path                   tmp_home;
@@ -55,25 +55,10 @@ protected:
 };
 
 // ---------------------------------------------------------------------------
-// project_tree_open_nodes_dir
-// ---------------------------------------------------------------------------
-
-TEST_F(ProjectTreeServiceTest, DirIsUnderHome)
-{
-  //
-  //
-  const fs::path dir = project_tree_open_nodes_dir();
-  //
-  //
-
-  EXPECT_EQ(dir, tmp_home / ".config" / "probe_lang" / "project_tree_open_nodes");
-}
-
-// ---------------------------------------------------------------------------
 // open_tree_node
 // ---------------------------------------------------------------------------
 
-TEST_F(ProjectTreeServiceTest, OpenCreatesMarkerFile)
+TEST_F(ProjectTreeServiceRWTest, OpenCreatesMarkerFile)
 {
   //
   //
@@ -84,7 +69,7 @@ TEST_F(ProjectTreeServiceTest, OpenCreatesMarkerFile)
   EXPECT_TRUE(fs::exists(marker("conn")));
 }
 
-TEST_F(ProjectTreeServiceTest, OpenJoinsPathWithHash)
+TEST_F(ProjectTreeServiceRWTest, OpenJoinsPathWithHash)
 {
   //
   //
@@ -95,7 +80,7 @@ TEST_F(ProjectTreeServiceTest, OpenJoinsPathWithHash)
   EXPECT_TRUE(fs::exists(marker("conn#public#abc")));
 }
 
-TEST_F(ProjectTreeServiceTest, OpenCreatesEmptyFile)
+TEST_F(ProjectTreeServiceRWTest, OpenCreatesEmptyFile)
 {
   //
   //
@@ -107,7 +92,7 @@ TEST_F(ProjectTreeServiceTest, OpenCreatesEmptyFile)
   EXPECT_EQ(fs::file_size(marker("conn#public")), 0u);
 }
 
-TEST_F(ProjectTreeServiceTest, OpenIsIdempotent)
+TEST_F(ProjectTreeServiceRWTest, OpenIsIdempotent)
 {
   open_tree_node({"conn"});
 
@@ -124,7 +109,7 @@ TEST_F(ProjectTreeServiceTest, OpenIsIdempotent)
 // close_tree_node
 // ---------------------------------------------------------------------------
 
-TEST_F(ProjectTreeServiceTest, CloseRemovesMarkerFile)
+TEST_F(ProjectTreeServiceRWTest, CloseRemovesMarkerFile)
 {
   open_tree_node({"conn", "public"});
   ASSERT_TRUE(fs::exists(marker("conn#public")));
@@ -138,7 +123,7 @@ TEST_F(ProjectTreeServiceTest, CloseRemovesMarkerFile)
   EXPECT_FALSE(fs::exists(marker("conn#public")));
 }
 
-TEST_F(ProjectTreeServiceTest, CloseMissingNodeDoesNotThrow)
+TEST_F(ProjectTreeServiceRWTest, CloseMissingNodeDoesNotThrow)
 {
   //
   //
@@ -147,7 +132,7 @@ TEST_F(ProjectTreeServiceTest, CloseMissingNodeDoesNotThrow)
   //
 }
 
-TEST_F(ProjectTreeServiceTest, CloseAffectsOnlyTheGivenNode)
+TEST_F(ProjectTreeServiceRWTest, CloseAffectsOnlyTheGivenNode)
 {
   open_tree_node({"conn"});
   open_tree_node({"conn", "public"});
@@ -160,60 +145,4 @@ TEST_F(ProjectTreeServiceTest, CloseAffectsOnlyTheGivenNode)
 
   EXPECT_TRUE(fs::exists(marker("conn"))); // sibling untouched
   EXPECT_FALSE(fs::exists(marker("conn#public")));
-}
-
-// ---------------------------------------------------------------------------
-// is_tree_node_open
-// ---------------------------------------------------------------------------
-
-TEST_F(ProjectTreeServiceTest, IsOpenFalseWhenAbsent)
-{
-  //
-  //
-  const bool open = is_tree_node_open({"conn"});
-  //
-  //
-
-  EXPECT_FALSE(open);
-}
-
-TEST_F(ProjectTreeServiceTest, IsOpenTrueAfterOpen)
-{
-  open_tree_node({"conn", "public", "abc"});
-
-  //
-  //
-  const bool open = is_tree_node_open({"conn", "public", "abc"});
-  //
-  //
-
-  EXPECT_TRUE(open);
-}
-
-TEST_F(ProjectTreeServiceTest, IsOpenFalseAfterClose)
-{
-  open_tree_node({"conn"});
-  close_tree_node({"conn"});
-
-  //
-  //
-  const bool open = is_tree_node_open({"conn"});
-  //
-  //
-
-  EXPECT_FALSE(open);
-}
-
-TEST_F(ProjectTreeServiceTest, DistinctPathsAreIndependent)
-{
-  open_tree_node({"conn", "public"});
-
-  //
-  //
-  const bool other = is_tree_node_open({"conn", "private"});
-  //
-  //
-
-  EXPECT_FALSE(other);
-  EXPECT_TRUE(is_tree_node_open({"conn", "public"}));
 }

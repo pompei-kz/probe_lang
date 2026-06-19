@@ -1,5 +1,6 @@
 #include "back/DbTestBase.h"
-#include "back/service/FolderService.h"
+#include "back/service/FolderServiceR.h"
+#include "back/service/FolderServiceRW.h"
 #include <gtest/gtest.h>
 
 #include <string>
@@ -7,7 +8,7 @@
 
 using namespace back;
 
-class FolderServiceTest : public DbTest
+class FolderServiceRWTest : public DbTest
 {
 protected:
   // id of the first folder with the given name ("" if none).
@@ -29,7 +30,7 @@ protected:
 // create_folder
 // ---------------------------------------------------------------------------
 
-TEST_F(FolderServiceTest, CreateFolderCreatesTableIfMissing)
+TEST_F(FolderServiceRWTest, CreateFolderCreatesTableIfMissing)
 {
   make_schema();
   ASSERT_FALSE(table_exists("folder"));
@@ -44,7 +45,7 @@ TEST_F(FolderServiceTest, CreateFolderCreatesTableIfMissing)
   EXPECT_TRUE(table_exists("folder"));
 }
 
-TEST_F(FolderServiceTest, CreateRootFolder)
+TEST_F(FolderServiceRWTest, CreateRootFolder)
 {
   make_schema();
 
@@ -62,7 +63,7 @@ TEST_F(FolderServiceTest, CreateRootFolder)
   EXPECT_TRUE(roots[0].parent_id.empty());
 }
 
-TEST_F(FolderServiceTest, CreateChildFolderBuildsTree)
+TEST_F(FolderServiceRWTest, CreateChildFolderBuildsTree)
 {
   make_schema();
   ASSERT_TRUE(create_folder(conn(), schema, "", "Parent").first);
@@ -89,7 +90,7 @@ TEST_F(FolderServiceTest, CreateChildFolderBuildsTree)
 // rename_folder
 // ---------------------------------------------------------------------------
 
-TEST_F(FolderServiceTest, RenameFolder)
+TEST_F(FolderServiceRWTest, RenameFolder)
 {
   make_schema();
   ASSERT_TRUE(create_folder(conn(), schema, "", "Before").first);
@@ -110,7 +111,7 @@ TEST_F(FolderServiceTest, RenameFolder)
 // delete_folder_recursive
 // ---------------------------------------------------------------------------
 
-TEST_F(FolderServiceTest, DeleteFolderRecursiveRemovesDescendants)
+TEST_F(FolderServiceRWTest, DeleteFolderRecursiveRemovesDescendants)
 {
   make_schema();
   ASSERT_TRUE(create_folder(conn(), schema, "", "Root").first);
@@ -130,7 +131,7 @@ TEST_F(FolderServiceTest, DeleteFolderRecursiveRemovesDescendants)
   EXPECT_EQ(folder_count(), 0);
 }
 
-TEST_F(FolderServiceTest, DeleteFolderRecursiveKeepsSiblings)
+TEST_F(FolderServiceRWTest, DeleteFolderRecursiveKeepsSiblings)
 {
   make_schema();
   ASSERT_TRUE(create_folder(conn(), schema, "", "A").first);
@@ -146,44 +147,4 @@ TEST_F(FolderServiceTest, DeleteFolderRecursiveKeepsSiblings)
   ASSERT_TRUE(ok) << msg;
   EXPECT_TRUE(folder_id("A").empty());
   EXPECT_FALSE(folder_id("B").empty());
-}
-
-// ---------------------------------------------------------------------------
-// load_repo_folders / load_folders_for_schema
-// ---------------------------------------------------------------------------
-
-TEST_F(FolderServiceTest, LoadRepoFoldersWithoutFolderTableReturnsEmpty)
-{
-  make_schema(); // schema exists, but no folder table
-
-  std::vector<model::FolderNode> roots;
-  //
-  //
-  auto [ok, msg] = load_repo_folders(conn(), schema, roots);
-  //
-  //
-
-  EXPECT_TRUE(ok) << msg;
-  EXPECT_TRUE(roots.empty());
-}
-
-TEST_F(FolderServiceTest, LoadFoldersForSchemaBuildsTree)
-{
-  make_schema();
-  ASSERT_TRUE(create_folder(conn(), schema, "", "Root").first);
-  const std::string root = folder_id("Root");
-  ASSERT_TRUE(create_folder(conn(), schema, root, "Child").first);
-
-  pqxx::work txn(*pg);
-  //
-  //
-  auto tree = load_folders_for_schema(txn, *pg, schema);
-  //
-  //
-  txn.commit();
-
-  ASSERT_EQ(tree.size(), 1u);
-  EXPECT_EQ(tree[0].name, "Root");
-  ASSERT_EQ(tree[0].children.size(), 1u);
-  EXPECT_EQ(tree[0].children[0].name, "Child");
 }

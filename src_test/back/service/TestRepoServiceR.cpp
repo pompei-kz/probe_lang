@@ -1,6 +1,7 @@
 #include "back/DbTestBase.h"
-#include "back/service/FolderService.h" // create_folder, for the folders-loading test
-#include "back/service/RepoService.h"
+#include "back/service/FolderServiceRW.h" // create_folder, for the folders-loading test
+#include "back/service/RepoServiceR.h"
+#include "back/service/RepoServiceRW.h" // create_repository, for connect_and_load arrange
 #include <gtest/gtest.h>
 
 #include <string>
@@ -55,7 +56,7 @@ TEST(RepoServiceMakeCs, AppliesDefaultsAndOmitsEmptyCredentials)
 // DB-backed tests
 // ---------------------------------------------------------------------------
 
-class RepoServiceTest : public DbTest
+class RepoServiceRTest : public DbTest
 {
 protected:
   std::string repo_name_in(const std::string &sch)
@@ -66,7 +67,7 @@ protected:
   }
 };
 
-TEST_F(RepoServiceTest, TestConnectionSucceedsWithValidCreds)
+TEST_F(RepoServiceRTest, TestConnectionSucceedsWithValidCreds)
 {
   //
   //
@@ -77,7 +78,7 @@ TEST_F(RepoServiceTest, TestConnectionSucceedsWithValidCreds)
   EXPECT_TRUE(ok) << msg;
 }
 
-TEST_F(RepoServiceTest, TestConnectionFailsWithBadPassword)
+TEST_F(RepoServiceRTest, TestConnectionFailsWithBadPassword)
 {
   //
   //
@@ -89,80 +90,7 @@ TEST_F(RepoServiceTest, TestConnectionFailsWithBadPassword)
   EXPECT_FALSE(msg.empty());
 }
 
-TEST_F(RepoServiceTest, CreateRepositoryCreatesSchemaAndTables)
-{
-  //
-  //
-  auto [ok, msg] = create_repository(conn(), schema, "My Repo");
-  //
-  //
-
-  ASSERT_TRUE(ok) << msg;
-  EXPECT_TRUE(schema_exists(schema));
-  EXPECT_TRUE(table_exists("lang_setting"));
-  EXPECT_TRUE(table_exists("folder"));
-  EXPECT_EQ(repo_name_in(schema), "My Repo");
-}
-
-TEST_F(RepoServiceTest, CreateRepositoryAddsAuditColumns)
-{
-  //
-  //
-  auto [ok, msg] = create_repository(conn(), schema, "R");
-  //
-  //
-
-  ASSERT_TRUE(ok) << msg;
-  EXPECT_TRUE(column_exists("lang_setting", "created_at"));
-  EXPECT_TRUE(column_exists("lang_setting", "last_modified_at"));
-}
-
-TEST_F(RepoServiceTest, CreateRepositoryIsIdempotentAndUpdatesName)
-{
-  ASSERT_TRUE(create_repository(conn(), schema, "First").first);
-
-  //
-  //
-  auto [ok, msg] = create_repository(conn(), schema, "Second"); // ON CONFLICT updates value
-  //
-  //
-
-  ASSERT_TRUE(ok) << msg;
-  EXPECT_EQ(repo_name_in(schema), "Second");
-}
-
-TEST_F(RepoServiceTest, EditRepositoryRenamesValueOnly)
-{
-  ASSERT_TRUE(create_repository(conn(), schema, "Old Name").first);
-
-  //
-  //
-  auto [ok, msg] = edit_repository(conn(), schema, schema, "New Name");
-  //
-  //
-
-  ASSERT_TRUE(ok) << msg;
-  EXPECT_EQ(repo_name_in(schema), "New Name");
-}
-
-TEST_F(RepoServiceTest, EditRepositoryRenamesSchema)
-{
-  ASSERT_TRUE(create_repository(conn(), schema, "R").first);
-  const std::string new_schema = schema + "_renamed";
-
-  //
-  //
-  auto [ok, msg] = edit_repository(conn(), schema, new_schema, "R2");
-  //
-  //
-
-  ASSERT_TRUE(ok) << msg;
-  EXPECT_FALSE(schema_exists(schema));
-  EXPECT_TRUE(schema_exists(new_schema));
-  EXPECT_EQ(repo_name_in(new_schema), "R2");
-}
-
-TEST_F(RepoServiceTest, ConnectAndLoadReturnsCreatedRepo)
+TEST_F(RepoServiceRTest, ConnectAndLoadReturnsCreatedRepo)
 {
   ASSERT_TRUE(create_repository(conn(), schema, "Visible Repo").first);
 
@@ -183,7 +111,7 @@ TEST_F(RepoServiceTest, ConnectAndLoadReturnsCreatedRepo)
   EXPECT_TRUE(found) << "created schema not present in connect_and_load result";
 }
 
-TEST_F(RepoServiceTest, ConnectAndLoadIncludesFolders)
+TEST_F(RepoServiceRTest, ConnectAndLoadIncludesFolders)
 {
   ASSERT_TRUE(create_repository(conn(), schema, "R").first);
   ASSERT_TRUE(create_folder(conn(), schema, "", "Docs").first);

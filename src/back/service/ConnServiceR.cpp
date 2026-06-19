@@ -1,4 +1,4 @@
-#include "back/service/ConnService.h"
+#include "back/service/ConnServiceR.h"
 #include <algorithm>
 #include <cstdlib>
 #include <fstream>
@@ -64,25 +64,6 @@ namespace back {
     std::ranges::sort(v, [](auto &a, auto &b) { return a.name < b.name; });
 
     return v;
-  }
-
-  void delete_conn(const std::string &name)
-  {
-    fs::remove(ws_dir() / (name + EXT));
-  }
-
-  void save_conn(const Conn &c, const std::string &old_name)
-  {
-    const std::filesystem::path d = ws_dir();
-
-    fs::create_directories(d);
-
-    if (!old_name.empty() && old_name != c.name) fs::remove(d / (old_name + EXT));
-
-    std::ofstream f(d / (c.name + EXT));
-
-    f << "host=" << c.host << "\nport=" << c.port << "\ndbname=" << c.dbname << "\nuser=" << c.user << "\npass=" << c.pass
-      << "\nconnected=" << (c.connected ? "YES" : "NO") << "\n";
   }
 
 } // namespace back
