@@ -2,27 +2,27 @@
 // Created by pompei on 2026-06-18.
 //
 
-#include "UndoService.h"
+#include "ChangeSystem.h"
 
 #include <optional>
 
 namespace back {
-  using model::UndoRowChange;
+  using model::RowChange;
 
-  UndoService::UndoService(pqxx::work &txn, pqxx::connection &pg, const std::string &schema)
+  ChangeSystem::ChangeSystem(pqxx::work &txn, pqxx::connection &pg, const std::string &schema)
       : txn_(txn)
       , pg_(pg)
       , schema_(schema)
   {}
 
-  std::vector<UndoRowChange> UndoService::collectUndoChanges(std::vector<UndoRowChange> userChanges) const
+  std::vector<RowChange> ChangeSystem::collectUndoChanges(std::vector<RowChange> userChanges) const
   {
-    std::vector<UndoRowChange> result;
+    std::vector<RowChange> result;
 
     // Отменяем в обратном порядке: последнее исходное изменение откатывается
     // первым. Состояние читается ДО применения userChanges.
     for (auto it = userChanges.rbegin(); it != userChanges.rend(); ++it) {
-      const UndoRowChange &u      = *it;
+      const RowChange &u      = *it;
       const std::string    qtable = pg_.quote_name(schema_) + "." + pg_.quote_name(u.tableName);
 
       if (u.toDelete) {
@@ -36,7 +36,7 @@ namespace back {
         for (const pqxx::field &f : rows[0]) {
           if (std::string(f.name()) == "id") continue; // id уже задан в idValue каждого изменения
 
-          UndoRowChange undo;
+          RowChange undo;
           undo.tableName = u.tableName;
           undo.idValue   = u.idValue;
           undo.toDelete  = false;
@@ -51,7 +51,7 @@ namespace back {
       pqxx::result rows =
           txn_.exec_params("SELECT " + pg_.quote_name(u.colName) + " FROM " + qtable + " WHERE id = $1", u.idValue);
 
-      UndoRowChange undo;
+      RowChange undo;
       undo.tableName = u.tableName;
       undo.idValue   = u.idValue;
       if (rows.empty()) {

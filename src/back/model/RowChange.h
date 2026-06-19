@@ -21,7 +21,7 @@ namespace back::model {
 
    Если `toDelete == FALSE`, то в выбранных строках значение полей у колонки `colName` принимают значение `value`.
    */
-  struct UndoRowChange
+  struct RowChange
   {
     /**
      * Имя таблицы, в которой нужно сделать изменения. В этой таблице должен быть первичный ключ с именем `id`.

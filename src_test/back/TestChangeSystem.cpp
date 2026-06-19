@@ -1,12 +1,12 @@
 #include "DbTestBase.h"
-#include "back/UndoService.h"
+#include "back/ChangeSystem.h"
 #include <gtest/gtest.h>
 #include <map>
 
 using namespace back;
 using namespace back::model;
 
-class UndoServiceTest : public DbTest
+class ChangeSystemTest : public DbTest
 {
 protected:
   // Run DDL/DML setup in its own committed transaction.
@@ -18,19 +18,19 @@ protected:
   }
 };
 
-TEST_F(UndoServiceTest, UpdateUndoCapturesOldColumnValue)
+TEST_F(ChangeSystemTest, UpdateUndoCapturesOldColumnValue)
 {
   make_schema();
   setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
   setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r1', 'old')");
 
-  UndoRowChange change{"t", "r1", false, "val", "new"};
+  RowChange change{"t", "r1", false, "val", "new"};
 
   pqxx::work  txn(*pg);
-  UndoService svc(txn, *pg, schema);
+  ChangeSystem svc(txn, *pg, schema);
   //
   //
-  std::vector<UndoRowChange> undo = svc.collectUndoChanges({change});
+  std::vector<RowChange> undo = svc.collectUndoChanges({change});
   //
   //
 
@@ -43,19 +43,19 @@ TEST_F(UndoServiceTest, UpdateUndoCapturesOldColumnValue)
   EXPECT_EQ(*undo[0].value, "old");
 }
 
-TEST_F(UndoServiceTest, UpdateUndoOfNullOldValueIsNullopt)
+TEST_F(ChangeSystemTest, UpdateUndoOfNullOldValueIsNullopt)
 {
   make_schema();
   setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
   setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('r2', NULL)");
 
-  UndoRowChange change{"t", "r2", false, "val", "x"};
+  RowChange change{"t", "r2", false, "val", "x"};
 
   pqxx::work  txn(*pg);
-  UndoService svc(txn, *pg, schema);
+  ChangeSystem svc(txn, *pg, schema);
   //
   //
-  std::vector<UndoRowChange> undo = svc.collectUndoChanges({change});
+  std::vector<RowChange> undo = svc.collectUndoChanges({change});
   //
   //
 
@@ -63,20 +63,20 @@ TEST_F(UndoServiceTest, UpdateUndoOfNullOldValueIsNullopt)
   EXPECT_FALSE(undo[0].value.has_value()); // restore back to NULL
 }
 
-TEST_F(UndoServiceTest, ChangesAreUndoneInReverseOrder)
+TEST_F(ChangeSystemTest, ChangesAreUndoneInReverseOrder)
 {
   make_schema();
   setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
   setup_sql("INSERT INTO " + qual("t") + " (id, val) VALUES ('a', '1'), ('b', '2')");
 
-  UndoRowChange first{"t", "a", false, "val", "A"};
-  UndoRowChange second{"t", "b", false, "val", "B"};
+  RowChange first{"t", "a", false, "val", "A"};
+  RowChange second{"t", "b", false, "val", "B"};
 
   pqxx::work  txn(*pg);
-  UndoService svc(txn, *pg, schema);
+  ChangeSystem svc(txn, *pg, schema);
   //
   //
-  std::vector<UndoRowChange> undo = svc.collectUndoChanges({first, second});
+  std::vector<RowChange> undo = svc.collectUndoChanges({first, second});
   //
   //
 
@@ -88,20 +88,20 @@ TEST_F(UndoServiceTest, ChangesAreUndoneInReverseOrder)
   EXPECT_EQ(*undo[1].value, "1");
 }
 
-TEST_F(UndoServiceTest, UpdateOnMissingRowIsUndoneByDelete)
+TEST_F(ChangeSystemTest, UpdateOnMissingRowIsUndoneByDelete)
 {
   make_schema();
   setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
 
   // Строки 'missing' ещё нет: применение изменения её создаст, поэтому отмена
   // должна удалить эту строку.
-  UndoRowChange change{"t", "missing", false, "val", "x"};
+  RowChange change{"t", "missing", false, "val", "x"};
 
   pqxx::work  txn(*pg);
-  UndoService svc(txn, *pg, schema);
+  ChangeSystem svc(txn, *pg, schema);
   //
   //
-  std::vector<UndoRowChange> undo = svc.collectUndoChanges({change});
+  std::vector<RowChange> undo = svc.collectUndoChanges({change});
   //
   //
 
@@ -111,27 +111,27 @@ TEST_F(UndoServiceTest, UpdateOnMissingRowIsUndoneByDelete)
   EXPECT_TRUE(undo[0].toDelete);
 }
 
-TEST_F(UndoServiceTest, DeleteIsUndoneByPerColumnChanges)
+TEST_F(ChangeSystemTest, DeleteIsUndoneByPerColumnChanges)
 {
   make_schema();
   setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, a text, b int4)");
   setup_sql("INSERT INTO " + qual("t") + " (id, a, b) VALUES ('r1', 'hello', 5)");
 
-  UndoRowChange change{"t", "r1", true, "", std::nullopt};
+  RowChange change{"t", "r1", true, "", std::nullopt};
 
   pqxx::work  txn(*pg);
-  UndoService svc(txn, *pg, schema);
+  ChangeSystem svc(txn, *pg, schema);
 
   //
   //
-  std::vector<UndoRowChange> undo = svc.collectUndoChanges({change});
+  std::vector<RowChange> undo = svc.collectUndoChanges({change});
   //
   //
 
   // One set-column change per non-id column of the deleted row, recreating it.
   ASSERT_EQ(undo.size(), 2u);
   std::map<std::string, std::optional<std::string>> byCol;
-  for (const UndoRowChange &u : undo) {
+  for (const RowChange &u : undo) {
     EXPECT_EQ(u.tableName, "t");
     EXPECT_EQ(u.idValue, "r1");
     EXPECT_FALSE(u.toDelete);
@@ -144,40 +144,40 @@ TEST_F(UndoServiceTest, DeleteIsUndoneByPerColumnChanges)
   EXPECT_EQ(*byCol["b"], "5");
 }
 
-TEST_F(UndoServiceTest, DeleteOfMissingRowGivesNoUndo)
+TEST_F(ChangeSystemTest, DeleteOfMissingRowGivesNoUndo)
 {
   make_schema();
   setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, val text)");
 
-  UndoRowChange change{"t", "missing", true, "", std::nullopt};
+  RowChange change{"t", "missing", true, "", std::nullopt};
 
   pqxx::work  txn(*pg);
-  UndoService svc(txn, *pg, schema);
+  ChangeSystem svc(txn, *pg, schema);
   //
   //
-  std::vector<UndoRowChange> undo = svc.collectUndoChanges({change});
+  std::vector<RowChange> undo = svc.collectUndoChanges({change});
   //
   //
 
   EXPECT_TRUE(undo.empty());
 }
 
-TEST_F(UndoServiceTest, UpdatesAcrossThreeColumnsCaptureEachOldValue)
+TEST_F(ChangeSystemTest, UpdatesAcrossThreeColumnsCaptureEachOldValue)
 {
   make_schema();
   setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, a text, b int4, c bool)");
   setup_sql("INSERT INTO " + qual("t") + " (id, a, b, c) VALUES ('r1', 'old_a', 7, true)");
 
   // Three changes to the same row, one per non-id column.
-  UndoRowChange ca{"t", "r1", false, "a", "new_a"};
-  UndoRowChange cb{"t", "r1", false, "b", "42"};
-  UndoRowChange cc{"t", "r1", false, "c", "false"};
+  RowChange ca{"t", "r1", false, "a", "new_a"};
+  RowChange cb{"t", "r1", false, "b", "42"};
+  RowChange cc{"t", "r1", false, "c", "false"};
 
   pqxx::work  txn(*pg);
-  UndoService svc(txn, *pg, schema);
+  ChangeSystem svc(txn, *pg, schema);
   //
   //
-  std::vector<UndoRowChange> undo = svc.collectUndoChanges({ca, cb, cc});
+  std::vector<RowChange> undo = svc.collectUndoChanges({ca, cb, cc});
   //
   //
 
@@ -196,14 +196,14 @@ TEST_F(UndoServiceTest, UpdatesAcrossThreeColumnsCaptureEachOldValue)
   ASSERT_TRUE(undo[2].value.has_value());
   EXPECT_EQ(*undo[2].value, "old_a");
 
-  for (const UndoRowChange &u : undo) {
+  for (const RowChange &u : undo) {
     EXPECT_EQ(u.tableName, "t");
     EXPECT_EQ(u.idValue, "r1");
     EXPECT_FALSE(u.toDelete);
   }
 }
 
-TEST_F(UndoServiceTest, UpdateUndoCapturesOldTimestampWithSubsecondPrecision)
+TEST_F(ChangeSystemTest, UpdateUndoCapturesOldTimestampWithSubsecondPrecision)
 {
   make_schema();
   // PostgreSQL timestamp keeps microsecond precision (6 fractional digits) — its
@@ -212,13 +212,13 @@ TEST_F(UndoServiceTest, UpdateUndoCapturesOldTimestampWithSubsecondPrecision)
   setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, ts timestamp)");
   setup_sql("INSERT INTO " + qual("t") + " (id, ts) VALUES ('r1', '" + original + "')");
 
-  UndoRowChange change{"t", "r1", false, "ts", "2030-01-01 00:00:00"};
+  RowChange change{"t", "r1", false, "ts", "2030-01-01 00:00:00"};
 
   pqxx::work  txn(*pg);
-  UndoService svc(txn, *pg, schema);
+  ChangeSystem svc(txn, *pg, schema);
   //
   //
-  std::vector<UndoRowChange> undo = svc.collectUndoChanges({change});
+  std::vector<RowChange> undo = svc.collectUndoChanges({change});
   //
   //
 
@@ -236,27 +236,27 @@ TEST_F(UndoServiceTest, UpdateUndoCapturesOldTimestampWithSubsecondPrecision)
   EXPECT_EQ(restored, original);
 }
 
-TEST_F(UndoServiceTest, DeleteIsUndoneByThreeColumnChanges)
+TEST_F(ChangeSystemTest, DeleteIsUndoneByThreeColumnChanges)
 {
   make_schema();
   setup_sql("CREATE TABLE " + qual("t") + " (id varchar(32) primary key, a text, b int4, c bool)");
   setup_sql("INSERT INTO " + qual("t") + " (id, a, b, c) VALUES ('r1', 'hello', 5, true)");
 
-  UndoRowChange change{"t", "r1", true, "", std::nullopt};
+  RowChange change{"t", "r1", true, "", std::nullopt};
 
   pqxx::work  txn(*pg);
-  UndoService svc(txn, *pg, schema);
+  ChangeSystem svc(txn, *pg, schema);
 
   //
   //
-  std::vector<UndoRowChange> undo = svc.collectUndoChanges({change});
+  std::vector<RowChange> undo = svc.collectUndoChanges({change});
   //
   //
 
   // One set-column change per non-id column (three of them), recreating the row.
   ASSERT_EQ(undo.size(), 3u);
   std::map<std::string, std::optional<std::string>> byCol;
-  for (const UndoRowChange &u : undo) {
+  for (const RowChange &u : undo) {
     EXPECT_EQ(u.tableName, "t");
     EXPECT_EQ(u.idValue, "r1");
     EXPECT_FALSE(u.toDelete);

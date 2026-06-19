@@ -3,7 +3,7 @@
 //
 
 #pragma once
-#include "model/UndoRowChange.h"
+#include "model/RowChange.h"
 
 #include <pqxx/pqxx>
 #include <string>
@@ -11,14 +11,14 @@
 
 namespace back {
 
-  class UndoService
+  class ChangeSystem
   {
     pqxx::work        &txn_;
     pqxx::connection  &pg_;
     const std::string &schema_;
 
   public:
-    UndoService(pqxx::work &txn, pqxx::connection &pg, const std::string &schema);
+    ChangeSystem(pqxx::work &txn, pqxx::connection &pg, const std::string &schema);
 
     /**
      * Собирает изменения, которые отменяют исходящие.
@@ -41,7 +41,7 @@ namespace back {
      * @param userChanges Список исходящих изменений в БД
      * @return Список изменений, который отменяет эти изменения
      */
-    std::vector<model::UndoRowChange> collectUndoChanges(std::vector<model::UndoRowChange> userChanges) const;
+    std::vector<model::RowChange> collectUndoChanges(std::vector<model::RowChange> userChanges) const;
   };
 
 } // namespace back
