@@ -4,12 +4,11 @@
 
 #pragma once
 #include "Conn.h"
-
 #include <string>
 
 namespace back::model {
 
-  class ConnHash
+  struct ConnHash
   {
     size_t operator()(const Conn &k) const noexcept
     {

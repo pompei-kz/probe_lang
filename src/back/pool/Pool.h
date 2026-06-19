@@ -10,26 +10,24 @@
 #include <pqxx/pqxx>
 
 #include <memory>
+#include <mutex>
 #include <queue>
 
 namespace back::pool {
 
   class Connection;
 
-  class Pool
+  class Pool : public std::enable_shared_from_this<Pool>
   {
   public:
-    explicit Pool(const model::Conn &key, std::size_t maxConnections = 10)
-        : key_(key)
-        , maxConnections_(maxConnections)
-    {}
+    explicit Pool(const model::Conn &key, std::size_t maxConnections = 10);
 
-    ::back::pool::Connection acquire();
+    Connection acquire();
 
     void close();
 
   private:
-    friend class ::back::pool::Connection;
+    friend class Connection;
 
     void release(std::unique_ptr<pqxx::connection>);
 
