@@ -4,8 +4,6 @@
 
 #include "Pool.h"
 
-#include "back/service/RepoServiceR.h" // back::make_cs
-
 namespace back::pool {
 
   Pool::Pool(const model::Conn &key, std::size_t maxConnections)
@@ -37,7 +35,7 @@ namespace back::pool {
       lock.unlock();
       try {
 
-        std::unique_ptr<pqxx::connection> conn = std::make_unique<pqxx::connection>(make_cs(key_));
+        std::unique_ptr<pqxx::connection> conn = std::make_unique<pqxx::connection>(key_.dsn());
 
         return Connection(shared_from_this(), std::move(conn));
       } catch (...) {

@@ -32,17 +32,6 @@ namespace back {
     }
   }
 
-  std::string make_cs(const model::Conn &c)
-  {
-    std::string cs = "host=" + c.host;
-    cs += " port=" + (c.port.empty() ? "5432" : c.port);
-    cs += " dbname=" + (c.dbname.empty() ? "postgres" : c.dbname);
-    if (!c.user.empty()) cs += " user=" + c.user;
-    if (!c.pass.empty()) cs += " password=" + c.pass;
-    cs += " connect_timeout=5";
-    return cs;
-  }
-
   std::string sql_err_msg(const pqxx::sql_error &e)
   {
     std::string msg = e.what();
@@ -65,7 +54,7 @@ namespace back {
       tmp.dbname = dbname;
       tmp.user   = user;
       tmp.pass   = pass;
-      pqxx::connection c(make_cs(tmp));
+      pqxx::connection c(tmp.dsn());
       return {true, "Connected successfully"};
     } catch (const std::exception &e) {
       return {false, e.what()};

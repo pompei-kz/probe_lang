@@ -1,6 +1,7 @@
 #pragma once
 #include "TestDb.h"
 #include "back/model/Conn.h"
+#include "back/pool/PoolService.h"
 #include <gtest/gtest.h>
 #include <pqxx/pqxx>
 
@@ -20,13 +21,18 @@
 class DbTest : public ::testing::Test
 {
 protected:
-  std::unique_ptr<pqxx::connection> pg;
-  std::string                       schema;
+  // The per-test connection is taken from the shared connection pool (PoolService),
+  // the same path the services use. `pg` points at the pooled connection; the
+  // handle returns it to the pool when the fixture is torn down.
+  back::pool::Connection poolConn;
+  pqxx::connection      *pg = nullptr;
+  std::string            schema;
 
   void SetUp() override
   {
     try {
-      pg = std::make_unique<pqxx::connection>(test_db::dsn());
+      poolConn = back::pool::acquire(test_db::conn());
+      pg       = &*poolConn;
     } catch (const std::exception &e) {
       GTEST_SKIP() << "test DB unavailable: " << e.what();
     }

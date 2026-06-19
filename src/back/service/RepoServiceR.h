@@ -8,9 +8,6 @@
 
 namespace back {
 
-  // Build a libpq connection string from a Conn.
-  std::string make_cs(const model::Conn &c);
-
   // Format a pqxx::sql_error including the offending query.
   std::string sql_err_msg(const pqxx::sql_error &e);
 

@@ -8,7 +8,7 @@ namespace back::pool {
 
   PoolManager &manager()
   {
-    // Локальная static: потокобезопасная ленивая инициализация (C++11+),
+    // Локальная static: потоко-безопасная ленивая инициализация (C++11+),
     // живёт до конца программы.
     static PoolManager instance;
     return instance;

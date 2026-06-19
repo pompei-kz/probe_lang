@@ -1,5 +1,6 @@
 #include "TestDb.h"
 #include "back/etc/UtilDb.h"
+#include "back/pool/PoolService.h"
 #include <gtest/gtest.h>
 #include <pqxx/pqxx>
 
@@ -18,13 +19,16 @@
 class UtilDbTest : public testing::Test
 {
 protected:
-  std::unique_ptr<pqxx::connection> pg;
-  std::string                       schema;
+  // Connection comes from the shared pool (PoolService); `pg` points at it.
+  back::pool::Connection poolConn;
+  pqxx::connection      *pg = nullptr;
+  std::string            schema;
 
   void SetUp() override
   {
     try {
-      pg = std::make_unique<pqxx::connection>(test_db::dsn());
+      poolConn = back::pool::acquire(test_db::conn());
+      pg       = &*poolConn;
     } catch (const std::exception &e) {
       GTEST_SKIP() << "test DB unavailable: " << e.what();
     }

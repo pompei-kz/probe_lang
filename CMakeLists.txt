@@ -112,6 +112,7 @@ add_executable(probe_lang_tests
         src_test/back/service/TestExprServiceRW.cpp
         src_test/back/etc/TestChangeSystem.cpp
         src_test/back/etc/TestUnitEditorState.cpp
+        src_test/back/model/TestConn.cpp
         src/back/pool/Connection.cpp
         src/back/pool/Pool.cpp
         src/back/pool/PoolManager.cpp

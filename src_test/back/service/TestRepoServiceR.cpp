@@ -7,53 +7,6 @@
 #include <string>
 #include <vector>
 
-// ---------------------------------------------------------------------------
-// make_cs — pure, no DB needed
-// ---------------------------------------------------------------------------
-
-TEST(RepoServiceMakeCs, IncludesProvidedFields)
-{
-  back::model::Conn c;
-  c.host   = "myhost";
-  c.port   = "1234";
-  c.dbname = "mydb";
-  c.user   = "me";
-  c.pass   = "pw";
-
-  //
-  //
-  const std::string cs = back::make_cs(c);
-  //
-  //
-
-  EXPECT_NE(cs.find("host=myhost"), std::string::npos);
-  EXPECT_NE(cs.find("port=1234"), std::string::npos);
-  EXPECT_NE(cs.find("dbname=mydb"), std::string::npos);
-  EXPECT_NE(cs.find("user=me"), std::string::npos);
-  EXPECT_NE(cs.find("password=pw"), std::string::npos);
-}
-
-TEST(RepoServiceMakeCs, AppliesDefaultsAndOmitsEmptyCredentials)
-{
-  back::model::Conn c;
-  c.host = "h"; // port, dbname, user, pass left empty
-
-  //
-  //
-  const std::string cs = back::make_cs(c);
-  //
-  //
-
-  EXPECT_NE(cs.find("port=5432"), std::string::npos);
-  EXPECT_NE(cs.find("dbname=postgres"), std::string::npos);
-  EXPECT_EQ(cs.find("user="), std::string::npos);     // empty user omitted
-  EXPECT_EQ(cs.find("password="), std::string::npos); // empty pass omitted
-}
-
-// ---------------------------------------------------------------------------
-// DB-backed tests
-// ---------------------------------------------------------------------------
-
 class RepoServiceRTest : public DbTest
 {
 protected:
@@ -93,6 +46,7 @@ TEST_F(RepoServiceRTest, ConnectAndLoadReturnsCreatedRepo)
   ASSERT_TRUE(back::create_repository(conn(), schema, "Visible Repo").first);
 
   std::vector<back::model::RepoNode> repos;
+
   //
   //
   auto [ok, msg] = back::connect_and_load(conn(), repos);
