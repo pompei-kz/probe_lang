@@ -210,6 +210,74 @@ So code that follows a soft reference must `LEFT JOIN` (never assume the row exi
 identically for "NULL" and "dangling id". All `unit_e_{some}.id -> unit_e.id` links follow this rule,
 as does `unit_b_field.expr_id -> unit_e.id` and `unit_e_unit.unit_id -> unit.id`.
 
+## Change System (система изменений — undo/redo)
+
+A generic, table-agnostic undo/redo log that records edits to **any** table (one with a `VARCHAR`
+primary key named `id`) and can roll them back or replay them. Lives in `back::ChangeSystem`
+(`back/ChangeSystem.{h,cpp}`) — a class constructed per call with `(pqxx::work &txn, pqxx::connection
+&pg, const std::string &schema)`; all of its work happens inside the caller's transaction. Its three
+DB tables are created lazily, per repository schema, by `InitDb::init_change_system_tables()`.
+
+### The unit of change: `model::RowChange`
+
+A `RowChange` (`back/model/RowChange.h`) describes one edit to the row `id == idValue` of table
+`tableName`:
+- `toDelete == true` → delete that row.
+- `toDelete == false` → **upsert** `colName = value` (`INSERT … ON CONFLICT (id) DO UPDATE`), so it
+  creates the row if absent. `value` is `std::optional<std::string>`; `nullopt` means SQL `NULL`. The
+  text is cast to the column's real type by PostgreSQL, so non-text columns work.
+
+A logical edit is a `std::vector<RowChange>`. Recreating a row is expressed as one `RowChange` per
+non-`id` column (the first upsert creates the row, the rest fill columns in). **Limitation:** because
+that recreation is column-by-column, a row with a `NOT NULL` non-`id` column cannot be rebuilt this
+way (an intermediate upsert would violate the constraint).
+
+### Tables (per repository schema)
+
+- **`undo_buffer`** — one per edit *target*: `id`, `target_id`, `target_type`, `updated_at`. A target
+  is `model::ChangeSysTarget {targetId, targetType}` (currently `target_type` is always `'Unit'`).
+- **`undo_op`** — one *operation* (a logged edit) within a buffer: `id`, `undo_buffer_id`,
+  `order_index` (`BIGINT`, from sequence `undo_op_seq` — defines operation order), `undone` (`BOOL`),
+  `group_name`, `name`. The op's `name`/`group_name` come from `model::ChangeOp {operation, group}`.
+- **`undo_row_change`** — the individual `RowChange`s of an op: `id`, `undo_op_id`, `table_name`,
+  `id_value`, `to_delete`, `col_name`, `col_value`, and `direction TEXT CHECK (direction IN
+  ('Forward','ForUndo'))`. **`Forward`** rows are exactly what the user did; **`ForUndo`** rows are
+  the changes that fully revert it.
+
+### The stack model
+
+Within a buffer, ops are ordered by `undo_op.order_index`. The **done** ops (`undone = FALSE`) form a
+prefix and the **undone** ops (`undone = TRUE`, available for redo) form the suffix:
+
+- **Active operation** (the one undo will revert) = the *last* op with `undone = FALSE` (max
+  `order_index`). There is **no** `order_index` on `undo_buffer` — the active op is found purely via
+  `undone`.
+- **Next redo operation** = the *first* op with `undone = TRUE` (min `order_index`).
+
+### Methods
+
+- **`collectUndoChanges(userChanges)`** — pure helper, no writes. Called **before** `userChanges` are
+  applied; reads each affected row's current state from the DB and returns the `RowChange`s that
+  restore it, in **reverse** order. An update→ undo restores the old `colName` value (or deletes the
+  row if it didn't exist yet); a delete → undo emits one set-column change per non-`id` column.
+- **`apply(userChanges, operation, target)`** — the only entry point that mutates data. It: finds or
+  creates the target's buffer; **wipes the redo stack** (deletes all `undone = TRUE` ops of the buffer
+  and their `undo_row_change`s — a new action makes redo impossible); calls `collectUndoChanges`
+  *before* applying; inserts a new `undo_op` (`undone = FALSE`); stores the user changes as `Forward`
+  and the collected reverse changes as `ForUndo`; applies the user changes to the real tables; bumps
+  `undo_buffer.updated_at`.
+- **`undo(targetId, grouped) -> bool`** — applies the active op's `ForUndo` changes and sets its
+  `undone = TRUE`. `grouped == true` undoes the whole contiguous run of newest ops sharing the active
+  op's `group_name` (stops at the first different group). Returns `false` if there is no buffer or
+  nothing to undo.
+- **`redo(targetId, grouped) -> bool`** — symmetric: applies the next-redo op's `Forward` changes and
+  sets `undone = FALSE`; `grouped` replays the contiguous same-group run from the oldest undone op.
+  Returns `false` if there is nothing to redo.
+
+Order **between** ops matters and is honored — undo runs newest→oldest, redo oldest→newest. Order
+**within** a single op does not affect the final state (each change targets a distinct cell), though
+it is fixed by `ORDER BY id` for determinism. `undo`/`redo` resolve the buffer by `target_id` alone.
+
 ## Conventions
 
 - `.clang-format` (LLVM base, 2-space indent, 150 col, aligned consecutive assignments/declarations,
