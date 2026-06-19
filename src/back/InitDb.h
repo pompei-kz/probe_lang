@@ -33,7 +33,7 @@ namespace back {
 
     void init_unit_e_tables() const;
 
-    void init_undo_tables() const;
+    void init_change_system_tables() const;
   };
 
 } // namespace back

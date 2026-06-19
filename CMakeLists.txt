@@ -52,6 +52,8 @@ add_executable(probe_lang
         src/back/model/ExprType.h
         src/back/ChangeSystem.cpp
         src/back/ChangeSystem.h
+        src/back/model/ChangeSysTarget.h
+        src/back/model/ChangeOp.h
 )
 target_include_directories(probe_lang PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_include_directories(probe_lang PRIVATE ${stb_SOURCE_DIR})

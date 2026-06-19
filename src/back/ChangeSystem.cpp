@@ -4,6 +4,8 @@
 
 #include "ChangeSystem.h"
 
+#include "model/ChangeOp.h"
+
 #include <optional>
 
 namespace back {
@@ -15,15 +17,15 @@ namespace back {
       , schema_(schema)
   {}
 
-  std::vector<RowChange> ChangeSystem::collectUndoChanges(std::vector<RowChange> userChanges) const
+  std::vector<RowChange> ChangeSystem::collectUndoChanges(const std::vector<RowChange> &userChanges) const
   {
     std::vector<RowChange> result;
 
     // Отменяем в обратном порядке: последнее исходное изменение откатывается
     // первым. Состояние читается ДО применения userChanges.
     for (auto it = userChanges.rbegin(); it != userChanges.rend(); ++it) {
-      const RowChange &u      = *it;
-      const std::string    qtable = pg_.quote_name(schema_) + "." + pg_.quote_name(u.tableName);
+      const RowChange  &u      = *it;
+      const std::string qtable = pg_.quote_name(schema_) + "." + pg_.quote_name(u.tableName);
 
       if (u.toDelete) {
         // Отмена удаления: вставки в модели нет, поэтому строку воссоздаём
@@ -48,8 +50,7 @@ namespace back {
       }
 
       // Отмена обновления строки (id == idValue).
-      pqxx::result rows =
-          txn_.exec_params("SELECT " + pg_.quote_name(u.colName) + " FROM " + qtable + " WHERE id = $1", u.idValue);
+      pqxx::result rows = txn_.exec_params("SELECT " + pg_.quote_name(u.colName) + " FROM " + qtable + " WHERE id = $1", u.idValue);
 
       RowChange undo;
       undo.tableName = u.tableName;
@@ -69,5 +70,10 @@ namespace back {
     }
 
     return result;
+  }
+
+  void ChangeSystem::apply(std::vector<RowChange> userChanges, const model::ChangeOp &operation, const model::ChangeSysTarget &target) const
+  {
+
   }
 } // namespace back

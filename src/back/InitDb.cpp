@@ -64,7 +64,7 @@ namespace back {
     init_unit_table();
     init_unit_b_tables();
     init_unit_e_tables();
-    init_undo_tables();
+    init_change_system_tables();
   }
 
   void InitDb::init_unit_b_tables() const
@@ -244,7 +244,7 @@ namespace back {
     }
   }
 
-  void InitDb::init_undo_tables() const
+  void InitDb::init_change_system_tables() const
   {
     const std::string schemaQuoted = pg_.quote_name(schema_);
     {
@@ -255,7 +255,7 @@ namespace back {
                   "  target_id   VARCHAR(32)  not null,"
                   "  target_type VARCHAR(150) not null,"
                   "  order_index BIGINT       not null,"
-                  "  updated_at  timestamp DEFAULT now()"
+                  "  updated_at  TIMESTAMP    DEFAULT now()"
                   ")");
 
         txn_.exec("COMMENT ON TABLE  " + schemaQuoted + ".undo_buffer             IS 'Буфер отмены'");
