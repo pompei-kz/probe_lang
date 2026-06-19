@@ -3,11 +3,11 @@
 #include "FontAtlas.h"
 #include "PanelMenu.h"
 #include "SchemaMenu.h"
-#include "back/ConnService.h"
-#include "back/ProjectTreeService.h"
-#include "back/RepoService.h"
-#include "back/UnitService.h"
 #include "back/model/ConnNode.h"
+#include "back/service/ConnService.h"
+#include "back/service/ProjectTreeService.h"
+#include "back/service/RepoService.h"
+#include "back/service/UnitService.h"
 #include "render_helpers.h"
 
 namespace front {

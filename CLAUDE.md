@@ -83,17 +83,26 @@ Two namespaces, cleanly separated — `back` (logic + persistence) never include
 
 ### `src/back` — services & model
 
+`back/` itself contains **only three subfolders** — `model/`, `service/`, `etc/`:
+
 - `model/` holds plain structs (`Conn`, `RepoNode`, `FolderNode`, `Unit`, `Block`, `BBox`, …) plus
   free `to_string` / `*_from_string` enum converters. No behavior.
-- Each `*Service.{h,cpp}` is a set of **free functions** (no service classes). The pervasive
-  convention: operations return `std::pair<bool, std::string>` = `{ok, error_message}`, or
-  `std::pair<T, std::string>` where an empty/`nullopt` first element signals failure. Callers surface
-  the error string in a `MsgDlg`.
-- `InitDb` / `UtilDb` hold **idempotent DDL** (`CREATE ... IF NOT EXISTS`, `ensureCreatedAt`,
-  `ensureLastModifiedAt`). Schemas/tables are created lazily — `ensure_*` is called when a branch is
-  opened or a connection becomes "connected", so repositories predating a newer table get it on next
-  open. When adding a table/column, extend the relevant `ensure_*` path rather than assuming it exists.
-- `CustomId` generates time+random IDs (base-64 alphabet, no DB sequences).
+- `service/` holds every `*Service.{h,cpp}` (`BlockService`, `ConnService`, `ExprService`,
+  `FolderService`, `ProjectTreeService`, `RepoService`, `UnitService`) — each a set of **free
+  functions** (no service classes). The pervasive convention: operations return
+  `std::pair<bool, std::string>` = `{ok, error_message}`, or `std::pair<T, std::string>` where an
+  empty/`nullopt` first element signals failure. Callers surface the error string in a `MsgDlg`.
+- `etc/` holds the rest of `back` that isn't a service: `InitDb`, `UtilDb`, `CustomId`,
+  `UnitEditorState`, `ChangeSystem`.
+- `InitDb` / `UtilDb` (`back/etc/`) hold **idempotent DDL** (`CREATE ... IF NOT EXISTS`,
+  `ensureCreatedAt`, `ensureLastModifiedAt`). Schemas/tables are created lazily — `ensure_*` is called
+  when a branch is opened or a connection becomes "connected", so repositories predating a newer table
+  get it on next open. When adding a table/column, extend the relevant `ensure_*` path rather than
+  assuming it exists.
+- `CustomId` (`back/etc/`) generates time+random IDs (base-64 alphabet, no DB sequences).
+
+Include paths are root-relative from `src/`: back headers are included as `back/service/Foo.h`,
+`back/etc/Foo.h`, or `back/model/Foo.h` (everywhere, including from within `back` itself).
 
 ### `src/front` — SDL UI
 
@@ -214,7 +223,7 @@ as does `unit_b_field.expr_id -> unit_e.id` and `unit_e_unit.unit_id -> unit.id`
 
 A generic, table-agnostic undo/redo log that records edits to **any** table (one with a `VARCHAR`
 primary key named `id`) and can roll them back or replay them. Lives in `back::ChangeSystem`
-(`back/ChangeSystem.{h,cpp}`) — a class constructed per call with `(pqxx::work &txn, pqxx::connection
+(`back/etc/ChangeSystem.{h,cpp}`) — a class constructed per call with `(pqxx::work &txn, pqxx::connection
 &pg, const std::string &schema)`; all of its work happens inside the caller's transaction. Its three
 DB tables are created lazily, per repository schema, by `InitDb::init_change_system_tables()`.
 
@@ -285,6 +294,6 @@ it is fixed by `ORDER BY id` for determinism. `undo`/`redo` resolve the buffer b
 - The project is developed in CLion; `// ReSharper disable once ...` comments are intentional — leave
   them in place.
 - **One type per file**: every `enum`, `struct` and `class` lives in its own header named exactly after
-  it (e.g. `BlockType` → `model/BlockType.h`, `InitDb` → `back/InitDb.h`). An aggregate type that owns
+  it (e.g. `BlockType` → `model/BlockType.h`, `InitDb` → `back/etc/InitDb.h`). An aggregate type that owns
   others (e.g. `Block`) just `#include`s their headers. Its free `to_string` / `*_from_string` converters
   stay in the same file as the type they convert.

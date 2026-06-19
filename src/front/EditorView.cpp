@@ -1,9 +1,9 @@
 #include "EditorView.h"
 #include "Clr.h"
 #include "FontAtlas.h"
-#include "back/BlockService.h"
-#include "back/ExprService.h"
-#include "back/UnitEditorState.h"
+#include "back/etc/UnitEditorState.h"
+#include "back/service/BlockService.h"
+#include "back/service/ExprService.h"
 #include "render_helpers.h"
 
 #include <algorithm>
@@ -15,13 +15,13 @@ namespace front {
   using namespace back::model;
 
   static constexpr float ZOOM_MIN = 0.15f, ZOOM_MAX = 8.f;
-  static constexpr float GRID  = 50.f;
-  static constexpr float PAD   = 5.f;  // inner padding (left == top == bottom)
-  static constexpr float GAP   = 6.f;  // gap between the badge and the name
-  static constexpr float BADGE = 22.f; // M/F badge size (unchanged)
+  static constexpr float GRID   = 50.f;
+  static constexpr float PAD    = 5.f;  // inner padding (left == top == bottom)
+  static constexpr float GAP    = 6.f;  // gap between the badge and the name
+  static constexpr float BADGE  = 22.f; // M/F badge size (unchanged)
   // Compact box height: the badge plus equal top/bottom padding (== PAD == left).
-  static constexpr float BOX_H = BADGE + 2.f * PAD;
-  static constexpr float TAB_H = 30.f;
+  static constexpr float BOX_H  = BADGE + 2.f * PAD;
+  static constexpr float TAB_H  = 30.f;
   // Below a method's header come the "add argument" (+) row and one row per
   // argument; ROW_H is the (world-unit) height of each, PLUS_D the +-circle.
   static constexpr float ROW_H  = FS + 6.f;
@@ -60,7 +60,7 @@ namespace front {
   // ── block box geometry / drawing ─────────────────────────────────────────
   struct BoxGeo
   {
-    float z;             // active zoom (screen px per world unit)
+    float z; // active zoom (screen px per world unit)
     float bx, by, bw, bh;
     float badge_x, badge_y, badge;
     float nx, ny, nw, nh;
@@ -70,7 +70,10 @@ namespace front {
 
   // (World-unit) height of a method box for the given argument count: the
   // compact header, the + row, one row per argument, plus a bottom margin.
-  static float method_height_for(int n_args) { return BOX_H + ROW_H * (1.f + static_cast<float>(n_args)) + PAD; }
+  static float method_height_for(int n_args)
+  {
+    return BOX_H + ROW_H * (1.f + static_cast<float>(n_args)) + PAD;
+  }
 
   // (World-unit) height of a block: methods grow to hold their + row and args;
   // fields stay compact.
@@ -82,7 +85,10 @@ namespace front {
   // Extra (unscaled) left indent of the name from the badge — one "Н" wide — so
   // the name never touches the access "walls" drawn around a private/protected
   // block's badge.
-  static float name_indent() { return text_w("Н"); }
+  static float name_indent()
+  {
+    return text_w("Н");
+  }
 
   // Layout is computed at scale 1 (world/unzoomed) and multiplied by the zoom,
   // so the box and everything inside it scale together.
@@ -115,7 +121,10 @@ namespace front {
   }
 
   // Top (screen y) of argument row `i` for a method box (rows follow the header).
-  static float arg_row_y(const BoxGeo &g, int i) { return g.by + (BOX_H + ROW_H * i) * g.z; }
+  static float arg_row_y(const BoxGeo &g, int i)
+  {
+    return g.by + (BOX_H + ROW_H * i) * g.z;
+  }
 
   // Russian plural for "байт": 1 байт, 2 байта, 5 байт.
   static const char *byte_word(int n)
@@ -129,14 +138,23 @@ namespace front {
   }
 
   // The "Размер: 34 байта" message shown for a field with an explicit size.
-  static std::string size_label(int n) { return "Размер: " + std::to_string(n) + " " + byte_word(n); }
+  static std::string size_label(int n)
+  {
+    return "Размер: " + std::to_string(n) + " " + byte_word(n);
+  }
 
   // Extra padding between the name and the divider — half a "W" wide.
-  static float size_pad() { return text_w("W") * .5f; }
+  static float size_pad()
+  {
+    return text_w("W") * .5f;
+  }
 
   // Screen x where a field's size message / size editor / expression begins —
   // right of the name, past the gap, the half-"W" padding and the divider.
-  static float field_size_x(const BoxGeo &g, const Block &s) { return g.nx + (text_w(s.name.c_str()) + GAP + size_pad()) * g.z; }
+  static float field_size_x(const BoxGeo &g, const Block &s)
+  {
+    return g.nx + (text_w(s.name.c_str()) + GAP + size_pad()) * g.z;
+  }
 
   // The text shown for a "self" expression (ThisObject / ThisUnit / ThisMethod).
   static const char *expr_this_label(ExprType t)
@@ -160,7 +178,10 @@ namespace front {
   }
 
   // Side of the empty-expression square / Unit diamond — about a glyph tall.
-  static float expr_square_side() { return FS * .85f; }
+  static float expr_square_side()
+  {
+    return FS * .85f;
+  }
 
   // Screen rect of a field's expression slot: the stored slot (relative to the
   // block) when present, else a cube-sized fallback right of the name.
@@ -199,7 +220,8 @@ namespace front {
   static float block_fit_width(const Block &s)
   {
     float w = fit_width(s.name);
-    for (const MethodArg &a : s.args) w = std::max(w, fit_width(a.name));
+    for (const MethodArg &a : s.args)
+      w = std::max(w, fit_width(a.name));
     // A field's right section (the "Размер: N байт" message or the expression)
     // sits after the name, the half-"W" divider padding and the divider.
     if (s.type == BlockType::Field) {
@@ -252,8 +274,8 @@ namespace front {
   static void stroke_circle(SDL_Renderer *r, Clr c, float cx, float cy, float rad)
   {
     sc(r, c);
-    const int   segs = std::max(16, static_cast<int>(rad * 2.f));
-    float       px = cx + rad, py = cy;
+    const int segs = std::max(16, static_cast<int>(rad * 2.f));
+    float     px = cx + rad, py = cy;
     for (int i = 1; i <= segs; i++) {
       const float a = static_cast<float>(i) / static_cast<float>(segs) * 6.2831853f;
       const float x = cx + rad * std::cos(a), y = cy + rad * std::sin(a);
@@ -275,12 +297,12 @@ namespace front {
   {
     rect(ren, c, x, y, side, side);
 
-    const float cs = side / 3.f;                       // cube front-face side
-    const float d  = cs * .4f;                         // 3D depth offset
-    const float fx = x + (side - cs - d) * .5f;         // front face top-left
+    const float cs = side / 3.f;                // cube front-face side
+    const float d  = cs * .4f;                  // 3D depth offset
+    const float fx = x + (side - cs - d) * .5f; // front face top-left
     const float fy = y + (side - cs - d) * .5f + d;
-    rect(ren, c, fx, fy, cs, cs);                       // front face
-    sc(ren, c);                                         // top + right faces (edges only)
+    rect(ren, c, fx, fy, cs, cs); // front face
+    sc(ren, c);                   // top + right faces (edges only)
     SDL_RenderLine(ren, fx, fy, fx + d, fy - d);
     SDL_RenderLine(ren, fx + d, fy - d, fx + cs + d, fy - d);
     SDL_RenderLine(ren, fx + cs + d, fy - d, fx + cs, fy);
@@ -295,11 +317,11 @@ namespace front {
   {
     const float hw = size * .5f, hh = size * .5f;
     sc(ren, c);
-    SDL_RenderLine(ren, cx, cy - hh, cx + hw, cy);      // top-right
-    SDL_RenderLine(ren, cx + hw, cy, cx, cy + hh);      // bottom-right
-    SDL_RenderLine(ren, cx, cy + hh, cx - hw, cy);      // bottom-left
-    SDL_RenderLine(ren, cx - hw, cy, cx, cy - hh);      // top-left
-    const float ty = cy - hh * .4f;                     // table facet
+    SDL_RenderLine(ren, cx, cy - hh, cx + hw, cy); // top-right
+    SDL_RenderLine(ren, cx + hw, cy, cx, cy + hh); // bottom-right
+    SDL_RenderLine(ren, cx, cy + hh, cx - hw, cy); // bottom-left
+    SDL_RenderLine(ren, cx - hw, cy, cx, cy - hh); // top-left
+    const float ty = cy - hh * .4f;                // table facet
     SDL_RenderLine(ren, cx - hw * .6f, ty, cx + hw * .6f, ty);
   }
 
@@ -322,7 +344,7 @@ namespace front {
     fill(ren, hovered ? scale_clr(C_ACCENT, .8f) : C_ACCENT, x, y, w, h);
     rect(ren, C_BORDER, x, y, w, h);
     const float bcx = x + w * .5f, bcy = y + h * .5f;
-    const float arm = std::min(w, h) * .28f;
+    const float arm   = std::min(w, h) * .28f;
     const float thick = std::max(1.5f, std::min(w, h) * .16f);
     fill(ren, C_PANEL, bcx - arm, bcy - thick * .5f, 2.f * arm, thick);
     if (plus) fill(ren, C_PANEL, bcx - thick * .5f, bcy - arm, thick, 2.f * arm);
@@ -400,7 +422,7 @@ namespace front {
                          bool               hov_plus,
                          int                hov_minus)
   {
-    const float z = g.z;
+    const float z       = g.z;
     // A deactivated block renders dim and monochrome.
     const bool disabled = s.disabled;
     const Clr  accent   = disabled ? C_DIM : C_ACCENT;
@@ -431,7 +453,7 @@ namespace front {
     // Access level as protective "walls" enclosing the badge (following its
     // shape): Public — none, Protected — one wall, Private — two walls. More
     // walls reads as more enclosed, hence more protected.
-    const int walls = s.access == MethodAccess::Private ? 2 : (s.access == MethodAccess::Protected ? 1 : 0);
+    const int   walls = s.access == MethodAccess::Private ? 2 : (s.access == MethodAccess::Protected ? 1 : 0);
     const float cx = g.badge_x + g.badge * .5f, cy = g.badge_y + g.badge * .5f;
     for (int w = 0; w < walls; w++) {
       const float d = (2.f + 2.f * static_cast<float>(w)) * z; // gap of the w-th wall from the badge
@@ -443,8 +465,7 @@ namespace front {
 
     // Name, centred in the header band.
     const float header_h = 2.f * (g.badge_y - g.by) + g.badge;
-    if (!blank_name && !s.name.empty())
-      text_draw_scaled(ren, s.name.c_str(), g.nx, center_baseline_scaled(g.by, header_h, z), txt, z);
+    if (!blank_name && !s.name.empty()) text_draw_scaled(ren, s.name.c_str(), g.nx, center_baseline_scaled(g.by, header_h, z), txt, z);
 
     if (s.type != BlockType::Method) return;
 
@@ -475,20 +496,20 @@ namespace front {
     t.unit_name = uname;
     t.unit_type = utype;
     tabs.push_back(std::move(t));
-    active       = static_cast<int>(tabs.size()) - 1;
-    open         = true;
-    editing      = false;
-    chooser_open = false;
-    panning      = false;
+    active           = static_cast<int>(tabs.size()) - 1;
+    open             = true;
+    editing          = false;
+    chooser_open     = false;
+    panning          = false;
     method_menu_open = false;
   }
 
   void EditorView::close()
   {
-    open         = false;
-    editing      = false;
-    chooser_open = false;
-    panning      = false;
+    open             = false;
+    editing          = false;
+    chooser_open     = false;
+    panning          = false;
     method_menu_open = false;
   }
 
@@ -496,9 +517,9 @@ namespace front {
   {
     if (i < 0 || i >= static_cast<int>(tabs.size())) return;
     tabs.erase(tabs.begin() + i);
-    editing      = false;
-    chooser_open = false;
-    panning      = false;
+    editing          = false;
+    chooser_open     = false;
+    panning          = false;
     method_menu_open = false;
     if (tabs.empty()) {
       active = -1;
@@ -562,10 +583,10 @@ namespace front {
   {
     EditorTab *t = cur();
     if (!t) return;
-    const float minx = static_cast<float>(t->cam_x);
-    const float miny = static_cast<float>(t->cam_y);
-    const float maxx = static_cast<float>(t->cam_x + cw / t->zoom);
-    const float maxy = static_cast<float>(t->cam_y + ch / t->zoom);
+    const float minx   = static_cast<float>(t->cam_x);
+    const float miny   = static_cast<float>(t->cam_y);
+    const float maxx   = static_cast<float>(t->cam_x + cw / t->zoom);
+    const float maxy   = static_cast<float>(t->cam_y + ch / t->zoom);
     auto [rows, err]   = load_blocks_in_view(t->conn, t->schema, t->unit_id, minx, miny, maxx, maxy);
     t->blocks          = std::move(rows);
     // Expressions are queried independently against the same viewport.
@@ -599,9 +620,9 @@ namespace front {
 
   void EditorView::start_edit_name(const Block &s, float fbx, float fby, float fbw, float fbh)
   {
-    editing       = true;
-    edit_is_arg   = false;
-    edit_is_size  = false;
+    editing      = true;
+    edit_is_arg  = false;
+    edit_is_size = false;
     edit_arg_id.clear();
     edit_id       = s.id;
     edit_type     = s.type;
@@ -633,9 +654,9 @@ namespace front {
 
   void EditorView::start_edit_size(const Block &s, float fbx, float fby, float fbw, float fbh)
   {
-    editing       = true;
-    edit_is_arg   = false;
-    edit_is_size  = true;
+    editing      = true;
+    edit_is_arg  = false;
+    edit_is_size = true;
     edit_arg_id.clear();
     edit_id       = s.id;
     edit_type     = s.type;
@@ -711,9 +732,7 @@ namespace front {
       int         action; // -1 for separators
       Mark        mark;
     };
-    auto grp = [](bool current, const char *name, int action) {
-      return Item{name, false, action, current ? MARK_CURRENT : MARK_SWITCH};
-    };
+    auto grp = [](bool current, const char *name, int action) { return Item{name, false, action, current ? MARK_CURRENT : MARK_SWITCH}; };
 
     std::vector<Item> items;
     if (!is_method) {
@@ -744,7 +763,8 @@ namespace front {
     for (const Item &it : items)
       if (!it.sep) w = std::max(w, label_x + text_w(it.label.c_str()) + PADX);
     float h = 4.f;
-    for (const Item &it : items) h += it.sep ? SEP_H : IH;
+    for (const Item &it : items)
+      h += it.sep ? SEP_H : IH;
 
     const float ox = std::clamp(method_menu_x, cx, cx + cw - w);
     const float oy = std::clamp(method_menu_y, cy, cy + ch - h);
@@ -986,7 +1006,8 @@ namespace front {
         for (const Block &s : t->blocks)
           if (s.id == drag_arg_owner) {
             std::vector<std::string> ids;
-            for (const MethodArg &a : s.args) ids.push_back(a.id);
+            for (const MethodArg &a : s.args)
+              ids.push_back(a.id);
             reorder_method_args(t->conn, t->schema, s.id, ids);
             break;
           }
@@ -1099,14 +1120,14 @@ namespace front {
     if (ldown) {
       if (hm) {
         create_block(t->conn,
-                         t->schema,
-                         t->unit_id,
-                         BlockType::Method,
-                         e.chooser_wx,
-                         e.chooser_wy,
-                         fit_width("Новый Метод"),
-                         method_height_for(0),
-                         "Новый Метод");
+                     t->schema,
+                     t->unit_id,
+                     BlockType::Method,
+                     e.chooser_wx,
+                     e.chooser_wy,
+                     fit_width("Новый Метод"),
+                     method_height_for(0),
+                     "Новый Метод");
         e.chooser_open = false;
         e.reload();
       } else if (hf) {
@@ -1230,8 +1251,7 @@ namespace front {
         }
       }
 
-      draw_block(
-          ren, g, s, letter, blank_name, editing_this && edit_is_arg ? edit_arg_id : std::string{}, hov_name, hov_arg, hov_plus, hov_minus);
+      draw_block(ren, g, s, letter, blank_name, editing_this && edit_is_arg ? edit_arg_id : std::string{}, hov_name, hov_arg, hov_plus, hov_minus);
 
       // A field's right section — the "Размер: N байт" message (when expr_id_used
       // is false) or its expression slot (when true) — split off by a vertical
@@ -1247,7 +1267,7 @@ namespace front {
           if (!s.expr_id_used) {
             const float dx = field_size_x(g, s) - GAP * z * .5f;
             fill(ren, C_BORDER, dx, g.by, 1.f, g.bh); // divider
-            if (!editing_this) {                       // (size editor draws the value otherwise)
+            if (!editing_this) {                      // (size editor draws the value otherwise)
               const float header_h = 2.f * (g.badge_y - g.by) + g.badge;
               text_draw_scaled(ren, size_label(s.size_bytes).c_str(), field_size_x(g, s), center_baseline_scaled(g.by, header_h, z), txt, z);
             }
@@ -1309,12 +1329,17 @@ namespace front {
       // don't draw the expression over it.
       if (editing && e.owner_block_id == edit_id) continue;
       const float ex_s = to_screen_x(e.x), ey_s = to_screen_y(e.y);
-      const float h_s  = e.height * ez;
+      const float h_s      = e.height * ez;
       const float baseline = center_baseline_scaled(ey_s, h_s, ez);
       if (e.type == ExprType::Unit) {
         // Diamond emblem, then the unit name (or a red error if unresolved).
         draw_diamond(ren, ex_s + h_s * .5f, ey_s + h_s * .5f, h_s, C_ACCENT);
-        text_draw_scaled(ren, e.unit_present ? e.unit_name.c_str() : EXPR_UNIT_ERR, ex_s + h_s + GAP * ez, baseline, e.unit_present ? C_TEXT : C_ERR, ez);
+        text_draw_scaled(ren,
+                         e.unit_present ? e.unit_name.c_str() : EXPR_UNIT_ERR,
+                         ex_s + h_s + GAP * ez,
+                         baseline,
+                         e.unit_present ? C_TEXT : C_ERR,
+                         ez);
       } else {
         // A "self" expression: "Этот Объект" / "Этот Юнит" / "Этот Метод".
         text_draw_scaled(ren, expr_this_label(e.type), ex_s, baseline, C_TEXT, ez);
@@ -1326,7 +1351,7 @@ namespace front {
       const float text_ox = edit_bx + 6.f;
       // Adjust the size buffer by `d`, clamped at 0 (does not commit — Enter or a
       // click outside persists).
-      auto bump_size = [&](int d) {
+      auto bump_size      = [&](int d) {
         int v = 0;
         try {
           v = std::stoi(edit_field.ed.buf);
@@ -1351,7 +1376,7 @@ namespace front {
 
     // Expression-selection menu takes precedence over everything else while open.
     if (expr_menu.open) {
-      const std::string         fid = expr_menu.field_id;
+      const std::string          fid = expr_menu.field_id;
       ContextMenuSelExpr::Action act = expr_menu.render(ren, mx, my, ldown && !tab_clicked);
       using A                        = ContextMenuSelExpr::Action;
       if (act == A::SetThisObject || act == A::SetThisUnit || act == A::SetThisMethod) {
@@ -1412,9 +1437,10 @@ namespace front {
         }
       }
       if (target) {
-        const int ai = arg_row_at(tgeo, *target, mx, my);
-        const bool on_size = target->type == BlockType::Field && !target->expr_id_used &&
-                             hit(mx, my, field_size_x(tgeo, *target), tgeo.by, text_w(size_label(target->size_bytes).c_str()) * tgeo.z, BOX_H * tgeo.z);
+        const int  ai = arg_row_at(tgeo, *target, mx, my);
+        const bool on_size =
+            target->type == BlockType::Field && !target->expr_id_used &&
+            hit(mx, my, field_size_x(tgeo, *target), tgeo.by, text_w(size_label(target->size_bytes).c_str()) * tgeo.z, BOX_H * tgeo.z);
         // A double-click on the expression slot (empty cube or a set expression)
         // opens the expression-selection menu (not name edit).
         bool  on_expr_slot = false;
@@ -1464,8 +1490,8 @@ namespace front {
         }
       }
       if (target) {
-        int minus_i = arg_minus_at(tgeo, *target, mx, my);
-        int arg_i   = target->type == BlockType::Method ? arg_row_at(tgeo, *target, mx, my) : -1;
+        int minus_i        = arg_minus_at(tgeo, *target, mx, my);
+        int arg_i          = target->type == BlockType::Method ? arg_row_at(tgeo, *target, mx, my) : -1;
         // Clicking a field's expression slot (empty cube or a set expression)
         // opens the expression-selection menu instead of starting a drag.
         bool  on_expr_slot = false;

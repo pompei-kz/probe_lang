@@ -3,7 +3,7 @@
 #include "ContextMenu.h"
 #include "FontAtlas.h"
 #include "FormWidgets.h"
-#include "back/UnitService.h"
+#include "back/service/UnitService.h"
 #include "render_helpers.h"
 
 namespace front {
@@ -31,8 +31,8 @@ namespace front {
     name_field.ed       = TextEditor{};
     name_field.ctx.open = false;
     err_view.set("");
-    focus               = 0;
-    activate            = false;
+    focus    = 0;
+    activate = false;
   }
 
   void FormEditUnit::open_edit(
@@ -137,8 +137,10 @@ namespace front {
     const bool      clickable = ldown && !blocked && !ate;
     const bool      act       = activate && !blocked; // OK is "active" only when not blocked
     activate                  = false;
-    const bool do_save = form_button(ren, sx, btn_y, BW_S, BH, "Сохранить", true, !blocked && hit(mx, my, sx, btn_y, BW_S, BH), focus == SAVE, clickable, act);
-    const bool do_can  = form_button(ren, cx, btn_y, BW_C, BH, "Отмена", false, !blocked && hit(mx, my, cx, btn_y, BW_C, BH), focus == CANCEL, clickable, act);
+    const bool do_save =
+        form_button(ren, sx, btn_y, BW_S, BH, "Сохранить", true, !blocked && hit(mx, my, sx, btn_y, BW_S, BH), focus == SAVE, clickable, act);
+    const bool do_can =
+        form_button(ren, cx, btn_y, BW_C, BH, "Отмена", false, !blocked && hit(mx, my, cx, btn_y, BW_C, BH), focus == CANCEL, clickable, act);
 
     if (do_can) return -1;
     if (do_save) {

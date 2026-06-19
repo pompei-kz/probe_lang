@@ -11,8 +11,8 @@
 #include "PanelMenu.h"
 #include "SchemaMenu.h"
 #include "UnitMenu.h"
-#include "back/ConnService.h"
 #include "back/model/ConnNode.h"
+#include "back/service/ConnService.h"
 #include <SDL3/SDL.h>
 #include <vector>
 

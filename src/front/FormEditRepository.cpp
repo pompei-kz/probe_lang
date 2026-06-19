@@ -3,7 +3,7 @@
 #include "ContextMenu.h"
 #include "FontAtlas.h"
 #include "FormWidgets.h"
-#include "back/RepoService.h"
+#include "back/service/RepoService.h"
 #include "render_helpers.h"
 
 namespace front {
@@ -99,8 +99,10 @@ namespace front {
     const bool any_ctx = fields[0].ctx.open || fields[1].ctx.open;
     const bool act     = activate && !any_ctx; // OK is "active" only when not blocked
     activate           = false;
-    const bool do_save = form_button(ren, sx, btn_y, BW_S, BH, "Save", true, !any_ctx && hit(mx, my, sx, btn_y, BW_S, BH), focus == SAVE, ldown && !any_ctx, act);
-    const bool do_can  = form_button(ren, cx, btn_y, BW_C, BH, "Cancel", false, !any_ctx && hit(mx, my, cx, btn_y, BW_C, BH), focus == CANCEL, ldown && !any_ctx, act);
+    const bool do_save =
+        form_button(ren, sx, btn_y, BW_S, BH, "Save", true, !any_ctx && hit(mx, my, sx, btn_y, BW_S, BH), focus == SAVE, ldown && !any_ctx, act);
+    const bool do_can =
+        form_button(ren, cx, btn_y, BW_C, BH, "Cancel", false, !any_ctx && hit(mx, my, cx, btn_y, BW_C, BH), focus == CANCEL, ldown && !any_ctx, act);
 
     if (do_can) return -1;
     if (do_save) {

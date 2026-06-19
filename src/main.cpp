@@ -8,11 +8,11 @@
 #include "front/common.h"
 #include "front/render_helpers.h"
 
-#include "back/ConnService.h"
-#include "back/FolderService.h"
-#include "back/RepoService.h"
-#include "back/UnitService.h"
 #include "back/model/SchemaNode.h"
+#include "back/service/ConnService.h"
+#include "back/service/FolderService.h"
+#include "back/service/RepoService.h"
+#include "back/service/UnitService.h"
 
 using namespace front;
 using namespace back;
@@ -148,9 +148,9 @@ int main(int /*argc*/, char * /*argv*/[])
           break;
 
         case SDL_EVENT_TEXT_INPUT:
-          if (app.dlg.open)
+          if (app.dlg.open) {
             app.dlg.fields[app.dlg.focus].handle_text(ev.text.text);
-          else if (app.repo_dlg.open) {
+          } else if (app.repo_dlg.open) {
             if (app.repo_dlg.focus < app.repo_dlg.FIRST_BUTTON) app.repo_dlg.fields[app.repo_dlg.focus].handle_text(ev.text.text);
           } else if (app.folder_dlg.open) {
             if (app.folder_dlg.focus == 0) app.folder_dlg.name_field.handle_text(ev.text.text);
@@ -158,8 +158,9 @@ int main(int /*argc*/, char * /*argv*/[])
             if (app.unit_dlg.focus == 0) app.unit_dlg.name_field.handle_text(ev.text.text);
           } else if (app.sel_unit_form.open) {
             if (app.sel_unit_form.focus == 0) app.sel_unit_form.filter_field.handle_text(ev.text.text);
-          } else if (app.editor.editing)
+          } else if (app.editor.editing) {
             app.editor.handle_text(ev.text.text);
+          }
           break;
 
         case SDL_EVENT_KEY_DOWN:
@@ -207,9 +208,9 @@ int main(int /*argc*/, char * /*argv*/[])
               }
             }
           } else if (app.repo_dlg.open) {
-            auto      &d    = app.repo_dlg;
-            SDL_Keymod mod  = ev.key.mod;
-            const bool ent  = ev.key.key == SDLK_RETURN || ev.key.key == SDLK_KP_ENTER;
+            auto      &d   = app.repo_dlg;
+            SDL_Keymod mod = ev.key.mod;
+            const bool ent = ev.key.key == SDLK_RETURN || ev.key.key == SDLK_KP_ENTER;
             if ((mod & SDL_KMOD_CTRL) && ent) { // Ctrl+Enter presses OK (render gates on active)
               d.focus    = d.SAVE;
               d.activate = true;
@@ -251,9 +252,9 @@ int main(int /*argc*/, char * /*argv*/[])
               }
             }
           } else if (app.sel_unit_form.open) {
-            auto      &d        = app.sel_unit_form;
-            SDL_Keymod mod      = ev.key.mod;
-            bool       consumed = d.focus == 0 && d.filter_field.handle_key(ev.key.key, mod);
+            FormSelectUnit &d        = app.sel_unit_form;
+            SDL_Keymod      mod      = ev.key.mod;
+            bool            consumed = d.focus == 0 && d.filter_field.handle_key(ev.key.key, mod);
             if (!consumed && !form_nav(d.focus, d.activate, d.FOCUS_COUNT, d.FIRST_BUTTON, ev.key.key, mod) && ev.key.key == SDLK_ESCAPE) {
               d.close();
               SDL_StopTextInput(app.win);
@@ -284,8 +285,8 @@ int main(int /*argc*/, char * /*argv*/[])
     fill(app.ren, C_BG, pw, 0, app.ww - pw, static_cast<float>(app.wh));
 
     if (app.editor.open) {
-      bool       editor_clicks = !any_dlg();
-      static bool prev_editing = false;
+      bool        editor_clicks = !any_dlg();
+      static bool prev_editing  = false;
       app.editor.render(app.ren,
                         pw,
                         0,
@@ -296,6 +297,7 @@ int main(int /*argc*/, char * /*argv*/[])
                         editor_clicks && l_click,
                         editor_clicks && r_click,
                         l_clicks);
+
       if (app.editor.editing && !prev_editing) SDL_StartTextInput(app.win);
       if (!app.editor.editing && prev_editing) SDL_StopTextInput(app.win);
       prev_editing = app.editor.editing;
@@ -429,8 +431,8 @@ int main(int /*argc*/, char * /*argv*/[])
       float             my2 = l_click ? l_click_y : app.my;
       const std::string fid = app.sel_unit_form.field_id;
       // ReSharper disable once CppTooWideScopeInitStatement
-      int res = app.sel_unit_form.render(app.ren, mx2, my2, l_click, r_click, l_clicks);
-      if (res != 0) SDL_StopTextInput(app.win);                 // form closes itself on confirm/cancel
+      int res               = app.sel_unit_form.render(app.ren, mx2, my2, l_click, r_click, l_clicks);
+      if (res != 0) SDL_StopTextInput(app.win);                     // form closes itself on confirm/cancel
       if (res == 1 && app.editor.open) app.editor.refit_field(fid); // show the chosen unit; resize the box
     }
 

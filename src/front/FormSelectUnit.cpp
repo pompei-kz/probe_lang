@@ -3,8 +3,8 @@
 #include "ContextMenu.h"
 #include "FontAtlas.h"
 #include "FormWidgets.h"
-#include "back/ExprService.h"
-#include "back/UnitService.h"
+#include "back/service/ExprService.h"
+#include "back/service/UnitService.h"
 #include "render_helpers.h"
 #include <algorithm>
 
@@ -15,7 +15,7 @@ namespace front {
 
   namespace {
     constexpr float FDW = 420.f, FDH = 480.f;
-    constexpr float FFH  = 28.f; // filter field height
+    constexpr float FFH   = 28.f; // filter field height
     constexpr float ROW_H = 26.f;
     constexpr float PADY  = 4.f;
     constexpr int   PAGE  = 40; // units fetched per page
@@ -34,7 +34,10 @@ namespace front {
     reset_for_filter("");
   }
 
-  void FormSelectUnit::close() { open = false; }
+  void FormSelectUnit::close()
+  {
+    open = false;
+  }
 
   void FormSelectUnit::reset_for_filter(const std::string &filter)
   {
@@ -52,11 +55,15 @@ namespace front {
     auto [page, err] = list_units_paginated(conn, schema, applied_filter, next_offset, PAGE);
     next_offset += static_cast<int>(page.size());
     if (static_cast<int>(page.size()) < PAGE) has_more = false;
-    for (Unit &u : page) units.push_back(std::move(u));
+    for (Unit &u : page)
+      units.push_back(std::move(u));
   }
 
   // Total content height: one row per unit, plus the "no more data" line.
-  static float content_height(int n_units, bool has_more) { return (n_units + (has_more ? 0 : 1)) * ROW_H; }
+  static float content_height(int n_units, bool has_more)
+  {
+    return (n_units + (has_more ? 0 : 1)) * ROW_H;
+  }
 
   void FormSelectUnit::on_scroll(float dy)
   {
@@ -66,7 +73,10 @@ namespace front {
     scroll_y            = std::clamp(scroll_y - dy * ROW_H * 3.f, 0.f, max_s);
   }
 
-  bool FormSelectUnit::mouse_over_list(float mx, float my) const { return hit(mx, my, list_x, list_y, list_w, list_h); }
+  bool FormSelectUnit::mouse_over_list(float mx, float my) const
+  {
+    return hit(mx, my, list_x, list_y, list_w, list_h);
+  }
 
   int FormSelectUnit::render(SDL_Renderer *ren, float mx, float my, bool ldown, bool rdown, int clicks)
   {
@@ -108,8 +118,17 @@ namespace front {
     const float     cxb   = dx + FDW - 16 - BW_C;
     const bool      act   = activate;
     activate              = false;
-    const bool do_can =
-        form_button(ren, cxb, btn_y, BW_C, BH, "Отмена", false, !filter_field.ctx.open && hit(mx, my, cxb, btn_y, BW_C, BH), focus == CANCEL, ldown, act);
+    const bool do_can     = form_button(ren,
+                                        cxb,
+                                        btn_y,
+                                        BW_C,
+                                        BH,
+                                        "Отмена",
+                                        false,
+                                        !filter_field.ctx.open && hit(mx, my, cxb, btn_y, BW_C, BH),
+                                        focus == CANCEL,
+                                        ldown,
+                                        act);
 
     // ── Unit list ───────────────────────────────────────────────────────────────
     list_x = dx + 16;

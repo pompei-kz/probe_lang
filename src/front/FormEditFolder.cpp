@@ -3,7 +3,7 @@
 #include "ContextMenu.h"
 #include "FontAtlas.h"
 #include "FormWidgets.h"
-#include "back/FolderService.h"
+#include "back/service/FolderService.h"
 #include "render_helpers.h"
 
 namespace front {
@@ -28,8 +28,8 @@ namespace front {
     name_field.ed       = TextEditor{};
     name_field.ctx.open = false;
     err_view.set("");
-    focus               = 0;
-    activate            = false;
+    focus    = 0;
+    activate = false;
   }
 
   void FormEditFolder::open_edit(int ci, int ri, const Conn &c, const std::string &schema, const std::string &fid, const std::string &fname)
@@ -81,11 +81,13 @@ namespace front {
     float           sx    = dx + FDW - 16 - BW_S;
     float           cx    = sx - 10 - BW_C;
 
-    const bool any_ctx  = name_field.ctx.open;
-    const bool act      = activate && !any_ctx; // OK is "active" only when not blocked
-    activate            = false;
-    const bool do_save  = form_button(ren, sx, btn_y, BW_S, BH, "Сохранить", true, !any_ctx && hit(mx, my, sx, btn_y, BW_S, BH), focus == SAVE, ldown && !any_ctx, act);
-    const bool do_can   = form_button(ren, cx, btn_y, BW_C, BH, "Отмена", false, !any_ctx && hit(mx, my, cx, btn_y, BW_C, BH), focus == CANCEL, ldown && !any_ctx, act);
+    const bool any_ctx = name_field.ctx.open;
+    const bool act     = activate && !any_ctx; // OK is "active" only when not blocked
+    activate           = false;
+    const bool do_save =
+        form_button(ren, sx, btn_y, BW_S, BH, "Сохранить", true, !any_ctx && hit(mx, my, sx, btn_y, BW_S, BH), focus == SAVE, ldown && !any_ctx, act);
+    const bool do_can =
+        form_button(ren, cx, btn_y, BW_C, BH, "Отмена", false, !any_ctx && hit(mx, my, cx, btn_y, BW_C, BH), focus == CANCEL, ldown && !any_ctx, act);
 
     if (do_can) return -1;
     if (do_save) {
